@@ -73,7 +73,7 @@
                 
             </div>
             <div class="column has-background-white p-0">
-                <pre class="has-background-white py-0 px-2">use budlang::vm::{Comparison, Context, Function, Operation, Value};</pre>
+                <pre class="has-background-white py-0 px-2">use budlang::vm::{Bud, Comparison, Function, Instruction, Value};</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -164,7 +164,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">        ops: vec![</pre>
+                <pre class="has-background-success-light py-0 px-2">        code: vec![</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -190,7 +190,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Push(Value::Integer(2)),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Push(Value::Integer(2)),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -203,7 +203,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::PushArg(ARG_N),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::PushArg(ARG_N),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -216,7 +216,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Compare(Comparison::LessThanOrEqual),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Compare(Comparison::LessThanOrEqual),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -229,7 +229,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::If { false_jump_to: 6 },</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::If { false_jump_to: 6 },</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -242,7 +242,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Push(Value::Integer(1)),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Push(Value::Integer(1)),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -255,7 +255,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Return,</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Return,</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -281,7 +281,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Push(Value::Integer(1)),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Push(Value::Integer(1)),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -294,7 +294,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::PushArg(ARG_N),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::PushArg(ARG_N),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -307,7 +307,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Sub,</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Sub,</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -320,7 +320,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Call {</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Call {</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -385,7 +385,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Push(Value::Integer(2)),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Push(Value::Integer(2)),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -398,7 +398,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::PushArg(ARG_N),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::PushArg(ARG_N),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -411,7 +411,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Sub,</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Sub,</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -424,7 +424,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Call {</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Call {</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -489,7 +489,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Add,</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Add,</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -528,7 +528,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">    let mut context = Context::empty().with_function(&quot;fibonacci&quot;, fib);</pre>
+                <pre class="has-background-success-light py-0 px-2">    let mut context = Bud::empty().with_function(&quot;fibonacci&quot;, fib);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -567,7 +567,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Push(Value::Integer(35)),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Push(Value::Integer(35)),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -580,7 +580,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Operation::Call {</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::Call {</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -754,7 +754,7 @@
         </div></div>
         <footer class="footer">
             <div class="content has-text-centered">
-                <p class="heading">Date: 2022-09-30 02:07</p>
+                <p class="heading">Date: 2022-09-30 04:13</p>
             </div>
         </footer>
     </body>
