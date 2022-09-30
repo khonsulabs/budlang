@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["budlang"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.64.0/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"enum\" href=\"budlang/vm/enum.Value.html\" title=\"enum budlang::vm::Value\">Value</a>","synthetic":false,"types":["budlang::vm::Value"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

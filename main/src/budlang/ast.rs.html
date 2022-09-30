@@ -719,6 +719,10 @@
 <span id="719">719</span>
 <span id="720">720</span>
 <span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
+<span id="725">725</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">allow</span>(<span class="ident">missing_docs</span>, <span class="ident">clippy::missing_panics_doc</span>)]</span> <span class="comment">// TODO docs and panics for ast</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::{
@@ -809,7 +813,7 @@
                 }
                 <span class="ident">list</span>.<span class="ident">finish</span>()
             }
-            <span class="ident">Node::Literal</span>(<span class="ident">literal</span>) =&gt; <span class="ident">literal</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
+            <span class="ident">Node::Literal</span>(<span class="ident">literal</span>) =&gt; <span class="ident">Debug::fmt</span>(<span class="ident">literal</span>, <span class="ident">f</span>),
             <span class="ident">Node::Identifier</span>(<span class="ident">identifier</span>) =&gt; <span class="ident">Debug::fmt</span>(<span class="ident">identifier</span>, <span class="ident">f</span>),
             <span class="ident">Node::Call</span>(<span class="ident">call</span>) =&gt; {
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">symbol</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">name</span> {
@@ -1083,6 +1087,10 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">integer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">integer</span>: <span class="ident">i64</span>) -&gt; <span class="ident">NodeId</span> {
         <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Node::Literal</span>(<span class="ident">Value::Integer</span>(<span class="ident">integer</span>)))
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">real</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">real</span>: <span class="ident">f64</span>) -&gt; <span class="ident">NodeId</span> {
+        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Node::Literal</span>(<span class="ident">Value::Real</span>(<span class="ident">real</span>)))
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">call</span>: <span class="ident">Call</span>) -&gt; <span class="ident">NodeId</span> {
