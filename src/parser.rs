@@ -550,8 +550,35 @@ fn parse_expression(
 
             Ok(tree.if_node(if_op))
         }
-        _ => parse_comparison_expression(first_token, tree, tokens, owning_function_name),
+        _ => parse_assign_expression(first_token, tree, tokens, owning_function_name),
     }
+}
+
+fn parse_assign_expression(
+    first_token: Token,
+    tree: &SyntaxTreeBuilder,
+    tokens: &mut Lexer<'_>,
+    owning_function_name: Option<&str>,
+) -> Result<NodeId, ParseError> {
+    // This operator groups differently than most of the other operators. a := b
+    // := c should result in `(a := (b := c))`, not `((a := b) := c))`.
+    let mut left = parse_comparison_expression(first_token, tree, tokens, owning_function_name)?;
+
+    let mut stack = Vec::new();
+    while let Some(TokenKind::Assign) = tokens.peek_token_kind() {
+        tokens.next();
+        stack.push(left);
+        let first_token = tokens.next().unwrap()?;
+        left = parse_comparison_expression(first_token, tree, tokens, owning_function_name)?;
+    }
+
+    // Perform the assignments.
+    let mut right = left;
+    while let Some(left) = stack.pop() {
+        right = tree.assign_node(left, right);
+    }
+
+    Ok(right)
 }
 
 fn parse_comparison_expression(
@@ -686,6 +713,16 @@ fn parse_term(
         }
         TokenKind::Integer(integer) => Ok(tree.integer(integer)),
         TokenKind::Real(integer) => Ok(tree.real(integer)),
+        TokenKind::Open(BracketType::Paren) => {
+            let first_token = tokens.next().unwrap()?;
+            let expression = parse_expression(first_token, tree, tokens, owning_function_name)?;
+            let close_paren = tokens.next().unwrap()?;
+            if !matches!(close_paren.kind, TokenKind::Close(BracketType::Paren)) {
+                todo!("error expected close paren")
+            }
+
+            Ok(expression)
+        }
         _ => todo!("parse_term: {first_token:?}"),
     }
 }

@@ -53,9 +53,22 @@ fn math() {
 
     // Order of operations
     assert_run!("6 * 2 + 4 / 2", 14);
+    assert_run!("6 * (2 + 4) / 2", 18);
 
     // Floating points
     assert_run!("1.1 + 2", Value::Real(3.1));
     assert_run!("-1 - -10.0", Value::Real(9.));
     assert_run!("-0.0 * 0.0", Value::Real(0.));
+}
+
+#[test]
+fn assignment() {
+    assert_run!(
+        r#"
+        a := 2
+        b := 3
+        a * b
+    "#,
+        6
+    );
 }

@@ -81,6 +81,11 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
                 .field("left", &self.node(binop.left))
                 .field("right", &self.node(binop.right))
                 .finish(),
+            Node::Assign(assign) => f
+                .debug_struct("Assign")
+                .field("target", &self.node(assign.target))
+                .field("value", &self.node(assign.value))
+                .finish(),
             Node::Block(block) => {
                 let mut list = f.debug_list();
                 for statement in &block.0 {
@@ -118,6 +123,7 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
 enum Node {
     If(If),
     BinOp(BinOp),
+    Assign(Assign),
     // UnaryOp(UnaryOp),
     Block(Block),
     Literal(Value),
@@ -132,18 +138,20 @@ impl Node {
             Node::If(if_expr) => if_expr.generate_code(operations, tree),
             Node::BinOp(bin_op) => bin_op.generate_code(operations, tree),
             Node::Block(statements) => {
-                let mut is_first = false;
+                let mut is_first = true;
                 for statement in &statements.0 {
+                    let statement = tree.node(*statement);
+
                     if is_first {
                         is_first = false;
                     } else {
                         // The last statement leaves a value behind.
-                        operations.push(IntermediateOp::Pop);
+                        operations.push(IntermediateOp::PopAndDrop);
                     }
-                    let statement = tree.node(*statement);
                     statement.generate_code(operations, tree);
                 }
             }
+            Node::Assign(assign) => assign.generate_code(operations, tree),
             Node::Literal(literal) => operations.push(IntermediateOp::Push(literal.clone())),
             Node::Identifier(identifier) => operations.push_from_symbol(identifier),
             Node::Call(call) => call.generate_code(operations, tree),
@@ -300,7 +308,7 @@ impl Call {
             (None, Some(symbol)) => {
                 // Global call
                 match operations.scope.get(symbol) {
-                    Some(ScopeSymbol::Argument(_)) => {
+                    Some(ScopeSymbol::Argument(_) | ScopeSymbol::Variable(_)) => {
                         todo!("calling a lambda function in an argument")
                     }
                     Some(ScopeSymbol::Function { function }) => {
@@ -316,6 +324,27 @@ impl Call {
                 }
             }
             _ => todo!("message"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Assign {
+    target: NodeId,
+    value: NodeId,
+}
+
+impl Assign {
+    fn generate_code(&self, operations: &mut CodeBlockBuilder, tree: &ExpressionTree) {
+        let value = tree.node(self.value);
+        value.generate_code(operations, tree);
+
+        match tree.node(self.target) {
+            Node::Identifier(name) => {
+                let variable = operations.variable_index_from_name(name);
+                operations.push(IntermediateOp::CopyToVariable(variable));
+            }
+            _ => todo!("not a variable name"),
         }
     }
 }
@@ -350,6 +379,10 @@ impl SyntaxTreeBuilder {
             left,
             right,
         }))
+    }
+
+    pub fn assign_node(&self, target: NodeId, value: NodeId) -> NodeId {
+        self.push(Node::Assign(Assign { target, value }))
     }
 
     pub fn statements<Nodes: IntoIterator<Item = NodeId>>(&self, nodes: Nodes) -> NodeId {
@@ -390,6 +423,7 @@ pub struct CodeBlockBuilder {
     ops: Vec<IntermediateOp>,
     args: usize,
     scope: HashMap<Symbol, ScopeSymbol>,
+    variables: HashMap<Symbol, Variable>,
 }
 
 impl CodeBlockBuilder {
@@ -420,14 +454,35 @@ impl CodeBlockBuilder {
             ScopeSymbol::Argument(index) => {
                 self.ops.push(IntermediateOp::PushCopy(*index));
             }
+            ScopeSymbol::Variable(index) => {
+                self.ops.push(IntermediateOp::PushVariable(*index));
+            }
             ScopeSymbol::Function { .. } => todo!("pushing a vtable entry?"),
         }
     }
 
-    pub fn finish<Env>(self, scope: &Bud<Env>) -> Result<Vec<Instruction>, CompilationError>
+    pub fn variable_index_from_name(&mut self, name: &Symbol) -> Variable {
+        let new_index = self.variables.len();
+        let variable = *self
+            .variables
+            .entry(name.clone())
+            .or_insert_with(|| Variable(new_index));
+
+        if variable.0 == new_index {
+            self.add_symbol(name.clone(), ScopeSymbol::Variable(variable));
+        }
+
+        variable
+    }
+
+    pub fn finish<Env>(
+        self,
+        scope: &Bud<Env>,
+    ) -> Result<(usize, Vec<Instruction>), CompilationError>
     where
         Env: Environment,
     {
+        // TODO this also needs to return the total number of variables needed.
         self.ops
             .into_iter()
             .map(|op| {
@@ -446,10 +501,10 @@ impl CodeBlockBuilder {
                     IntermediateOp::Push(value) => Instruction::Push(value),
                     IntermediateOp::PushVariable(variable) => Instruction::PushVariable(variable.0),
                     IntermediateOp::PushCopy(arg) => Instruction::PushArg(arg),
-                    IntermediateOp::Pop => Instruction::PopAndDrop,
+                    IntermediateOp::PopAndDrop => Instruction::PopAndDrop,
                     IntermediateOp::Return => Instruction::Return,
-                    IntermediateOp::PopToVariable(variable_index) => {
-                        Instruction::PopToVariable(variable_index.0)
+                    IntermediateOp::CopyToVariable(variable_index) => {
+                        Instruction::CopyToVariable(variable_index.0)
                     }
                     IntermediateOp::Call {
                         function,
@@ -470,12 +525,14 @@ impl CodeBlockBuilder {
                 })
             })
             .collect::<Result<_, CompilationError>>()
+            .map(|instructions| (self.variables.len(), instructions))
     }
 }
 
 #[derive(Debug)]
 pub enum ScopeSymbol {
     Argument(usize),
+    Variable(Variable),
     Function { function: Symbol },
 }
 
@@ -640,11 +697,11 @@ impl Function {
             block.add_symbol(arg.clone(), ScopeSymbol::Argument(index));
         }
         self.body.generate_code(&mut block);
-        let ops = block.finish(context)?;
+        let (variable_count, code) = block.finish(context)?;
         let function = vm::Function {
             arg_count: self.args.len(),
-            code: ops,
-            variable_count: 0,
+            code,
+            variable_count,
         };
         let vtable_index = context.define_function(name, function);
         Ok(vtable_index)
@@ -676,9 +733,9 @@ pub enum IntermediateOp {
     Push(Value),
     PushVariable(Variable),
     PushCopy(usize),
-    Pop,
+    PopAndDrop,
     Return,
-    PopToVariable(Variable),
+    CopyToVariable(Variable),
     Call {
         function: Option<Symbol>,
         arg_count: usize,

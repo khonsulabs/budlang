@@ -83,8 +83,8 @@ It probably doesn't do what you need (yet):
 - [x] Don't panic in vm
 - [ ] Don't panic in compiler
 - [ ] Don't panic ih parser
-- [ ] Support parenthesized expressions as terms
-- [ ] Add variables (VM supports them already)
+- [x] Support parenthesized expressions as terms
+- [x] Add variables
 - [ ] Add loops
 - [x] Add Real (Float) type
 - [ ] Add String type

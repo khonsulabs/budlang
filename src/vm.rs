@@ -86,14 +86,13 @@ pub enum Instruction {
     PopAndDrop,
     /// Returns from the current stack frame.
     Return,
-    /// Pops a value from the stack and stores it into the variable index
-    /// provided.
+    /// Copies the top value from the stack  into the variable index provided.
     ///
     /// Each function is allocated a fixed number of variables which are
     /// accessed using 0-based indexes. Attempting to use a variable index
     /// outside of the range allocated will cause a
     /// [`FaultKind::InvalidVariableIndex`] to be returned.
-    PopToVariable(usize),
+    CopyToVariable(usize),
     /// Calls a function.
     ///
     /// When calling a function, values on the stack are "passed" to the
@@ -885,7 +884,7 @@ where
                 Ok(None)
             }
             Instruction::Return => Ok(Some(FlowControl::Return)),
-            Instruction::PopToVariable(variable) => self.pop_to_var(*variable),
+            Instruction::CopyToVariable(variable) => self.copy_to_var(*variable),
             Instruction::Call {
                 vtable_index,
                 arg_count,
@@ -1141,18 +1140,21 @@ where
         Err(Fault::from(FaultKind::InvalidArgumentIndex))
     }
 
-    fn pop_to_var(
+    fn copy_to_var(
         &mut self,
         variable: usize,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let value = self.stack.pop()?;
-        if let Some(stack_offset) = self.variables_offset.checked_add(variable) {
-            if stack_offset < self.return_offset {
-                self.stack[stack_offset] = value;
-                return Ok(None);
+        if self.stack.len() >= self.return_offset {
+            let value = self.stack.top()?;
+            if let Some(stack_offset) = self.variables_offset.checked_add(variable) {
+                if stack_offset < self.return_offset {
+                    self.stack[stack_offset] = value.clone();
+                }
             }
+            Ok(None)
+        } else {
+            Err(Fault::stack_underflow())
         }
-        Ok(None)
     }
 
     fn call(
@@ -1175,8 +1177,7 @@ where
         let return_offset = variables_offset + function.variable_count;
         let arg_offset = variables_offset - function.arg_count;
         if function.variable_count > 0 {
-            self.stack
-                .grow_to(return_offset + function.variable_count)?;
+            self.stack.grow_to(return_offset)?;
         }
 
         StackFrame {
@@ -1603,7 +1604,6 @@ fn budget_with_frames() {
             FaultKind::Paused(pending) => pending,
             error => unreachable!("unexpected error: {error}"),
         };
-        dbg!(&pending.stack);
         pending.environment_mut().add_budget(1);
 
         fault = match pending.resume() {
@@ -1661,6 +1661,17 @@ impl Stack {
             Ok(())
         } else {
             Err(FaultKind::StackOverflow)
+        }
+    }
+
+    /// Returns a reference to the top [`Value`] on the stack, or returns a
+    /// [`FaultKind::StackUnderflow`] if no values are present.
+    #[inline]
+    pub fn top<Env, ReturnType>(&self) -> Result<&Value, Fault<'static, Env, ReturnType>> {
+        if let Some(value) = self.values.last() {
+            Ok(value)
+        } else {
+            Err(Fault::from(FaultKind::StackUnderflow))
         }
     }
 
