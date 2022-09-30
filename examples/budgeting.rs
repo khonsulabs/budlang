@@ -1,5 +1,5 @@
 use budlang::{
-    vm::{Budgeted, Context, Fault, FaultKind},
+    vm::{Bud, Budgeted, Fault, FaultKind},
     Error,
 };
 
@@ -8,7 +8,7 @@ fn main() {
     // instructions to operate before pausing. The default budget is 0, which
     // means the script will immediately pause when it begins executing
     // `fibonacci(10)`.
-    let mut context = Context::new(Budgeted::default());
+    let mut context = Bud::new(Budgeted::default());
 
     let mut result = context.run_source::<i64>(
         r#"function fibonacci(n)

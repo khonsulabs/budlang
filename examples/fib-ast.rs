@@ -35,7 +35,7 @@ fn main() {
     )
     .compile();
 
-    let mut context = vm::Context::empty();
+    let mut context = vm::Bud::empty();
     let result: i64 = code_unit.execute_in(&mut context).unwrap();
     assert_eq!(result, 9227465);
 }

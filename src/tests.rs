@@ -1,8 +1,8 @@
-use crate::vm::{Context, Value};
+use crate::vm::{Bud, Value};
 
 macro_rules! assert_run {
     ($source:literal, $result:expr) => {
-        let mut context = Context::empty();
+        let mut context = Bud::empty();
         let expected_result = $result;
         let result: Value = context.run_source($source).unwrap();
         if result != $result {

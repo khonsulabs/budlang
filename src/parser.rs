@@ -1,3 +1,9 @@
+// TODO docs for parser
+#![allow(missing_docs)]
+// We use the Range type which doesn't allow this, and it's not worth making a
+// helper function to appease clippy.
+#![allow(clippy::range_plus_one)]
+
 use std::{fmt::Display, iter::Peekable, ops::Range, str::CharIndices};
 
 use crate::{
@@ -9,7 +15,7 @@ use crate::{
 #[derive(Debug)]
 struct Token {
     kind: TokenKind,
-    range: Range<usize>,
+    _range: Range<usize>,
 }
 
 impl Token {
@@ -18,7 +24,10 @@ impl Token {
     }
 
     fn new(kind: TokenKind, range: Range<usize>) -> Self {
-        Self { kind, range }
+        Self {
+            kind,
+            _range: range,
+        }
     }
 }
 
@@ -83,6 +92,7 @@ impl<'a> Lexer<'a> {
         self.peek_token().map(|token| &token.kind)
     }
 
+    #[allow(clippy::too_many_lines)] // TODO refactor too many lines
     fn read_token(&mut self) -> Option<Result<Token, ParseError>> {
         loop {
             break match self.chars.next() {
@@ -101,7 +111,7 @@ impl<'a> Lexer<'a> {
 
                     Some(Ok(Token {
                         kind: TokenKind::Identifier(Symbol::from(&self.source[offset..=end])),
-                        range: offset..end + 1,
+                        _range: offset..end + 1,
                     }))
                 }
                 Some((offset, char)) if char.is_numeric() => {
@@ -118,7 +128,7 @@ impl<'a> Lexer<'a> {
 
                     Some(Ok(Token {
                         kind: TokenKind::Integer(value),
-                        range: offset..end + 1,
+                        _range: offset..end + 1,
                     }))
                 }
                 Some((offset, char)) if char == '+' => {

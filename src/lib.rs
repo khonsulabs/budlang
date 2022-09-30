@@ -1,16 +1,37 @@
+#![doc = include_str!(".crate-docs.md")]
 #![forbid(unsafe_code)]
+#![warn(
+    clippy::cargo,
+    missing_docs,
+    clippy::pedantic,
+    future_incompatible,
+    rust_2018_idioms
+)]
+#![allow(
+    clippy::option_if_let_else,
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc
+)]
 
 use std::fmt::Display;
 
+/// The abstract syntax tree Bud uses.
 pub mod ast;
+/// The interface for parsing Bud code.
 pub mod parser;
+/// An "interned" string-like type used for identifiers in Bud.
 pub mod symbol;
+/// The Bud virtual machine.
 pub mod vm;
 
+/// All errors that can be encountered executing Bud code.
 #[derive(Debug)]
 pub enum Error<'a, Env, ReturnType> {
+    /// An error occurred while parsing the source code.
     Parse(parser::ParseError),
+    /// An error occurred while compiling [`CodeUnit`](ast::CodeUnit).
     Compilation(ast::CompilationError),
+    /// A fault occurred while running the virtual machine.
     Fault(vm::Fault<'a, Env, ReturnType>),
 }
 

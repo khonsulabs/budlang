@@ -1,3 +1,5 @@
+#![allow(missing_docs, clippy::missing_panics_doc)] // TODO docs and panics for ast
+
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -7,7 +9,7 @@ use std::{
 
 use crate::{
     symbol::Symbol,
-    vm::{self, Comparison, Context, Environment, FromStack, Operation, Value},
+    vm::{self, Bud, Comparison, Environment, FromStack, Instruction, Value},
     Error,
 };
 
@@ -48,6 +50,7 @@ impl Debug for ExpressionTree {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[must_use]
 pub struct NodeId(usize);
 
 struct ExpressionTreeNode<'a> {
@@ -144,12 +147,11 @@ impl Node {
             Node::Literal(literal) => operations.push(IntermediateOp::Push(literal.clone())),
             Node::Identifier(identifier) => operations.push_from_symbol(identifier),
             Node::Call(call) => call.generate_code(operations, tree),
-            Node::Return(value) => self.generate_return(*value, operations, tree),
+            Node::Return(value) => Self::generate_return(*value, operations, tree),
         }
     }
 
     fn generate_return(
-        &self,
         value_to_return: NodeId,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
@@ -168,6 +170,7 @@ pub struct If {
 }
 
 impl If {
+    #[must_use]
     pub fn new(condition: NodeId, true_block: NodeId) -> Self {
         Self {
             condition,
@@ -176,6 +179,7 @@ impl If {
         }
     }
 
+    #[must_use]
     pub fn with_else(mut self, else_block: NodeId) -> Self {
         self.else_block = Some(else_block);
         self
@@ -291,7 +295,7 @@ impl Call {
                 operations.push(IntermediateOp::Call {
                     function: None,
                     arg_count: self.args.len(),
-                })
+                });
             }
             (None, Some(symbol)) => {
                 // Global call
@@ -303,7 +307,7 @@ impl Call {
                         operations.push(IntermediateOp::Call {
                             function: Some(function.clone()), // Switch to a Module/Index vtable lookup? We can't compile the code because of recursion.
                             arg_count: self.args.len(),
-                        })
+                        });
                     }
                     None => operations.push(IntermediateOp::Call {
                         function: Some(symbol.clone()), // Switch to a Module/Index vtable lookup? We can't compile the code because of recursion.
@@ -320,6 +324,7 @@ impl Call {
 pub struct SyntaxTreeBuilder(RefCell<Vec<Node>>);
 
 impl SyntaxTreeBuilder {
+    #[must_use]
     pub const fn new() -> Self {
         Self(RefCell::new(Vec::new()))
     }
@@ -415,7 +420,7 @@ impl CodeBlockBuilder {
         }
     }
 
-    pub fn finish<Env>(self, scope: &Context<Env>) -> Result<Vec<Operation>, CompilationError>
+    pub fn finish<Env>(self, scope: &Bud<Env>) -> Result<Vec<Instruction>, CompilationError>
     where
         Env: Environment,
     {
@@ -423,25 +428,25 @@ impl CodeBlockBuilder {
             .into_iter()
             .map(|op| {
                 Ok(match op {
-                    IntermediateOp::Add => Operation::Add,
-                    IntermediateOp::Sub => Operation::Sub,
-                    IntermediateOp::Multiply => Operation::Multiply,
-                    IntermediateOp::Divide => Operation::Divide,
-                    IntermediateOp::If { false_jump_to } => Operation::If {
+                    IntermediateOp::Add => Instruction::Add,
+                    IntermediateOp::Sub => Instruction::Sub,
+                    IntermediateOp::Multiply => Instruction::Multiply,
+                    IntermediateOp::Divide => Instruction::Divide,
+                    IntermediateOp::If { false_jump_to } => Instruction::If {
                         false_jump_to: self.labels[false_jump_to.0].expect("label not inserted"),
                     },
                     IntermediateOp::JumpTo(label) => {
-                        Operation::JumpTo(self.labels[label.0].expect("label not inserted"))
+                        Instruction::JumpTo(self.labels[label.0].expect("label not inserted"))
                     }
-                    IntermediateOp::Compare(comparison) => Operation::Compare(comparison),
-                    IntermediateOp::Push(value) => Operation::Push(value),
-                    IntermediateOp::PushVariable(variable) => Operation::PushVariable(variable.0),
-                    IntermediateOp::PushCopy(arg) => Operation::PushArg(arg),
-                    IntermediateOp::Pop => Operation::Pop,
-                    IntermediateOp::Return => Operation::Return,
-                    IntermediateOp::Define { variable_index } => Operation::PopToVariable {
-                        variable_index: variable_index.0,
-                    },
+                    IntermediateOp::Compare(comparison) => Instruction::Compare(comparison),
+                    IntermediateOp::Push(value) => Instruction::Push(value),
+                    IntermediateOp::PushVariable(variable) => Instruction::PushVariable(variable.0),
+                    IntermediateOp::PushCopy(arg) => Instruction::PushArg(arg),
+                    IntermediateOp::Pop => Instruction::PopAndDrop,
+                    IntermediateOp::Return => Instruction::Return,
+                    IntermediateOp::PopToVariable(variable_index) => {
+                        Instruction::PopToVariable(variable_index.0)
+                    }
                     IntermediateOp::Call {
                         function,
                         arg_count,
@@ -449,11 +454,11 @@ impl CodeBlockBuilder {
                         let vtable_index = function
                             .map(|symbol| {
                                 scope
-                                    .resolve_function_index(&symbol)
+                                    .resolve_function_vtable_index(&symbol)
                                     .ok_or(CompilationError::UndefinedFunction(symbol))
                             })
                             .transpose()?;
-                        Operation::Call {
+                        Instruction::Call {
                             vtable_index,
                             arg_count,
                         }
@@ -461,18 +466,6 @@ impl CodeBlockBuilder {
                 })
             })
             .collect::<Result<_, CompilationError>>()
-        // for to_patch in self.ops_to_patch {
-        //     match &mut self.ops[to_patch] {
-        //         IntermediateOp::If { false_jump_to } => {
-        //             *false_jump_to = self.labels[*false_jump_to].expect("label not inserted");
-        //         }
-        //         IntermediateOp::JumpTo(jump_to) => {
-        //             *jump_to = self.labels[*jump_to].expect("label not inserted");
-        //         }
-        //         _ => unreachable!("invalid patch"),
-        //     }
-        // }
-        // self.ops
     }
 }
 
@@ -483,6 +476,7 @@ pub enum ScopeSymbol {
 }
 
 #[derive(Default, Debug)]
+#[must_use]
 pub struct CodeUnit {
     declarations_by_symbol: HashMap<Symbol, usize>,
     declarations: Vec<DeclaredSymbol>,
@@ -542,11 +536,7 @@ impl CodeUnit {
             init.map(|body| Function::new("__init", Vec::new(), self.init_tree.finish(body)));
         UnlinkedCodeUnit {
             vtable: self.vtable,
-            modules: self
-                .modules
-                .into_iter()
-                .map(|module| module.compile())
-                .collect(),
+            modules: self.modules.into_iter().map(CodeUnit::compile).collect(),
             init,
         }
     }
@@ -563,7 +553,7 @@ impl UnlinkedCodeUnit {
     /// Runs all code in this unit in the passed context.
     pub fn execute_in<'a, Output: FromStack, Env>(
         &self,
-        context: &'a mut Context<Env>,
+        context: &'a mut Bud<Env>,
     ) -> Result<Output, Error<'a, Env, Output>>
     where
         Env: Environment,
@@ -582,7 +572,7 @@ impl UnlinkedCodeUnit {
         if let Some(init) = &self.init {
             let vtable_index = init.compile_into(context)?;
             context
-                .run(Cow::Owned(vec![Operation::Call {
+                .run(Cow::Owned(vec![Instruction::Call {
                     vtable_index: Some(vtable_index),
                     arg_count: 0,
                 }]))
@@ -633,7 +623,7 @@ impl Function {
         }
     }
 
-    pub fn compile_into<Env>(&self, context: &mut Context<Env>) -> Result<usize, CompilationError>
+    pub fn compile_into<Env>(&self, context: &mut Bud<Env>) -> Result<usize, CompilationError>
     where
         Env: Environment,
     {
@@ -649,13 +639,14 @@ impl Function {
         let ops = block.finish(context)?;
         let function = vm::Function {
             arg_count: self.args.len(),
-            ops,
+            code: ops,
             variable_count: 0,
         };
         let vtable_index = context.define_function(name, function);
         Ok(vtable_index)
     }
 
+    #[must_use]
     pub fn name(&self) -> Option<&Symbol> {
         self.name.as_ref()
     }
@@ -683,9 +674,7 @@ pub enum IntermediateOp {
     PushCopy(usize),
     Pop,
     Return,
-    Define {
-        variable_index: Variable,
-    },
+    PopToVariable(Variable),
     Call {
         function: Option<Symbol>,
         arg_count: usize,

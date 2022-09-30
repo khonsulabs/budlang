@@ -31,6 +31,16 @@ struct Symbols {
     free_slots: Vec<usize>,
 }
 
+/// A String-like type that ensures only one instance of each Symbol exists per
+/// value, enabling quicker lookups by not requiring string comparisons.
+///
+/// After all instances of a given Symbol are dropped, the underlying storage is
+/// released.
+///
+/// This type's [`Hash`] implementation is different than `String`'s hash
+/// implementation. This type avoids implementing `Borrow<str>` to prevent using
+/// strings to look up values in `HashMap`s/`HashSet`s where this type is used
+/// as the key.
 #[derive(Debug, Clone)]
 pub struct Symbol(SharedData);
 
