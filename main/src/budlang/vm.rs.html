@@ -1859,6 +1859,17 @@
 <span id="1859">1859</span>
 <span id="1860">1860</span>
 <span id="1861">1861</span>
+<span id="1862">1862</span>
+<span id="1863">1863</span>
+<span id="1864">1864</span>
+<span id="1865">1865</span>
+<span id="1866">1866</span>
+<span id="1867">1867</span>
+<span id="1868">1868</span>
+<span id="1869">1869</span>
+<span id="1870">1870</span>
+<span id="1871">1871</span>
+<span id="1872">1872</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">borrow::Cow</span>,
     <span class="ident">cmp::Ordering</span>,
@@ -1947,14 +1958,13 @@
     <span class="ident">PopAndDrop</span>,
     <span class="doccomment">/// Returns from the current stack frame.</span>
     <span class="ident">Return</span>,
-    <span class="doccomment">/// Pops a value from the stack and stores it into the variable index</span>
-    <span class="doccomment">/// provided.</span>
+    <span class="doccomment">/// Copies the top value from the stack  into the variable index provided.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Each function is allocated a fixed number of variables which are</span>
     <span class="doccomment">/// accessed using 0-based indexes. Attempting to use a variable index</span>
     <span class="doccomment">/// outside of the range allocated will cause a</span>
     <span class="doccomment">/// [`FaultKind::InvalidVariableIndex`] to be returned.</span>
-    <span class="ident">PopToVariable</span>(<span class="ident">usize</span>),
+    <span class="ident">CopyToVariable</span>(<span class="ident">usize</span>),
     <span class="doccomment">/// Calls a function.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// When calling a function, values on the stack are &quot;passed&quot; to the</span>
@@ -2746,7 +2756,7 @@
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
             }
             <span class="ident">Instruction::Return</span> =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">FlowControl::Return</span>)),
-            <span class="ident">Instruction::PopToVariable</span>(<span class="ident">variable</span>) =&gt; <span class="self">self</span>.<span class="ident">pop_to_var</span>(<span class="kw-2">*</span><span class="ident">variable</span>),
+            <span class="ident">Instruction::CopyToVariable</span>(<span class="ident">variable</span>) =&gt; <span class="self">self</span>.<span class="ident">copy_to_var</span>(<span class="kw-2">*</span><span class="ident">variable</span>),
             <span class="ident">Instruction::Call</span> {
                 <span class="ident">vtable_index</span>,
                 <span class="ident">arg_count</span>,
@@ -3002,18 +3012,21 @@
         <span class="prelude-val">Err</span>(<span class="ident">Fault::from</span>(<span class="ident">FaultKind::InvalidArgumentIndex</span>))
     }
 
-    <span class="kw">fn</span> <span class="ident">pop_to_var</span>(
+    <span class="kw">fn</span> <span class="ident">copy_to_var</span>(
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">variable</span>: <span class="ident">usize</span>,
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FlowControl</span><span class="op">&gt;</span>, <span class="ident">Fault</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">Env</span>, <span class="ident">Output</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">pop</span>()<span class="question-mark">?</span>;
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">stack_offset</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">variables_offset</span>.<span class="ident">checked_add</span>(<span class="ident">variable</span>) {
-            <span class="kw">if</span> <span class="ident">stack_offset</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">return_offset</span> {
-                <span class="self">self</span>.<span class="ident">stack</span>[<span class="ident">stack_offset</span>] <span class="op">=</span> <span class="ident">value</span>;
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">return_offset</span> {
+            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">top</span>()<span class="question-mark">?</span>;
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">stack_offset</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">variables_offset</span>.<span class="ident">checked_add</span>(<span class="ident">variable</span>) {
+                <span class="kw">if</span> <span class="ident">stack_offset</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">return_offset</span> {
+                    <span class="self">self</span>.<span class="ident">stack</span>[<span class="ident">stack_offset</span>] <span class="op">=</span> <span class="ident">value</span>.<span class="ident">clone</span>();
+                }
             }
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+        } <span class="kw">else</span> {
+            <span class="prelude-val">Err</span>(<span class="ident">Fault::stack_underflow</span>())
         }
-        <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">call</span>(
@@ -3036,8 +3049,7 @@
         <span class="kw">let</span> <span class="ident">return_offset</span> <span class="op">=</span> <span class="ident">variables_offset</span> <span class="op">+</span> <span class="ident">function</span>.<span class="ident">variable_count</span>;
         <span class="kw">let</span> <span class="ident">arg_offset</span> <span class="op">=</span> <span class="ident">variables_offset</span> <span class="op">-</span> <span class="ident">function</span>.<span class="ident">arg_count</span>;
         <span class="kw">if</span> <span class="ident">function</span>.<span class="ident">variable_count</span> <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="self">self</span>.<span class="ident">stack</span>
-                .<span class="ident">grow_to</span>(<span class="ident">return_offset</span> <span class="op">+</span> <span class="ident">function</span>.<span class="ident">variable_count</span>)<span class="question-mark">?</span>;
+            <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">grow_to</span>(<span class="ident">return_offset</span>)<span class="question-mark">?</span>;
         }
 
         <span class="ident">StackFrame</span> {
@@ -3464,7 +3476,6 @@
             <span class="ident">FaultKind::Paused</span>(<span class="ident">pending</span>) =&gt; <span class="ident">pending</span>,
             <span class="ident">error</span> =&gt; <span class="macro">unreachable!</span>(<span class="string">&quot;unexpected error: {error}&quot;</span>),
         };
-        <span class="macro">dbg!</span>(<span class="kw-2">&amp;</span><span class="ident">pending</span>.<span class="ident">stack</span>);
         <span class="ident">pending</span>.<span class="ident">environment_mut</span>().<span class="ident">add_budget</span>(<span class="number">1</span>);
 
         <span class="ident">fault</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">pending</span>.<span class="ident">resume</span>() {
@@ -3522,6 +3533,17 @@
             <span class="prelude-val">Ok</span>(())
         } <span class="kw">else</span> {
             <span class="prelude-val">Err</span>(<span class="ident">FaultKind::StackOverflow</span>)
+        }
+    }
+
+    <span class="doccomment">/// Returns a reference to the top [`Value`] on the stack, or returns a</span>
+    <span class="doccomment">/// [`FaultKind::StackUnderflow`] if no values are present.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">top</span><span class="op">&lt;</span><span class="ident">Env</span>, <span class="ident">ReturnType</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">Fault</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">Env</span>, <span class="ident">ReturnType</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">last</span>() {
+            <span class="prelude-val">Ok</span>(<span class="ident">value</span>)
+        } <span class="kw">else</span> {
+            <span class="prelude-val">Err</span>(<span class="ident">Fault::from</span>(<span class="ident">FaultKind::StackUnderflow</span>))
         }
     }
 
