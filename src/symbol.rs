@@ -175,22 +175,32 @@ impl Drop for SharedData {
 
 #[test]
 fn basics() {
-    let first_symbol = Symbol::from("test");
-    let first_again = Symbol::from("test");
+    let first_symbol = Symbol::from("basics-test-symbol");
+    let slot = first_symbol.0 .0.index;
+    let first_again = Symbol::from("basics-test-symbol");
+    assert_eq!(slot, first_again.0 .0.index);
     assert_eq!(first_symbol, first_again);
     drop(first_again);
     // Dropping the second copy shouldn't free the underlying symbol
     with_active_symbols(|symbols| {
-        assert_eq!(symbols.active.len(), 1);
-        assert_eq!(symbols.slots.len(), 1);
-        assert!(symbols.slots[0].is_some());
-        assert_eq!(symbols.free_slots.len(), 0);
+        assert!(symbols.active.contains("basics-test-symbol"));
+        assert!(!symbols.slots.is_empty());
+        assert!(symbols.slots[slot].is_some());
+        assert!(!symbols.free_slots.iter().any(|free| *free == slot));
     });
     drop(first_symbol);
     with_active_symbols(|symbols| {
-        assert!(symbols.active.is_empty());
-        assert_eq!(symbols.slots.len(), 1);
-        assert!(symbols.slots[0].is_none());
-        assert_eq!(symbols.free_slots[0], 0);
+        assert!(!symbols.active.contains("basics-test-symbol"));
+        match &symbols.slots[slot] {
+            Some(new_symbol) => {
+                // This test isn't run in isolation, so other symbols may get
+                // registered between the drop and this block. Very unlikely,
+                // but possible.
+                assert_ne!(new_symbol, "basics-test-symbol");
+            }
+            None => {
+                assert!(symbols.free_slots.iter().any(|free| *free == slot));
+            }
+        }
     });
 }
