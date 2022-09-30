@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["Symbol",""]]};
+window.SIDEBAR_ITEMS = {"struct":[["Symbol","A String-like type that ensures only one instance of each Symbol exists per value, enabling quicker lookups by not requiring string comparisons."]]};

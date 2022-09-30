@@ -549,7 +549,23 @@
 <span id="549">549</span>
 <span id="550">550</span>
 <span id="551">551</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt::Display</span>, <span class="ident">iter::Peekable</span>, <span class="ident">ops::Range</span>, <span class="ident">str::CharIndices</span>};
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+</pre><pre class="rust"><code><span class="comment">// TODO docs for parser</span>
+<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">missing_docs</span>)]</span>
+<span class="comment">// We use the Range type which doesn&#39;t allow this, and it&#39;s not worth making a</span>
+<span class="comment">// helper function to appease clippy.</span>
+<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">clippy::range_plus_one</span>)]</span>
+
+<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt::Display</span>, <span class="ident">iter::Peekable</span>, <span class="ident">ops::Range</span>, <span class="ident">str::CharIndices</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">ast</span>::{<span class="ident">BinOpKind</span>, <span class="ident">Call</span>, <span class="ident">CodeUnit</span>, <span class="ident">Function</span>, <span class="ident">If</span>, <span class="ident">NodeId</span>, <span class="ident">SyntaxTreeBuilder</span>},
@@ -560,7 +576,7 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">struct</span> <span class="ident">Token</span> {
     <span class="ident">kind</span>: <span class="ident">TokenKind</span>,
-    <span class="ident">range</span>: <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
+    <span class="ident">_range</span>: <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Token</span> {
@@ -569,7 +585,10 @@
     }
 
     <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">kind</span>: <span class="ident">TokenKind</span>, <span class="ident">range</span>: <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> { <span class="ident">kind</span>, <span class="ident">range</span> }
+        <span class="self">Self</span> {
+            <span class="ident">kind</span>,
+            <span class="ident">_range</span>: <span class="ident">range</span>,
+        }
     }
 }
 
@@ -634,6 +653,7 @@
         <span class="self">self</span>.<span class="ident">peek_token</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">token</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">token</span>.<span class="ident">kind</span>)
     }
 
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_lines</span>)]</span> <span class="comment">// TODO refactor too many lines</span>
     <span class="kw">fn</span> <span class="ident">read_token</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Token</span>, <span class="ident">ParseError</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">loop</span> {
             <span class="kw">break</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">chars</span>.<span class="ident">next</span>() {
@@ -652,7 +672,7 @@
 
                     <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">Token</span> {
                         <span class="ident">kind</span>: <span class="ident">TokenKind::Identifier</span>(<span class="ident">Symbol::from</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">source</span>[<span class="ident">offset</span>..<span class="op">=</span><span class="ident">end</span>])),
-                        <span class="ident">range</span>: <span class="ident">offset</span>..<span class="ident">end</span> <span class="op">+</span> <span class="number">1</span>,
+                        <span class="ident">_range</span>: <span class="ident">offset</span>..<span class="ident">end</span> <span class="op">+</span> <span class="number">1</span>,
                     }))
                 }
                 <span class="prelude-val">Some</span>((<span class="ident">offset</span>, <span class="ident">char</span>)) <span class="kw">if</span> <span class="ident">char</span>.<span class="ident">is_numeric</span>() =&gt; {
@@ -669,7 +689,7 @@
 
                     <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">Token</span> {
                         <span class="ident">kind</span>: <span class="ident">TokenKind::Integer</span>(<span class="ident">value</span>),
-                        <span class="ident">range</span>: <span class="ident">offset</span>..<span class="ident">end</span> <span class="op">+</span> <span class="number">1</span>,
+                        <span class="ident">_range</span>: <span class="ident">offset</span>..<span class="ident">end</span> <span class="op">+</span> <span class="number">1</span>,
                     }))
                 }
                 <span class="prelude-val">Some</span>((<span class="ident">offset</span>, <span class="ident">char</span>)) <span class="kw">if</span> <span class="ident">char</span> <span class="op">==</span> <span class="string">&#39;+&#39;</span> =&gt; {

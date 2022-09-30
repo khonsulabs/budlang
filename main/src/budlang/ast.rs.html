@@ -719,18 +719,9 @@
 <span id="719">719</span>
 <span id="720">720</span>
 <span id="721">721</span>
-<span id="722">722</span>
-<span id="723">723</span>
-<span id="724">724</span>
-<span id="725">725</span>
-<span id="726">726</span>
-<span id="727">727</span>
-<span id="728">728</span>
-<span id="729">729</span>
-<span id="730">730</span>
-<span id="731">731</span>
-<span id="732">732</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
+</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">allow</span>(<span class="ident">missing_docs</span>, <span class="ident">clippy::missing_panics_doc</span>)]</span> <span class="comment">// TODO docs and panics for ast</span>
+
+<span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">borrow::Cow</span>,
     <span class="ident">cell::RefCell</span>,
     <span class="ident">collections::HashMap</span>,
@@ -739,7 +730,7 @@
 
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">symbol::Symbol</span>,
-    <span class="ident">vm</span>::{<span class="self">self</span>, <span class="ident">Comparison</span>, <span class="ident">Context</span>, <span class="ident">Environment</span>, <span class="ident">FromStack</span>, <span class="ident">Operation</span>, <span class="ident">Value</span>},
+    <span class="ident">vm</span>::{<span class="self">self</span>, <span class="ident">Bud</span>, <span class="ident">Comparison</span>, <span class="ident">Environment</span>, <span class="ident">FromStack</span>, <span class="ident">Instruction</span>, <span class="ident">Value</span>},
     <span class="ident">Error</span>,
 };
 
@@ -780,6 +771,7 @@
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
+<span class="attribute">#[<span class="ident">must_use</span>]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NodeId</span>(<span class="ident">usize</span>);
 
 <span class="kw">struct</span> <span class="ident">ExpressionTreeNode</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
@@ -876,12 +868,11 @@
             <span class="ident">Node::Literal</span>(<span class="ident">literal</span>) =&gt; <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">IntermediateOp::Push</span>(<span class="ident">literal</span>.<span class="ident">clone</span>())),
             <span class="ident">Node::Identifier</span>(<span class="ident">identifier</span>) =&gt; <span class="ident">operations</span>.<span class="ident">push_from_symbol</span>(<span class="ident">identifier</span>),
             <span class="ident">Node::Call</span>(<span class="ident">call</span>) =&gt; <span class="ident">call</span>.<span class="ident">generate_code</span>(<span class="ident">operations</span>, <span class="ident">tree</span>),
-            <span class="ident">Node::Return</span>(<span class="ident">value</span>) =&gt; <span class="self">self</span>.<span class="ident">generate_return</span>(<span class="kw-2">*</span><span class="ident">value</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
+            <span class="ident">Node::Return</span>(<span class="ident">value</span>) =&gt; <span class="ident"><span class="self">Self</span>::generate_return</span>(<span class="kw-2">*</span><span class="ident">value</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
         }
     }
 
     <span class="kw">fn</span> <span class="ident">generate_return</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">value_to_return</span>: <span class="ident">NodeId</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
@@ -900,6 +891,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">If</span> {
+    <span class="attribute">#[<span class="ident">must_use</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">condition</span>: <span class="ident">NodeId</span>, <span class="ident">true_block</span>: <span class="ident">NodeId</span>) -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">condition</span>,
@@ -908,6 +900,7 @@
         }
     }
 
+    <span class="attribute">#[<span class="ident">must_use</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_else</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">else_block</span>: <span class="ident">NodeId</span>) -&gt; <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">else_block</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">else_block</span>);
         <span class="self">self</span>
@@ -1023,7 +1016,7 @@
                 <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">IntermediateOp::Call</span> {
                     <span class="ident">function</span>: <span class="prelude-val">None</span>,
                     <span class="ident">arg_count</span>: <span class="self">self</span>.<span class="ident">args</span>.<span class="ident">len</span>(),
-                })
+                });
             }
             (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">symbol</span>)) =&gt; {
                 <span class="comment">// Global call</span>
@@ -1035,7 +1028,7 @@
                         <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">IntermediateOp::Call</span> {
                             <span class="ident">function</span>: <span class="prelude-val">Some</span>(<span class="ident">function</span>.<span class="ident">clone</span>()), <span class="comment">// Switch to a Module/Index vtable lookup? We can&#39;t compile the code because of recursion.</span>
                             <span class="ident">arg_count</span>: <span class="self">self</span>.<span class="ident">args</span>.<span class="ident">len</span>(),
-                        })
+                        });
                     }
                     <span class="prelude-val">None</span> =&gt; <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">IntermediateOp::Call</span> {
                         <span class="ident">function</span>: <span class="prelude-val">Some</span>(<span class="ident">symbol</span>.<span class="ident">clone</span>()), <span class="comment">// Switch to a Module/Index vtable lookup? We can&#39;t compile the code because of recursion.</span>
@@ -1052,6 +1045,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SyntaxTreeBuilder</span>(<span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&gt;</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span> <span class="ident">SyntaxTreeBuilder</span> {
+    <span class="attribute">#[<span class="ident">must_use</span>]</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
         <span class="self">Self</span>(<span class="ident">RefCell::new</span>(<span class="ident">Vec::new</span>()))
     }
@@ -1147,7 +1141,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">finish</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">scope</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Operation</span><span class="op">&gt;</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">finish</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">scope</span>: <span class="kw-2">&amp;</span><span class="ident">Bud</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Instruction</span><span class="op">&gt;</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
     <span class="kw">where</span>
         <span class="ident">Env</span>: <span class="ident">Environment</span>,
     {
@@ -1155,25 +1149,25 @@
             .<span class="ident">into_iter</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">op</span><span class="op">|</span> {
                 <span class="prelude-val">Ok</span>(<span class="kw">match</span> <span class="ident">op</span> {
-                    <span class="ident">IntermediateOp::Add</span> =&gt; <span class="ident">Operation::Add</span>,
-                    <span class="ident">IntermediateOp::Sub</span> =&gt; <span class="ident">Operation::Sub</span>,
-                    <span class="ident">IntermediateOp::Multiply</span> =&gt; <span class="ident">Operation::Multiply</span>,
-                    <span class="ident">IntermediateOp::Divide</span> =&gt; <span class="ident">Operation::Divide</span>,
-                    <span class="ident">IntermediateOp::If</span> { <span class="ident">false_jump_to</span> } =&gt; <span class="ident">Operation::If</span> {
+                    <span class="ident">IntermediateOp::Add</span> =&gt; <span class="ident">Instruction::Add</span>,
+                    <span class="ident">IntermediateOp::Sub</span> =&gt; <span class="ident">Instruction::Sub</span>,
+                    <span class="ident">IntermediateOp::Multiply</span> =&gt; <span class="ident">Instruction::Multiply</span>,
+                    <span class="ident">IntermediateOp::Divide</span> =&gt; <span class="ident">Instruction::Divide</span>,
+                    <span class="ident">IntermediateOp::If</span> { <span class="ident">false_jump_to</span> } =&gt; <span class="ident">Instruction::If</span> {
                         <span class="ident">false_jump_to</span>: <span class="self">self</span>.<span class="ident">labels</span>[<span class="ident">false_jump_to</span>.<span class="number">0</span>].<span class="ident">expect</span>(<span class="string">&quot;label not inserted&quot;</span>),
                     },
                     <span class="ident">IntermediateOp::JumpTo</span>(<span class="ident">label</span>) =&gt; {
-                        <span class="ident">Operation::JumpTo</span>(<span class="self">self</span>.<span class="ident">labels</span>[<span class="ident">label</span>.<span class="number">0</span>].<span class="ident">expect</span>(<span class="string">&quot;label not inserted&quot;</span>))
+                        <span class="ident">Instruction::JumpTo</span>(<span class="self">self</span>.<span class="ident">labels</span>[<span class="ident">label</span>.<span class="number">0</span>].<span class="ident">expect</span>(<span class="string">&quot;label not inserted&quot;</span>))
                     }
-                    <span class="ident">IntermediateOp::Compare</span>(<span class="ident">comparison</span>) =&gt; <span class="ident">Operation::Compare</span>(<span class="ident">comparison</span>),
-                    <span class="ident">IntermediateOp::Push</span>(<span class="ident">value</span>) =&gt; <span class="ident">Operation::Push</span>(<span class="ident">value</span>),
-                    <span class="ident">IntermediateOp::PushVariable</span>(<span class="ident">variable</span>) =&gt; <span class="ident">Operation::PushVariable</span>(<span class="ident">variable</span>.<span class="number">0</span>),
-                    <span class="ident">IntermediateOp::PushCopy</span>(<span class="ident">arg</span>) =&gt; <span class="ident">Operation::PushArg</span>(<span class="ident">arg</span>),
-                    <span class="ident">IntermediateOp::Pop</span> =&gt; <span class="ident">Operation::Pop</span>,
-                    <span class="ident">IntermediateOp::Return</span> =&gt; <span class="ident">Operation::Return</span>,
-                    <span class="ident">IntermediateOp::Define</span> { <span class="ident">variable_index</span> } =&gt; <span class="ident">Operation::PopToVariable</span> {
-                        <span class="ident">variable_index</span>: <span class="ident">variable_index</span>.<span class="number">0</span>,
-                    },
+                    <span class="ident">IntermediateOp::Compare</span>(<span class="ident">comparison</span>) =&gt; <span class="ident">Instruction::Compare</span>(<span class="ident">comparison</span>),
+                    <span class="ident">IntermediateOp::Push</span>(<span class="ident">value</span>) =&gt; <span class="ident">Instruction::Push</span>(<span class="ident">value</span>),
+                    <span class="ident">IntermediateOp::PushVariable</span>(<span class="ident">variable</span>) =&gt; <span class="ident">Instruction::PushVariable</span>(<span class="ident">variable</span>.<span class="number">0</span>),
+                    <span class="ident">IntermediateOp::PushCopy</span>(<span class="ident">arg</span>) =&gt; <span class="ident">Instruction::PushArg</span>(<span class="ident">arg</span>),
+                    <span class="ident">IntermediateOp::Pop</span> =&gt; <span class="ident">Instruction::PopAndDrop</span>,
+                    <span class="ident">IntermediateOp::Return</span> =&gt; <span class="ident">Instruction::Return</span>,
+                    <span class="ident">IntermediateOp::PopToVariable</span>(<span class="ident">variable_index</span>) =&gt; {
+                        <span class="ident">Instruction::PopToVariable</span>(<span class="ident">variable_index</span>.<span class="number">0</span>)
+                    }
                     <span class="ident">IntermediateOp::Call</span> {
                         <span class="ident">function</span>,
                         <span class="ident">arg_count</span>,
@@ -1181,11 +1175,11 @@
                         <span class="kw">let</span> <span class="ident">vtable_index</span> <span class="op">=</span> <span class="ident">function</span>
                             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">symbol</span><span class="op">|</span> {
                                 <span class="ident">scope</span>
-                                    .<span class="ident">resolve_function_index</span>(<span class="kw-2">&amp;</span><span class="ident">symbol</span>)
+                                    .<span class="ident">resolve_function_vtable_index</span>(<span class="kw-2">&amp;</span><span class="ident">symbol</span>)
                                     .<span class="ident">ok_or</span>(<span class="ident">CompilationError::UndefinedFunction</span>(<span class="ident">symbol</span>))
                             })
                             .<span class="ident">transpose</span>()<span class="question-mark">?</span>;
-                        <span class="ident">Operation::Call</span> {
+                        <span class="ident">Instruction::Call</span> {
                             <span class="ident">vtable_index</span>,
                             <span class="ident">arg_count</span>,
                         }
@@ -1193,18 +1187,6 @@
                 })
             })
             .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-        <span class="comment">// for to_patch in self.ops_to_patch {</span>
-        <span class="comment">//     match &amp;mut self.ops[to_patch] {</span>
-        <span class="comment">//         IntermediateOp::If { false_jump_to } =&gt; {</span>
-        <span class="comment">//             *false_jump_to = self.labels[*false_jump_to].expect(&quot;label not inserted&quot;);</span>
-        <span class="comment">//         }</span>
-        <span class="comment">//         IntermediateOp::JumpTo(jump_to) =&gt; {</span>
-        <span class="comment">//             *jump_to = self.labels[*jump_to].expect(&quot;label not inserted&quot;);</span>
-        <span class="comment">//         }</span>
-        <span class="comment">//         _ =&gt; unreachable!(&quot;invalid patch&quot;),</span>
-        <span class="comment">//     }</span>
-        <span class="comment">// }</span>
-        <span class="comment">// self.ops</span>
     }
 }
 
@@ -1215,6 +1197,7 @@
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">must_use</span>]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CodeUnit</span> {
     <span class="ident">declarations_by_symbol</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Symbol</span>, <span class="ident">usize</span><span class="op">&gt;</span>,
     <span class="ident">declarations</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">DeclaredSymbol</span><span class="op">&gt;</span>,
@@ -1274,11 +1257,7 @@
             <span class="ident">init</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">body</span><span class="op">|</span> <span class="ident">Function::new</span>(<span class="string">&quot;__init&quot;</span>, <span class="ident">Vec::new</span>(), <span class="self">self</span>.<span class="ident">init_tree</span>.<span class="ident">finish</span>(<span class="ident">body</span>)));
         <span class="ident">UnlinkedCodeUnit</span> {
             <span class="ident">vtable</span>: <span class="self">self</span>.<span class="ident">vtable</span>,
-            <span class="ident">modules</span>: <span class="self">self</span>
-                .<span class="ident">modules</span>
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">module</span><span class="op">|</span> <span class="ident">module</span>.<span class="ident">compile</span>())
-                .<span class="ident">collect</span>(),
+            <span class="ident">modules</span>: <span class="self">self</span>.<span class="ident">modules</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="ident">CodeUnit::compile</span>).<span class="ident">collect</span>(),
             <span class="ident">init</span>,
         }
     }
@@ -1295,7 +1274,7 @@
     <span class="doccomment">/// Runs all code in this unit in the passed context.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">execute_in</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Output</span>: <span class="ident">FromStack</span>, <span class="ident">Env</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>,
+        <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Bud</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>,
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Output</span>, <span class="ident">Error</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Env</span>, <span class="ident">Output</span><span class="op">&gt;</span><span class="op">&gt;</span>
     <span class="kw">where</span>
         <span class="ident">Env</span>: <span class="ident">Environment</span>,
@@ -1314,7 +1293,7 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">init</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">init</span> {
             <span class="kw">let</span> <span class="ident">vtable_index</span> <span class="op">=</span> <span class="ident">init</span>.<span class="ident">compile_into</span>(<span class="ident">context</span>)<span class="question-mark">?</span>;
             <span class="ident">context</span>
-                .<span class="ident">run</span>(<span class="ident">Cow::Owned</span>(<span class="macro">vec!</span>[<span class="ident">Operation::Call</span> {
+                .<span class="ident">run</span>(<span class="ident">Cow::Owned</span>(<span class="macro">vec!</span>[<span class="ident">Instruction::Call</span> {
                     <span class="ident">vtable_index</span>: <span class="prelude-val">Some</span>(<span class="ident">vtable_index</span>),
                     <span class="ident">arg_count</span>: <span class="number">0</span>,
                 }]))
@@ -1365,7 +1344,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compile_into</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compile_into</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Bud</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
     <span class="kw">where</span>
         <span class="ident">Env</span>: <span class="ident">Environment</span>,
     {
@@ -1381,13 +1360,14 @@
         <span class="kw">let</span> <span class="ident">ops</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">finish</span>(<span class="ident">context</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">function</span> <span class="op">=</span> <span class="ident">vm::Function</span> {
             <span class="ident">arg_count</span>: <span class="self">self</span>.<span class="ident">args</span>.<span class="ident">len</span>(),
-            <span class="ident">ops</span>,
+            <span class="ident">code</span>: <span class="ident">ops</span>,
             <span class="ident">variable_count</span>: <span class="number">0</span>,
         };
         <span class="kw">let</span> <span class="ident">vtable_index</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">define_function</span>(<span class="ident">name</span>, <span class="ident">function</span>);
         <span class="prelude-val">Ok</span>(<span class="ident">vtable_index</span>)
     }
 
+    <span class="attribute">#[<span class="ident">must_use</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Symbol</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">name</span>.<span class="ident">as_ref</span>()
     }
@@ -1415,9 +1395,7 @@
     <span class="ident">PushCopy</span>(<span class="ident">usize</span>),
     <span class="ident">Pop</span>,
     <span class="ident">Return</span>,
-    <span class="ident">Define</span> {
-        <span class="ident">variable_index</span>: <span class="ident">Variable</span>,
-    },
+    <span class="ident">PopToVariable</span>(<span class="ident">Variable</span>),
     <span class="ident">Call</span> {
         <span class="ident">function</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>,
         <span class="ident">arg_count</span>: <span class="ident">usize</span>,

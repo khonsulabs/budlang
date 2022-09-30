@@ -184,6 +184,16 @@
 <span id="184">184</span>
 <span id="185">185</span>
 <span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">borrow::Borrow</span>,
     <span class="ident">collections::HashSet</span>,
@@ -217,6 +227,16 @@
     <span class="ident">free_slots</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
 }
 
+<span class="doccomment">/// A String-like type that ensures only one instance of each Symbol exists per</span>
+<span class="doccomment">/// value, enabling quicker lookups by not requiring string comparisons.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// After all instances of a given Symbol are dropped, the underlying storage is</span>
+<span class="doccomment">/// released.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This type&#39;s [`Hash`] implementation is different than `String`&#39;s hash</span>
+<span class="doccomment">/// implementation. This type avoids implementing `Borrow&lt;str&gt;` to prevent using</span>
+<span class="doccomment">/// strings to look up values in `HashMap`s/`HashSet`s where this type is used</span>
+<span class="doccomment">/// as the key.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Symbol</span>(<span class="ident">SharedData</span>);
 
