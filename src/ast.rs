@@ -88,7 +88,7 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
                 }
                 list.finish()
             }
-            Node::Literal(literal) => literal.fmt(f),
+            Node::Literal(literal) => Debug::fmt(literal, f),
             Node::Identifier(identifier) => Debug::fmt(identifier, f),
             Node::Call(call) => {
                 let name = if let Some(symbol) = &call.name {
@@ -362,6 +362,10 @@ impl SyntaxTreeBuilder {
 
     pub fn integer(&self, integer: i64) -> NodeId {
         self.push(Node::Literal(Value::Integer(integer)))
+    }
+
+    pub fn real(&self, real: f64) -> NodeId {
+        self.push(Node::Literal(Value::Real(real)))
     }
 
     pub fn call(&self, call: Call) -> NodeId {

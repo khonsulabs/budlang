@@ -1,15 +1,11 @@
 A safe, fast, lightweight embeddable scripting language written in Rust.
 
+**WARNING: This crate is not anywhere near being ready to publish.**
+
 [![crate version](https://img.shields.io/crates/v/budlang.svg)](https://crates.io/crates/budlang)
 [![Live Build Status](https://img.shields.io/github/workflow/status/khonsulabs/budlang/Tests/main)](https://github.com/khonsulabs/budlang/actions?query=workflow:Tests)
 [![HTML Coverage Report for `main` branch](https://khonsulabs.github.io/budlang/coverage/badge.svg)](https://khonsulabs.github.io/budlang/coverage/)
 [![Documentation](https://img.shields.io/badge/docs-main-informational)]($docs-base$)
-
-# Bud (budlang)
-
-A safe, fast, lightweight embeddable scripting language written in Rust.
-
-**WARNING: This crate is not anywhere near being ready to publish.**
 
 ## Why Bud?
 
@@ -82,11 +78,13 @@ difference):
 
 It probably doesn't do what you need (yet):
 
-- [ ] Don't panic
+- [x] Don't panic in vm
+- [ ] Don't panic in compiler
+- [ ] Don't panic ih parser
 - [ ] Support parenthesized expressions as terms
 - [ ] Add variables (VM supports them already)
 - [ ] Add loops
-- [ ] Add Real (Float) type
+- [x] Add Real (Float) type
 - [ ] Add String type
 - [ ] Add List type
 - [ ] Add Map type

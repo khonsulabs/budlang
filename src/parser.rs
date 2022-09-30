@@ -4,7 +4,7 @@
 // helper function to appease clippy.
 #![allow(clippy::range_plus_one)]
 
-use std::{fmt::Display, iter::Peekable, ops::Range, str::CharIndices};
+use std::{fmt::Display, ops::Range, str::CharIndices};
 
 use crate::{
     ast::{BinOpKind, Call, CodeUnit, Function, If, NodeId, SyntaxTreeBuilder},
@@ -35,6 +35,7 @@ impl Token {
 enum TokenKind {
     Identifier(Symbol),
     Integer(i64),
+    Real(f64),
     Assign,
     Comparison(Comparison),
     Not,
@@ -55,9 +56,122 @@ enum BracketType {
     Curly,
 }
 
+struct DoublePeekable<I>
+where
+    I: Iterator,
+{
+    iter: I,
+    peeked: Peeked<I::Item>,
+}
+
+impl<I> DoublePeekable<I>
+where
+    I: Iterator,
+{
+    fn peek(&mut self) -> Option<&I::Item> {
+        if self.peeked.len() < 1 {
+            if let Some(next_value) = self.iter.next() {
+                self.peeked = Peeked(Some(PeekedData::One(next_value)));
+            } else {
+                return None;
+            }
+        }
+
+        self.peeked.nth(0)
+    }
+
+    fn peek_second(&mut self) -> Option<&I::Item> {
+        if self.peeked.len() < 2 {
+            if let Some(next_value) = self.iter.next() {
+                self.peeked.0 = match self.peeked.0.take() {
+                    None => match self.iter.next() {
+                        Some(second_value) => Some(PeekedData::Two(next_value, second_value)),
+                        None => Some(PeekedData::One(next_value)),
+                    },
+                    Some(PeekedData::One(existing_value)) => {
+                        Some(PeekedData::Two(existing_value, next_value))
+                    }
+                    Some(PeekedData::Two(first, second)) => Some(PeekedData::Two(first, second)),
+                }
+            }
+        }
+
+        self.peeked.nth(1)
+    }
+}
+
+impl<I> Iterator for DoublePeekable<I>
+where
+    I: Iterator,
+{
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(peeked) = self.peeked.next() {
+            Some(peeked)
+        } else {
+            self.iter.next()
+        }
+    }
+}
+
+struct Peeked<T>(Option<PeekedData<T>>);
+
+enum PeekedData<T> {
+    One(T),
+    Two(T, T),
+}
+
+impl<T> Peeked<T> {
+    const fn len(&self) -> usize {
+        match &self.0 {
+            None => 0,
+            Some(PeekedData::One(_)) => 1,
+            Some(PeekedData::Two(_, _)) => 2,
+        }
+    }
+
+    fn nth(&self, index: usize) -> Option<&T> {
+        match &self.0 {
+            None => None,
+            Some(PeekedData::One(value)) => {
+                if index == 0 {
+                    Some(value)
+                } else {
+                    None
+                }
+            }
+            Some(PeekedData::Two(first, second)) => {
+                if index == 0 {
+                    Some(first)
+                } else if index == 1 {
+                    Some(second)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
+impl<T> Iterator for Peeked<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.0.take() {
+            None => None,
+            Some(PeekedData::One(value)) => Some(value),
+            Some(PeekedData::Two(first, second)) => {
+                self.0 = Some(PeekedData::One(second));
+                Some(first)
+            }
+        }
+    }
+}
+
 struct Lexer<'a> {
     source: &'a str,
-    chars: Peekable<CharIndices<'a>>,
+    chars: DoublePeekable<CharIndices<'a>>,
     peeked_token: Option<Result<Token, ParseError>>,
 }
 
@@ -65,7 +179,10 @@ impl<'a> Lexer<'a> {
     fn new(source: &'a str) -> Self {
         Self {
             source,
-            chars: source.char_indices().peekable(),
+            chars: DoublePeekable {
+                iter: source.char_indices(),
+                peeked: Peeked(None),
+            },
             peeked_token: None,
         }
     }
@@ -114,7 +231,11 @@ impl<'a> Lexer<'a> {
                         _range: offset..end + 1,
                     }))
                 }
-                Some((offset, char)) if char.is_numeric() => {
+                Some((offset, char))
+                    if char.is_numeric()
+                        || (char == '-'
+                            && self.chars.peek().map_or(false, |(_, ch)| ch.is_numeric())) =>
+                {
                     let mut end = offset;
                     while self
                         .chars
@@ -122,6 +243,31 @@ impl<'a> Lexer<'a> {
                         .map_or(false, |(_, char)| char.is_numeric())
                     {
                         end = self.chars.next().expect("just peeked").0;
+                    }
+
+                    // If we have a period and another numeric, this is a floating point number.
+                    if self.chars.peek().map_or(false, |(_, ch)| *ch == '.')
+                        && self
+                            .chars
+                            .peek_second()
+                            .map_or(false, |(_, ch)| ch.is_numeric())
+                    {
+                        // Skip the decimal
+                        self.chars.next();
+                        while self
+                            .chars
+                            .peek()
+                            .map_or(false, |(_, char)| char.is_numeric())
+                        {
+                            end = self.chars.next().expect("just peeked").0;
+                        }
+
+                        let value = self.source[offset..=end].parse::<f64>().unwrap();
+
+                        return Some(Ok(Token {
+                            kind: TokenKind::Real(value),
+                            _range: offset..end + 1,
+                        }));
                     }
 
                     let value = self.source[offset..=end].parse::<i64>().unwrap();
@@ -539,6 +685,7 @@ fn parse_term(
             }
         }
         TokenKind::Integer(integer) => Ok(tree.integer(integer)),
+        TokenKind::Real(integer) => Ok(tree.real(integer)),
         _ => todo!("parse_term: {first_token:?}"),
     }
 }

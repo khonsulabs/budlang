@@ -4,6 +4,7 @@ use std::{
     collections::{HashMap, VecDeque},
     fmt::Display,
     marker::PhantomData,
+    ops::{Index, IndexMut, RangeBounds},
 };
 
 use crate::{parser::parse, symbol::Symbol, Error};
@@ -152,6 +153,8 @@ pub struct Function {
 pub enum Value {
     /// A signed 64-bit integer value.
     Integer(i64),
+    /// A real number value (64-bit floating point).
+    Real(f64),
     /// A boolean representing true or false.
     Boolean(bool),
     /// A value representing the lack of a value.
@@ -167,23 +170,215 @@ impl Value {
     /// | Boolean    | value is true |
     /// | Void       | always false  |
     #[must_use]
+    #[inline]
     pub fn is_truthy(&self) -> bool {
         match self {
             Value::Integer(value) => *value != 0,
+            Value::Real(value) => value.abs() < f64::EPSILON,
             Value::Boolean(value) => *value,
             Value::Void => false,
         }
     }
+
+    /// Returns the inverse of [`is_truthy()`](Self::is_truthy)
+    #[must_use]
+    #[inline]
+    pub fn is_falsey(&self) -> bool {
+        !self.is_truthy()
+    }
+
+    /// Returns the kind of the contained value.
+    #[must_use]
+    pub const fn kind(&self) -> ValueKind {
+        match self {
+            Value::Integer(_) => ValueKind::Integer,
+            Value::Real(_) => ValueKind::Real,
+            Value::Boolean(_) => ValueKind::Boolean,
+            Value::Void => ValueKind::Void,
+        }
+    }
 }
 
+impl Eq for Value {}
+
 impl PartialEq for Value {
+    // floating point casts are intentional in this code.
+    #[allow(clippy::cast_precision_loss)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Integer(l0), Self::Integer(r0)) => l0 == r0,
-            (Self::Boolean(l0), Self::Boolean(r0)) => l0 == r0,
+            (Self::Integer(lhs), Self::Integer(rhs)) => lhs == rhs,
+            (Self::Real(lhs), Self::Real(rhs)) => real_total_eq(*lhs, *rhs),
+            (Self::Integer(lhs), Self::Real(rhs)) => real_total_eq(*lhs as f64, *rhs),
+            (Self::Real(lhs), Self::Integer(rhs)) => real_total_eq(*lhs, *rhs as f64),
+            (Self::Boolean(lhs), Self::Boolean(rhs)) => lhs == rhs,
             (Self::Void, Self::Void) => true,
             _ => false,
         }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Integer(value) => value.fmt(f),
+            Value::Real(value) => value.fmt(f),
+            Value::Boolean(value) => value.fmt(f),
+            Value::Void => f.write_str("Void"),
+        }
+    }
+}
+
+#[inline]
+fn real_eq(lhs: f64, rhs: f64) -> bool {
+    (lhs - rhs).abs() < f64::EPSILON
+}
+
+fn real_total_eq(lhs: f64, rhs: f64) -> bool {
+    match (lhs.is_nan(), rhs.is_nan()) {
+        // Neither are NaNs
+        (false, false) => {
+            match (lhs.is_infinite(), rhs.is_infinite()) {
+                // Neither are infinite -- perform a fuzzy floating point eq
+                // check using EPSILON as the step.
+                (false, false) => real_eq(lhs, rhs),
+                // Both are infinite, equality is determined by the signs matching.
+                (true, true) => lhs.is_sign_positive() == rhs.is_sign_positive(),
+                // One is finite, one is infinite, they aren't equal
+                _ => false,
+            }
+        }
+        // Both are NaN. They are only equal if the signs are equal.
+        (true, true) => lhs.is_sign_positive() == rhs.is_sign_positive(),
+        // One is NaN, the other isn't.
+        _ => false,
+    }
+}
+
+/// This function produces an Ordering for floats as follows:
+///
+/// - -Infinity
+/// - negative real numbers
+/// - -0.0
+/// - +0.0
+/// - positive real numbers
+/// - Infinity
+/// - NaN
+fn real_total_cmp(lhs: f64, rhs: f64) -> Ordering {
+    match (lhs.is_nan(), rhs.is_nan()) {
+        // Neither are NaNs
+        (false, false) => {
+            let (lhs_is_infinite, rhs_is_infinite) = (lhs.is_infinite(), rhs.is_infinite());
+            let (lhs_is_positive, rhs_is_positive) =
+                (lhs.is_sign_positive(), rhs.is_sign_positive());
+
+            match (
+                lhs_is_infinite,
+                rhs_is_infinite,
+                lhs_is_positive,
+                rhs_is_positive,
+            ) {
+                (false, false, _, _) => {
+                    if real_eq(lhs, rhs) {
+                        Ordering::Equal
+                    } else if lhs < rhs {
+                        Ordering::Less
+                    } else {
+                        Ordering::Greater
+                    }
+                }
+                // Equal if both are infinite and signs are equal
+                (true, true, true, true) | (true, true, false, false) => Ordering::Equal,
+                // If only one is infinite, its sign controls the sort.
+                (false, _, _, true) | (true, _, false, _) => Ordering::Less,
+                (false, _, _, false) | (true, _, true, _) => Ordering::Greater,
+            }
+        }
+        // Both are NaN.
+        (true, true) => Ordering::Equal,
+        // One is NaN, the other isn't. Unlike infinity, there is no concept of negative nan.
+        (false, _) => Ordering::Less,
+        (true, _) => Ordering::Greater,
+    }
+}
+
+#[test]
+fn real_cmp_tests() {
+    const EXPECTED_ORDER: [f64; 10] = [
+        f64::NEG_INFINITY,
+        f64::NEG_INFINITY,
+        -1.0,
+        -0.0,
+        0.0,
+        1.0,
+        f64::INFINITY,
+        f64::INFINITY,
+        f64::NAN,
+        f64::NAN,
+    ];
+
+    // NaN comparisons
+    assert_eq!(real_total_cmp(f64::NAN, f64::NAN), Ordering::Equal);
+    assert_eq!(real_total_cmp(f64::NAN, -1.), Ordering::Greater);
+    assert_eq!(real_total_cmp(f64::NAN, 1.), Ordering::Greater);
+    assert_eq!(
+        real_total_cmp(f64::NAN, f64::NEG_INFINITY),
+        Ordering::Greater
+    );
+    assert_eq!(real_total_cmp(f64::NAN, f64::INFINITY), Ordering::Greater);
+
+    // NaN comparisons reversed
+    assert_eq!(real_total_cmp(-1., f64::NAN), Ordering::Less);
+    assert_eq!(real_total_cmp(1., f64::NAN,), Ordering::Less);
+    assert_eq!(real_total_cmp(f64::NEG_INFINITY, f64::NAN), Ordering::Less);
+    assert_eq!(real_total_cmp(f64::INFINITY, f64::NAN), Ordering::Less);
+
+    // Infinity comparisons
+    assert_eq!(
+        real_total_cmp(f64::INFINITY, f64::INFINITY),
+        Ordering::Equal
+    );
+    assert_eq!(
+        real_total_cmp(f64::INFINITY, f64::NEG_INFINITY),
+        Ordering::Greater
+    );
+    assert_eq!(real_total_cmp(f64::INFINITY, -1.), Ordering::Greater);
+    assert_eq!(real_total_cmp(f64::INFINITY, 1.), Ordering::Greater);
+
+    // Infinity comparisons reversed
+    assert_eq!(
+        real_total_cmp(f64::NEG_INFINITY, f64::INFINITY),
+        Ordering::Less
+    );
+    assert_eq!(real_total_cmp(-1., f64::INFINITY,), Ordering::Less);
+    assert_eq!(real_total_cmp(1., f64::INFINITY,), Ordering::Less);
+
+    // Negative-Infinity comparisons
+    assert_eq!(
+        real_total_cmp(f64::NEG_INFINITY, f64::NEG_INFINITY),
+        Ordering::Equal
+    );
+    assert_eq!(real_total_cmp(f64::NEG_INFINITY, -1.), Ordering::Less);
+    assert_eq!(real_total_cmp(f64::NEG_INFINITY, 1.), Ordering::Less);
+
+    // Negative-Infinity comparisons reversed
+    assert_eq!(real_total_cmp(f64::NEG_INFINITY, -1.), Ordering::Less);
+    assert_eq!(real_total_cmp(f64::NEG_INFINITY, 1.), Ordering::Less);
+    let mut values = vec![
+        1.0,
+        f64::INFINITY,
+        0.0,
+        f64::NEG_INFINITY,
+        -1.0,
+        -0.0,
+        f64::NAN,
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+    ];
+    values.sort_by(|a, b| real_total_cmp(*a, *b));
+    println!("Sorted: {values:?}");
+    for (a, b) in values.iter().zip(EXPECTED_ORDER.iter()) {
+        assert!(real_total_eq(*a, *b), "{a} != {b}");
     }
 }
 
@@ -203,6 +398,119 @@ impl PartialEq<i64> for Value {
             this == other
         } else {
             false
+        }
+    }
+}
+
+impl PartialEq<f64> for Value {
+    // floating point casts are intentional in this code.
+    #[allow(clippy::cast_precision_loss)]
+    fn eq(&self, rhs: &f64) -> bool {
+        match self {
+            Value::Integer(lhs) => real_total_eq(*lhs as f64, *rhs),
+            Value::Real(lhs) => real_total_eq(*lhs, *rhs),
+            _ => false,
+        }
+    }
+}
+
+impl Ord for Value {
+    #[inline]
+    // floating point casts are intentional in this code.
+    #[allow(clippy::cast_precision_loss)]
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            // Handle all comparisons that do type-level comparisons
+            (Value::Integer(left), Value::Integer(right)) => left.cmp(right),
+            (Value::Real(left), Value::Real(right)) => real_total_cmp(*left, *right),
+            (Value::Integer(left), Value::Real(right)) => real_total_cmp(*left as f64, *right),
+            (Value::Real(left), Value::Integer(right)) => real_total_cmp(*left, *right as f64),
+            (Value::Boolean(left), Value::Boolean(right)) => {
+                if *left == *right {
+                    Ordering::Equal
+                } else if *left {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            }
+            // Now sort based purely on type:
+            // - Void
+            // - Boolean
+            // - Numerics
+            (Value::Void, Value::Void) => Ordering::Equal,
+            (Value::Void, _) => Ordering::Less,
+            (_, Value::Void) => Ordering::Greater,
+            (Value::Boolean(_), _) => Ordering::Less,
+            (_, Value::Boolean(_)) => Ordering::Greater,
+        }
+    }
+}
+
+#[test]
+fn value_ord_tests() {
+    let expected_order = vec![
+        Value::Void,
+        Value::Void,
+        Value::Boolean(false),
+        Value::Boolean(false),
+        Value::Boolean(true),
+        Value::Boolean(true),
+        Value::Integer(-5),
+        Value::Real(-4.0),
+        Value::Integer(-3),
+        Value::Real(1.0),
+        Value::Integer(3),
+        Value::Real(4.0),
+    ];
+
+    let mut faux_shuffled = vec![
+        Value::Boolean(false),
+        Value::Integer(-5),
+        Value::Void,
+        Value::Integer(-3),
+        Value::Boolean(true),
+        Value::Real(-4.0),
+        Value::Boolean(true),
+        Value::Real(4.0),
+        Value::Void,
+        Value::Real(1.0),
+        Value::Integer(3),
+        Value::Boolean(false),
+    ];
+    faux_shuffled.sort();
+    assert_eq!(faux_shuffled, expected_order);
+}
+
+impl PartialOrd for Value {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// All primitive [`Value`] kinds.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ValueKind {
+    /// A signed 64-bit integer value.
+    Integer,
+    /// A real number value (64-bit floating point).
+    Real,
+    /// A boolean representing true or false.
+    Boolean,
+    /// A value representing the lack of a value.
+    Void,
+}
+
+impl ValueKind {
+    /// Returns this kind as a string.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            ValueKind::Integer => "Integer",
+            ValueKind::Real => "Real",
+            ValueKind::Boolean => "Boolean",
+            ValueKind::Void => "Void",
         }
     }
 }
@@ -242,7 +550,7 @@ enum ModuleItem {
 /// instances of Bud with the exception that [`Symbol`]s are tracked globally.
 #[derive(Debug, Default)]
 pub struct Bud<Env> {
-    stack: Vec<Value>,
+    stack: Stack,
     local_module: Module,
     environment: Env,
 }
@@ -251,7 +559,7 @@ impl Bud<()> {
     /// Returns a default instance of Bud with no custom [`Environment`]
     #[must_use]
     pub fn empty() -> Self {
-        Self::new(())
+        Self::default_for(())
     }
 }
 
@@ -260,12 +568,21 @@ where
     Env: Environment,
 {
     /// Returns a new instance with the provided environment.
-    pub fn new(environment: Env) -> Self {
+    pub fn new(
+        environment: Env,
+        initial_stack_capacity: usize,
+        maximum_stack_capacity: usize,
+    ) -> Self {
         Self {
             environment,
-            stack: Vec::new(),
+            stack: Stack::new(initial_stack_capacity, maximum_stack_capacity),
             local_module: Module::default(),
         }
+    }
+
+    /// Returns a new instance with the provided environment.
+    pub fn default_for(environment: Env) -> Self {
+        Self::new(environment, 0, usize::MAX)
     }
 
     /// Returns a reference to the environment for this instance.
@@ -276,6 +593,12 @@ where
     /// Returns a mutable refernce to the environment for this instance.
     pub fn environment_mut(&mut self) -> &mut Env {
         &mut self.environment
+    }
+
+    /// Returns the stack of this virtual machine.
+    #[must_use]
+    pub const fn stack(&self) -> &Stack {
+        &self.stack
     }
 
     /// Registers a function with the provided name and returns self. This is a
@@ -401,7 +724,7 @@ enum FlowControl {
 #[derive(Debug)]
 struct StackFrame<'a, Env, Output> {
     module: &'a Module,
-    stack: &'a mut Vec<Value>,
+    stack: &'a mut Stack,
     environment: &'a mut Env,
     // Each stack frame cannot pop below this offset.
     return_offset: usize,
@@ -423,19 +746,21 @@ where
         operations: &[Instruction],
         mut resume_from: VecDeque<PausedFrame>,
     ) -> Result<(), Fault<'static, Env, Output>> {
-        if let Some(frame_to_resume) = resume_from.pop_front() {
+        if let Some(call_to_resume) = resume_from.pop_front() {
             // We were calling a function when this happened. We need to finish the call.
-            let vtable_index = frame_to_resume.vtable_index.expect("always have a vtable");
+            let vtable_index = call_to_resume
+                .vtable_index
+                .expect("can only resume a called function");
             let function = &self.module.vtable[vtable_index]; // TODO this module isn't necessarily right, but we don't really support modules.
             let mut running_frame = StackFrame {
                 module: self.module,
                 stack: self.stack,
                 environment: self.environment,
-                return_offset: frame_to_resume.return_offset,
-                variables_offset: frame_to_resume.variables_offset,
-                arg_offset: frame_to_resume.arg_offset,
-                vtable_index: frame_to_resume.vtable_index,
-                operation_index: frame_to_resume.operation_index,
+                return_offset: call_to_resume.return_offset,
+                variables_offset: call_to_resume.variables_offset,
+                arg_offset: call_to_resume.arg_offset,
+                vtable_index: call_to_resume.vtable_index,
+                operation_index: call_to_resume.operation_index,
                 _output: PhantomData,
             };
             match running_frame.resume_executing_execute_operations(&function.code, resume_from) {
@@ -459,9 +784,10 @@ where
                 Err(err) => return Err(err),
             };
 
-            // Remove the args, which sit between the stack and the return value
-            self.stack
-                .drain(frame_to_resume.arg_offset..frame_to_resume.return_offset);
+            self.clean_stack_after_call(call_to_resume.arg_offset, call_to_resume.return_offset)?;
+
+            // The call that was executing when we paused has finished, we can
+            // now resume executing our frame's instructions.
         }
 
         self.execute_operations(operations)
@@ -534,7 +860,6 @@ where
         }
     }
 
-    #[allow(clippy::too_many_lines)] // TODO I agree, but staring at a wall of yellow underlines is horrible.
     fn execute_operation(
         &mut self,
         operation: &Instruction,
@@ -543,185 +868,333 @@ where
             Instruction::JumpTo(instruction_index) => {
                 Ok(Some(FlowControl::JumpTo(*instruction_index)))
             }
-            Instruction::Add => {
-                let (left, right) = self.pop_pair()?;
-                let result = match (left, right) {
-                    (Value::Integer(left), Value::Integer(right)) => {
-                        left.checked_add(right).map_or(Value::Void, Value::Integer)
-                    }
-                    _ => todo!(),
-                };
-                self.stack.push(result);
-                Ok(None)
-            }
-            Instruction::Sub => {
-                let (left, right) = self.pop_pair()?;
-                let result = match (left, right) {
-                    (Value::Integer(left), Value::Integer(right)) => {
-                        left.checked_sub(right).map_or(Value::Void, Value::Integer)
-                    }
-                    _ => todo!(),
-                };
-                self.stack.push(result);
-                Ok(None)
-            }
-            Instruction::Multiply => {
-                let (left, right) = self.pop_pair()?;
-                let result = match (left, right) {
-                    (Value::Integer(left), Value::Integer(right)) => {
-                        left.checked_mul(right).map_or(Value::Void, Value::Integer)
-                    }
-                    _ => todo!(),
-                };
-                self.stack.push(result);
-                Ok(None)
-            }
-            Instruction::Divide => {
-                let (left, right) = self.pop_pair()?;
-                let result = match (left, right) {
-                    (Value::Integer(left), Value::Integer(right)) => {
-                        left.checked_div(right).map_or(Value::Void, Value::Integer)
-                    }
-                    _ => todo!(),
-                };
-                self.stack.push(result);
-                Ok(None)
-            }
-            Instruction::If {
-                false_jump_to: false_jump_to_label,
-            } => {
-                let value_to_check = self.pop()?;
-                if value_to_check.is_truthy() {
-                    Ok(None)
-                } else {
-                    Ok(Some(FlowControl::JumpTo(*false_jump_to_label)))
-                }
-            }
-            Instruction::Compare(comparison) => {
-                let (left, right) = self.pop_pair()?;
-                let cmp_result = match (left, right) {
-                    (Value::Integer(left), Value::Integer(right)) => left.cmp(&right),
-                    _ => todo!(),
-                };
-                let result = matches!(
-                    (comparison, cmp_result),
-                    (Comparison::Equal, Ordering::Equal)
-                        | (Comparison::NotEqual, Ordering::Greater | Ordering::Less)
-                        | (Comparison::GreaterThan, Ordering::Greater)
-                        | (
-                            Comparison::GreaterThanOrEqual,
-                            Ordering::Greater | Ordering::Equal
-                        )
-                        | (Comparison::LessThan, Ordering::Less)
-                        | (
-                            Comparison::LessThanOrEqual,
-                            Ordering::Less | Ordering::Equal
-                        )
-                );
-                self.stack.push(Value::Boolean(result));
-                Ok(None)
-            }
+            Instruction::Add => self.add(),
+            Instruction::Sub => self.sub(),
+            Instruction::Multiply => self.multiply(),
+            Instruction::Divide => self.divide(),
+            Instruction::If { false_jump_to } => self.r#if(*false_jump_to),
+            Instruction::Compare(comparison) => self.compare(*comparison),
             Instruction::Push(value) => {
-                self.stack.push(value.clone());
+                self.stack.push(value.clone())?;
                 Ok(None)
             }
-            Instruction::PushVariable(variable) => {
-                if let Some(stack_offset) = self.variables_offset.checked_add(*variable) {
-                    if stack_offset < self.return_offset {
-                        let value = self.stack[stack_offset].clone();
-                        self.stack.push(value);
-                        return Ok(None);
-                    }
-                }
-                Err(Fault::from(FaultKind::InvalidVariableIndex))
-            }
-            Instruction::PushArg(arg_index) => {
-                if let Some(stack_offset) = self.arg_offset.checked_add(*arg_index) {
-                    if stack_offset < self.variables_offset {
-                        let value = self.stack[stack_offset].clone();
-                        self.stack.push(value);
-                        return Ok(None);
-                    }
-                }
-                Err(Fault::from(FaultKind::InvalidArgumentIndex))
-            }
+            Instruction::PushVariable(variable) => self.push_var(*variable),
+            Instruction::PushArg(arg_index) => self.push_arg(*arg_index),
             Instruction::PopAndDrop => {
                 self.pop()?;
                 Ok(None)
             }
             Instruction::Return => Ok(Some(FlowControl::Return)),
-            Instruction::PopToVariable(variable) => {
-                let value = self.stack.pop().ok_or_else(Fault::stack_underflow)?;
-                if let Some(stack_offset) = self.variables_offset.checked_add(*variable) {
-                    if stack_offset < self.return_offset {
-                        self.stack[stack_offset] = value;
-                        return Ok(None);
-                    }
-                }
-                Ok(None)
-            }
+            Instruction::PopToVariable(variable) => self.pop_to_var(*variable),
             Instruction::Call {
                 vtable_index,
                 arg_count,
-            } => {
-                let vtable_index = vtable_index
-                    .or(self.vtable_index)
-                    .ok_or(FaultKind::InvalidVtableIndex)?;
-                let function = &self
-                    .module
-                    .vtable
-                    .get(vtable_index)
-                    .ok_or(FaultKind::InvalidVtableIndex)?;
-
-                assert_eq!(function.arg_count, *arg_count);
-
-                let variables_offset = self.stack.len();
-                let return_offset = variables_offset + function.variable_count;
-                let arg_offset = variables_offset - function.arg_count;
-                if function.variable_count > 0 {
-                    self.stack
-                        .resize(return_offset + function.variable_count, Value::Void);
-                }
-
-                StackFrame {
-                    module: self.module,
-                    stack: self.stack,
-                    environment: self.environment,
-                    return_offset,
-                    variables_offset,
-                    arg_offset,
-                    vtable_index: Some(vtable_index),
-                    operation_index: 0,
-                    _output: PhantomData,
-                }
-                .execute_operations(&function.code)?;
-
-                // Remove the args, which sit between the stack and the return value
-                self.stack.drain(arg_offset..return_offset);
-
-                Ok(None)
-            }
+            } => self.call(*vtable_index, *arg_count),
         }
     }
 
-    fn safe_pop(&mut self) -> Option<Value> {
+    fn clean_stack_after_call(
+        &mut self,
+        arg_offset: usize,
+        return_offset: usize,
+    ) -> Result<(), Fault<'static, Env, Output>> {
+        if arg_offset < return_offset {
+            // Remove the args, which sit between the stack and the return value
+            self.stack.remove_range(arg_offset..return_offset);
+        }
+
+        match self.stack.len() {
+            len if len == arg_offset => {
+                // The function didn't push a value before returning.
+                self.stack.push(Value::Void)?;
+            }
+            len if len > arg_offset + 1 => {
+                // The function more than one value, truncate the stack to the first value popped.
+                self.stack.remove_range(arg_offset + 1..);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Result<Value, Fault<'static, Env, Output>> {
         if self.stack.len() > self.return_offset {
             self.stack.pop()
         } else {
-            None
+            Err(Fault::stack_underflow())
         }
     }
 
-    fn pop(&mut self) -> Result<Value, Fault<'static, Env, Output>> {
-        self.safe_pop().ok_or_else(Fault::stack_underflow)
-    }
-
+    #[inline]
     fn pop_pair(&mut self) -> Result<(Value, Value), Fault<'static, Env, Output>> {
-        if let (Some(first), Some(second)) = (self.safe_pop(), self.safe_pop()) {
-            Ok((first, second))
+        if self.stack.len() + 1 > self.return_offset {
+            self.stack.pop_pair()
         } else {
             Err(Fault::stack_underflow())
         }
+    }
+
+    // floating point casts are intentional in this code.
+    #[allow(clippy::cast_precision_loss)]
+    fn add(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let (left, right) = self.pop_pair()?;
+        let result = match (left, right) {
+            (Value::Integer(left), Value::Integer(right)) => {
+                left.checked_add(right).map_or(Value::Void, Value::Integer)
+            }
+            (Value::Real(left), Value::Real(right)) => Value::Real(left + right),
+            (Value::Real(left), Value::Integer(right)) => Value::Real(left + right as f64),
+            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 + right),
+            (Value::Real(_), other) => {
+                return Err(Fault::type_mismatch(
+                    "can't add @expected and `@received-value` (@received-type)",
+                    ValueKind::Real,
+                    other,
+                ))
+            }
+            (Value::Integer(_), other) => {
+                return Err(Fault::type_mismatch(
+                    "can't add @expected and `@received-value` (@received-type)",
+                    ValueKind::Integer,
+                    other,
+                ))
+            }
+            (other, _) => {
+                return Err(Fault::invalid_type(
+                    "`@received-value` (@received-type) is not able to be added",
+                    other,
+                ))
+            }
+        };
+        self.stack.push(result)?;
+        Ok(None)
+    }
+
+    // floating point casts are intentional in this code.
+    #[allow(clippy::cast_precision_loss)]
+    fn sub(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let (left, right) = self.pop_pair()?;
+        let result = match (left, right) {
+            (Value::Integer(left), Value::Integer(right)) => {
+                left.checked_sub(right).map_or(Value::Void, Value::Integer)
+            }
+            (Value::Real(left), Value::Real(right)) => Value::Real(left - right),
+            (Value::Real(left), Value::Integer(right)) => Value::Real(left - right as f64),
+            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 - right),
+            (Value::Real(_), other) => {
+                return Err(Fault::type_mismatch(
+                    "can't subtract @expected and `@received-value` (@received-type)",
+                    ValueKind::Real,
+                    other,
+                ))
+            }
+            (Value::Integer(_), other) => {
+                return Err(Fault::type_mismatch(
+                    "can't subtract @expected and `@received-value` (@received-type)",
+                    ValueKind::Integer,
+                    other,
+                ))
+            }
+            (other, _) => {
+                return Err(Fault::invalid_type(
+                    "`@received-value` (@received-type) is not able to be subtracted",
+                    other,
+                ))
+            }
+        };
+        self.stack.push(result)?;
+        Ok(None)
+    }
+
+    // floating point casts are intentional in this code.
+    #[allow(clippy::cast_precision_loss)]
+    fn multiply(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let (left, right) = self.pop_pair()?;
+        let result = match (left, right) {
+            (Value::Integer(left), Value::Integer(right)) => {
+                left.checked_mul(right).map_or(Value::Void, Value::Integer)
+            }
+            (Value::Real(left), Value::Real(right)) => Value::Real(left * right),
+            (Value::Real(left), Value::Integer(right)) => Value::Real(left * right as f64),
+            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 * right),
+            (Value::Real(_), other) => {
+                return Err(Fault::type_mismatch(
+                    "can't multiply @expected and `@received-value` (@received-type)",
+                    ValueKind::Real,
+                    other,
+                ))
+            }
+            (Value::Integer(_), other) => {
+                return Err(Fault::type_mismatch(
+                    "can't multiply @expected and `@received-value` (@received-type)",
+                    ValueKind::Integer,
+                    other,
+                ))
+            }
+            (other, _) => {
+                return Err(Fault::invalid_type(
+                    "`@received-value` (@received-type) is not able to be multiplied",
+                    other,
+                ))
+            }
+        };
+        self.stack.push(result)?;
+        Ok(None)
+    }
+
+    // floating point casts are intentional in this code.
+    #[allow(clippy::cast_precision_loss)]
+    fn divide(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let (left, right) = self.pop_pair()?;
+        let result = match (left, right) {
+            (Value::Integer(left), Value::Integer(right)) => {
+                left.checked_div(right).map_or(Value::Void, Value::Integer)
+            }
+            (Value::Real(left), Value::Real(right)) => Value::Real(left / right),
+            (Value::Real(left), Value::Integer(right)) => Value::Real(left / right as f64),
+            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 / right),
+            (Value::Real(_), other) => {
+                return Err(Fault::type_mismatch(
+                    "can't divide @expected and `@received-value` (@received-type)",
+                    ValueKind::Real,
+                    other,
+                ))
+            }
+            (Value::Integer(_), other) => {
+                return Err(Fault::type_mismatch(
+                    "can't divide @expected and `@received-value` (@received-type)",
+                    ValueKind::Integer,
+                    other,
+                ))
+            }
+            (other, _) => {
+                return Err(Fault::invalid_type(
+                    "`@received-value` (@received-type) is not able to be divided",
+                    other,
+                ))
+            }
+        };
+        self.stack.push(result)?;
+        Ok(None)
+    }
+
+    fn r#if(
+        &mut self,
+        false_jump_to: usize,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let value_to_check = self.pop()?;
+        if value_to_check.is_truthy() {
+            Ok(None)
+        } else {
+            Ok(Some(FlowControl::JumpTo(false_jump_to)))
+        }
+    }
+
+    fn compare(
+        &mut self,
+        comparison: Comparison,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let (left, right) = self.pop_pair()?;
+        let cmp_result = left.cmp(&right);
+        let result = matches!(
+            (comparison, cmp_result),
+            (Comparison::Equal, Ordering::Equal)
+                | (Comparison::NotEqual, Ordering::Greater | Ordering::Less)
+                | (Comparison::GreaterThan, Ordering::Greater)
+                | (
+                    Comparison::GreaterThanOrEqual,
+                    Ordering::Greater | Ordering::Equal
+                )
+                | (Comparison::LessThan, Ordering::Less)
+                | (
+                    Comparison::LessThanOrEqual,
+                    Ordering::Less | Ordering::Equal
+                )
+        );
+        self.stack.push(Value::Boolean(result))?;
+        Ok(None)
+    }
+
+    fn push_var(
+        &mut self,
+        variable: usize,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        if let Some(stack_offset) = self.variables_offset.checked_add(variable) {
+            if stack_offset < self.return_offset {
+                let value = self.stack[stack_offset].clone();
+                self.stack.push(value)?;
+                return Ok(None);
+            }
+        }
+        Err(Fault::from(FaultKind::InvalidVariableIndex))
+    }
+
+    fn push_arg(&mut self, arg: usize) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        if let Some(stack_offset) = self.arg_offset.checked_add(arg) {
+            if stack_offset < self.variables_offset {
+                let value = self.stack[stack_offset].clone();
+                self.stack.push(value)?;
+                return Ok(None);
+            }
+        }
+        Err(Fault::from(FaultKind::InvalidArgumentIndex))
+    }
+
+    fn pop_to_var(
+        &mut self,
+        variable: usize,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let value = self.stack.pop()?;
+        if let Some(stack_offset) = self.variables_offset.checked_add(variable) {
+            if stack_offset < self.return_offset {
+                self.stack[stack_offset] = value;
+                return Ok(None);
+            }
+        }
+        Ok(None)
+    }
+
+    fn call(
+        &mut self,
+        vtable_index: Option<usize>,
+        arg_count: usize,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let vtable_index = vtable_index
+            .or(self.vtable_index)
+            .ok_or(FaultKind::InvalidVtableIndex)?;
+        let function = &self
+            .module
+            .vtable
+            .get(vtable_index)
+            .ok_or(FaultKind::InvalidVtableIndex)?;
+
+        assert_eq!(function.arg_count, arg_count);
+
+        let variables_offset = self.stack.len();
+        let return_offset = variables_offset + function.variable_count;
+        let arg_offset = variables_offset - function.arg_count;
+        if function.variable_count > 0 {
+            self.stack
+                .grow_to(return_offset + function.variable_count)?;
+        }
+
+        StackFrame {
+            module: self.module,
+            stack: self.stack,
+            environment: self.environment,
+            return_offset,
+            variables_offset,
+            arg_offset,
+            vtable_index: Some(vtable_index),
+            operation_index: 0,
+            _output: PhantomData,
+        }
+        .execute_operations(&function.code)?;
+
+        self.clean_stack_after_call(arg_offset, return_offset)?;
+
+        Ok(None)
     }
 }
 
@@ -738,7 +1211,23 @@ impl<'a, Env, ReturnType> Fault<'a, Env, ReturnType> {
     fn stack_underflow() -> Self {
         Self::from(FaultKind::StackUnderflow)
     }
+
+    fn invalid_type(message: impl Into<String>, received: Value) -> Self {
+        Self::from(FaultKind::InvalidType {
+            message: message.into(),
+            received,
+        })
+    }
+
+    fn type_mismatch(message: impl Into<String>, expected: ValueKind, received: Value) -> Self {
+        Self::from(FaultKind::TypeMismatch {
+            message: message.into(),
+            expected,
+            received,
+        })
+    }
 }
+
 impl<'a, Env, ReturnType> From<FaultKind<'a, Env, ReturnType>> for Fault<'a, Env, ReturnType> {
     fn from(kind: FaultKind<'a, Env, ReturnType>) -> Self {
         Self {
@@ -764,6 +1253,9 @@ impl<'a, Env, ReturnType> Display for Fault<'a, Env, ReturnType> {
 /// An unexpected event within the virtual machine.
 #[derive(Debug)]
 pub enum FaultKind<'a, Env, ReturnType> {
+    /// An attempt to push a value to the stack was made after the stack has
+    /// reached its capacity.
+    StackOverflow,
     /// An attempt to pop a value off of the stack was made when no values were
     /// present in the current code's stack frame.
     StackUnderflow,
@@ -779,6 +1271,33 @@ pub enum FaultKind<'a, Env, ReturnType> {
     InvalidArgumentIndex,
     /// An invalid vtable index was used.
     InvalidVtableIndex,
+    /// A value type was unexpected in the given context.
+    TypeMismatch {
+        /// The error message explaining the type mismatch.
+        ///
+        /// These patterns will be replaced in `message` before being Displayed:
+        ///
+        /// - @expected
+        /// - @received-value
+        /// - @received-kind
+        message: String,
+        /// The kind expected in this context.
+        expected: ValueKind,
+        /// The value that caused an error.
+        received: Value,
+    },
+    /// An invalid value type was encountered.
+    InvalidType {
+        /// The error message explaining the type mismatch.
+        ///
+        /// These patterns will be replaced in `message` before being Displayed:
+        ///
+        /// - @received-value
+        /// - @received-kind
+        message: String,
+        /// The value that caused an error.
+        received: Value,
+    },
 }
 
 impl<'a, Env, ReturnType> std::error::Error for FaultKind<'a, Env, ReturnType>
@@ -791,6 +1310,7 @@ where
 impl<'a, Env, ReturnType> Display for FaultKind<'a, Env, ReturnType> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            FaultKind::StackOverflow => f.write_str("stack pushed to while at maximum capacity"),
             FaultKind::StackUnderflow => f.write_str("stack popped but no values present"),
             FaultKind::Paused(_) => f.write_str("execution paused"),
             FaultKind::InvalidVariableIndex => {
@@ -802,6 +1322,21 @@ impl<'a, Env, ReturnType> Display for FaultKind<'a, Env, ReturnType> {
             FaultKind::InvalidVtableIndex => f.write_str(
                 "a vtable index was beyond the number functions registerd in the current module",
             ),
+            FaultKind::TypeMismatch {
+                message,
+                expected,
+                received,
+            } => {
+                let message = message.replace("@expected", expected.as_str());
+                let message = message.replace("@received-type", received.kind().as_str());
+                let message = message.replace("@received-value", &received.to_string());
+                f.write_str(&message)
+            }
+            FaultKind::InvalidType { message, received } => {
+                let message = message.replace("@received-type", received.kind().as_str());
+                let message = message.replace("@received-value", &received.to_string());
+                f.write_str(&message)
+            }
         }
     }
 }
@@ -877,15 +1412,45 @@ pub trait FromStack: Sized {
 
 impl FromStack for Value {
     fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>> {
-        stack.stack.pop().ok_or_else(Fault::stack_underflow)
+        stack.stack.pop()
     }
 }
 
 impl FromStack for i64 {
     fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>> {
-        match stack.stack.pop().ok_or_else(Fault::stack_underflow)? {
+        match stack.stack.pop()? {
             Value::Integer(integer) => Ok(integer),
-            _ => todo!("type mismatch"),
+            other => Err(Fault::type_mismatch(
+                "@expected expected but received `@received-value` (@received-type)",
+                ValueKind::Integer,
+                other,
+            )),
+        }
+    }
+}
+
+impl FromStack for f64 {
+    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>> {
+        match stack.stack.pop()? {
+            Value::Real(number) => Ok(number),
+            other => Err(Fault::type_mismatch(
+                "@expected expected but received `@received-value` (@received-type)",
+                ValueKind::Real,
+                other,
+            )),
+        }
+    }
+}
+
+impl FromStack for bool {
+    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>> {
+        match stack.stack.pop()? {
+            Value::Boolean(value) => Ok(value),
+            other => Err(Fault::type_mismatch(
+                "@expected expected but received `@received-value` (@received-type)",
+                ValueKind::Boolean,
+                other,
+            )),
         }
     }
 }
@@ -965,7 +1530,7 @@ pub enum ExecutionBehavior {
 
 #[test]
 fn budget() {
-    let mut context = Bud::new(Budgeted::new(0));
+    let mut context = Bud::default_for(Budgeted::new(0));
     let mut fault = context
         .run::<i64>(Cow::Borrowed(&[
             Instruction::Push(Value::Integer(1)),
@@ -1022,7 +1587,7 @@ fn budget_with_frames() {
             Instruction::Add, // should produce 30
         ],
     };
-    let mut context = Bud::new(Budgeted::new(0)).with_function("test", test);
+    let mut context = Bud::default_for(Budgeted::new(0)).with_function("test", test);
     let mut fault = context
         .run::<i64>(Cow::Borrowed(&[
             Instruction::Push(Value::Boolean(false)),
@@ -1048,6 +1613,153 @@ fn budget_with_frames() {
     };
 
     assert_eq!(output, 30);
+}
+
+/// A stack of [`Value`]s.
+#[derive(Debug)]
+pub struct Stack {
+    values: Vec<Value>,
+    remaining_capacity: usize,
+}
+
+impl Default for Stack {
+    fn default() -> Self {
+        Self {
+            values: Vec::default(),
+            remaining_capacity: usize::MAX,
+        }
+    }
+}
+
+impl Stack {
+    /// Returns a new stack with enough reserved space to store
+    /// `initial_capacity` values without reallocating and will not allow
+    /// pushing more than `maximum_capacity` values.
+    #[must_use]
+    pub fn new(initial_capacity: usize, maximum_capacity: usize) -> Self {
+        Self {
+            values: Vec::with_capacity(initial_capacity),
+            remaining_capacity: maximum_capacity,
+        }
+    }
+
+    /// Pushes `value` to the stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FaultKind::StackOverflow`] if the stack's maximum capacity has
+    /// been reached.
+    #[inline]
+    pub fn push<Env, ReturnType>(
+        &mut self,
+        value: Value,
+    ) -> Result<(), FaultKind<'static, Env, ReturnType>> {
+        if self.remaining_capacity > 0 {
+            self.remaining_capacity -= 1;
+
+            self.values.push(value);
+            Ok(())
+        } else {
+            Err(FaultKind::StackOverflow)
+        }
+    }
+
+    /// Pops a [`Value`] from the stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FaultKind::StackUnderflow`] if the stack is empty.
+    #[inline]
+    pub fn pop<Env, ReturnType>(&mut self) -> Result<Value, Fault<'static, Env, ReturnType>> {
+        if let Some(value) = self.values.pop() {
+            self.remaining_capacity += 1;
+            Ok(value)
+        } else {
+            Err(Fault::from(FaultKind::StackUnderflow))
+        }
+    }
+
+    /// Pops a [`Value`] from the stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FaultKind::StackUnderflow`] if the stack is empty.
+    #[inline]
+    pub fn pop_pair<Env, ReturnType>(
+        &mut self,
+    ) -> Result<(Value, Value), Fault<'static, Env, ReturnType>> {
+        let current_top = self.values.len();
+        if let Some(new_top) = current_top.checked_sub(2) {
+            let mut popped_values = self.values.drain(new_top..current_top);
+            // By using drain, we're getting the values in the opposite order of
+            // calling pop twice.
+            let second = popped_values.next().expect("known drain amount");
+            let first = popped_values.next().expect("known drain amount");
+            return Ok((first, second));
+        }
+
+        Err(Fault::from(FaultKind::StackUnderflow))
+    }
+
+    /// Returns the number of [`Value`]s contained in this stack.
+    #[inline]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    /// Returns true if this stack has no values.
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Returns the number of [`Value`]s that can be pushed to this stack before
+    /// a [`FaultKind::StackOverflow`] is raised.
+    #[must_use]
+    pub const fn remaining_capacity(&self) -> usize {
+        self.remaining_capacity
+    }
+
+    #[inline]
+    fn remove_range<R>(&mut self, range: R)
+    where
+        R: RangeBounds<usize>,
+    {
+        let removed = self.values.drain(range).count();
+        self.remaining_capacity += removed;
+    }
+
+    #[inline]
+    fn grow_to<Env, ReturnType>(
+        &mut self,
+        new_size: usize,
+    ) -> Result<(), Fault<'static, Env, ReturnType>> {
+        let extra_capacity = new_size.saturating_sub(self.len());
+        if extra_capacity <= self.remaining_capacity {
+            self.values.resize(new_size, Value::Void);
+            Ok(())
+        } else {
+            Err(Fault::from(FaultKind::StackOverflow))
+        }
+    }
+}
+
+impl Index<usize> for Stack {
+    type Output = Value;
+
+    #[inline]
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.values[index]
+    }
+}
+
+impl IndexMut<usize> for Stack {
+    #[inline]
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.values[index]
+    }
 }
 
 #[test]
@@ -1103,4 +1815,47 @@ fn invalid_vtable_index() {
             .kind,
         FaultKind::InvalidVtableIndex
     ));
+}
+
+#[test]
+fn function_without_return_value() {
+    let test = Function {
+        arg_count: 0,
+        variable_count: 0,
+        code: vec![],
+    };
+    let mut context = Bud::empty().with_function("test", test);
+    assert_eq!(
+        context
+            .run::<Value>(Cow::Borrowed(&[Instruction::Call {
+                vtable_index: Some(0),
+                arg_count: 0,
+            }]))
+            .unwrap(),
+        Value::Void
+    );
+}
+
+#[test]
+fn function_needs_extra_cleanup() {
+    let test = Function {
+        arg_count: 0,
+        variable_count: 0,
+        code: vec![
+            Instruction::Push(Value::Integer(1)),
+            Instruction::Push(Value::Integer(2)),
+        ],
+    };
+    let mut context = Bud::empty().with_function("test", test);
+    assert_eq!(
+        context
+            .run::<Value>(Cow::Borrowed(&[Instruction::Call {
+                vtable_index: Some(0),
+                arg_count: 0,
+            }]))
+            .unwrap(),
+        Value::Integer(1)
+    );
+
+    assert!(context.stack().is_empty());
 }
