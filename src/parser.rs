@@ -47,6 +47,7 @@ enum TokenKind {
     Close(BracketType),
     EndOfLine,
     Comma,
+    Period,
 }
 
 #[derive(Debug)]
@@ -346,6 +347,9 @@ impl<'a> Lexer<'a> {
                 }
                 Some((offset, char)) if char == ',' => {
                     Some(Ok(Token::at_offset(TokenKind::Comma, offset)))
+                }
+                Some((offset, char)) if char == '.' => {
+                    Some(Ok(Token::at_offset(TokenKind::Period, offset)))
                 }
                 Some((offset, char)) if char == '(' => Some(Ok(Token::at_offset(
                     TokenKind::Open(BracketType::Paren),
@@ -670,46 +674,7 @@ fn parse_term(
 ) -> Result<NodeId, ParseError> {
     match first_token.kind {
         TokenKind::Identifier(lookup_base) => {
-            match tokens.peek_token_kind() {
-                Some(TokenKind::Open(BracketType::Paren)) => {
-                    // Call
-                    let _open_paren = tokens.next();
-                    let mut args = Vec::new();
-                    let mut next_token = tokens.next().unwrap()?;
-                    if !matches!(next_token.kind, TokenKind::Close(BracketType::Paren)) {
-                        loop {
-                            args.push(parse_expression(
-                                next_token,
-                                tree,
-                                tokens,
-                                owning_function_name,
-                            )?);
-
-                            // Expect either end bracket or comma,
-                            let comma_or_end = tokens.next().unwrap()?;
-                            match comma_or_end.kind {
-                                TokenKind::Close(BracketType::Paren) => break,
-                                TokenKind::Comma => {}
-                                other => todo!("error: {other:?}"),
-                            }
-                            next_token = tokens.next().unwrap()?;
-                        }
-                    }
-                    if lookup_base == "this" || owning_function_name == Some(&lookup_base) {
-                        Ok(tree.call(Call::recurse(args)))
-                    } else {
-                        Ok(tree.call(Call::global(lookup_base, args)))
-                    }
-                }
-                Some(TokenKind::Open(BracketType::Square)) => {
-                    // Index
-                    todo!()
-                }
-                _ => {
-                    // Just a solo identifier literal
-                    Ok(tree.identifier(lookup_base))
-                }
-            }
+            parse_lookup(lookup_base, tree, tokens, owning_function_name)
         }
         TokenKind::Integer(integer) => Ok(tree.integer(integer)),
         TokenKind::Real(integer) => Ok(tree.real(integer)),
@@ -725,6 +690,72 @@ fn parse_term(
         }
         _ => todo!("parse_term: {first_token:?}"),
     }
+}
+
+fn parse_lookup(
+    mut symbol: Symbol,
+    tree: &SyntaxTreeBuilder,
+    tokens: &mut Lexer<'_>,
+    owning_function_name: Option<&str>,
+) -> Result<NodeId, ParseError> {
+    let mut base = None;
+    loop {
+        base = match tokens.peek_token_kind() {
+            Some(TokenKind::Open(BracketType::Paren)) => {
+                // Call
+                let _open_paren = tokens.next();
+                let mut args = Vec::new();
+                let mut next_token = tokens.next().unwrap()?;
+                if !matches!(next_token.kind, TokenKind::Close(BracketType::Paren)) {
+                    loop {
+                        args.push(parse_expression(
+                            next_token,
+                            tree,
+                            tokens,
+                            owning_function_name,
+                        )?);
+
+                        // Expect either end bracket or comma,
+                        let comma_or_end = tokens.next().unwrap()?;
+                        match comma_or_end.kind {
+                            TokenKind::Close(BracketType::Paren) => break,
+                            TokenKind::Comma => {}
+                            other => todo!("error: {other:?}"),
+                        }
+                        next_token = tokens.next().unwrap()?;
+                    }
+                }
+                if let Some(base) = base {
+                    Some(tree.call(Call::on(base, symbol, args)))
+                } else if symbol == "this" || owning_function_name == Some(&symbol) {
+                    Some(tree.call(Call::recurse(args)))
+                } else {
+                    Some(tree.call(Call::global(symbol, args)))
+                }
+            }
+            Some(TokenKind::Open(BracketType::Square)) => {
+                // Index
+                todo!()
+            }
+            _ if base.is_none() => {
+                // Just a solo identifier literal.
+                Some(tree.identifier(symbol))
+            }
+            _ => break,
+        };
+
+        if let Some(TokenKind::Period) = tokens.peek_token_kind() {
+            let _period = tokens.next();
+            match tokens.next().unwrap()?.kind {
+                TokenKind::Identifier(sym) => symbol = sym,
+                _ => todo!("error: invalid lookup"),
+            }
+        } else {
+            break;
+        }
+    }
+
+    Ok(base.expect("always at least a base lookup"))
 }
 
 #[derive(Debug)]

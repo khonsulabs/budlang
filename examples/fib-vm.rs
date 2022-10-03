@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use budlang::vm::{Bud, Comparison, Function, Instruction, Value};
+use budlang::vm::{Bud, Comparison, Function, Instruction, Value, ValueSource};
 
 fn main() {
     const ARG_N: usize = 0;
@@ -10,14 +10,14 @@ fn main() {
         code: vec![
             // if v0 <= 2
             Instruction::Push(Value::Integer(2)),
-            Instruction::PushArg(ARG_N),
+            Instruction::PushCopy(ValueSource::Argument(ARG_N)),
             Instruction::Compare(Comparison::LessThanOrEqual),
             Instruction::If { false_jump_to: 6 },
             Instruction::Push(Value::Integer(1)),
             Instruction::Return,
             // self(n - 1) (result left on stack)
             Instruction::Push(Value::Integer(1)),
-            Instruction::PushArg(ARG_N),
+            Instruction::PushCopy(ValueSource::Argument(ARG_N)),
             Instruction::Sub,
             Instruction::Call {
                 vtable_index: None,
@@ -25,7 +25,7 @@ fn main() {
             },
             // self(n - 2) (result left on stack)
             Instruction::Push(Value::Integer(2)),
-            Instruction::PushArg(ARG_N),
+            Instruction::PushCopy(ValueSource::Argument(ARG_N)),
             Instruction::Sub,
             Instruction::Call {
                 vtable_index: None,

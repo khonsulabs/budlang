@@ -1,5 +1,5 @@
 use budlang::{
-    vm::{Bud, Budgeted, Fault, FaultKind},
+    vm::{Bud, Budgeted, Fault, FaultOrPause},
     Error,
 };
 
@@ -33,7 +33,7 @@ fn main() {
                 break;
             }
             Err(Error::Fault(Fault {
-                kind: FaultKind::Paused(mut paused),
+                kind: FaultOrPause::Pause(mut paused),
                 ..
             })) => {
                 println!("Ran out of budget. Allowing 10 more operations");

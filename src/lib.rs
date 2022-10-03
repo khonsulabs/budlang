@@ -70,5 +70,11 @@ impl<'a, Env, ReturnType> From<vm::Fault<'a, Env, ReturnType>> for Error<'a, Env
     }
 }
 
+impl<'a, Env, ReturnType> From<vm::FaultKind> for Error<'a, Env, ReturnType> {
+    fn from(fault: vm::FaultKind) -> Self {
+        Self::Fault(vm::Fault::from(fault))
+    }
+}
+
 #[cfg(test)]
 mod tests;

@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     symbol::Symbol,
-    vm::{self, Bud, Comparison, Environment, FromStack, Instruction, Value},
+    vm::{self, Bud, Comparison, Environment, FromStack, Instruction, Value, ValueSource},
     Error,
 };
 
@@ -86,6 +86,11 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
                 .field("target", &self.node(assign.target))
                 .field("value", &self.node(assign.value))
                 .finish(),
+            // Node::Lookup(lookup) => f
+            //     .debug_struct("Lookup")
+            //     .field("base", &self.node(lookup.base))
+            //     .field("name", &lookup.name)
+            //     .finish(),
             Node::Block(block) => {
                 let mut list = f.debug_list();
                 for statement in &block.0 {
@@ -96,6 +101,7 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
             Node::Literal(literal) => Debug::fmt(literal, f),
             Node::Identifier(identifier) => Debug::fmt(identifier, f),
             Node::Call(call) => {
+                let target = call.target.map(|node| self.node(node));
                 let name = if let Some(symbol) = &call.name {
                     symbol.as_ref()
                 } else {
@@ -107,6 +113,7 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
                     .map(|node| self.node(*node))
                     .collect::<Vec<_>>();
                 f.debug_struct("Call")
+                    .field("target", &target)
                     .field("name", &name)
                     .field("args", &&args[..])
                     .finish()
@@ -128,6 +135,7 @@ enum Node {
     Block(Block),
     Literal(Value),
     Identifier(Symbol),
+    // Lookup(Lookup),
     Call(Call),
     Return(NodeId),
 }
@@ -154,6 +162,7 @@ impl Node {
             Node::Assign(assign) => assign.generate_code(operations, tree),
             Node::Literal(literal) => operations.push(IntermediateOp::Push(literal.clone())),
             Node::Identifier(identifier) => operations.push_from_symbol(identifier),
+            // Node::Lookup(lookup) => lookup.generate_code(operations, tree),
             Node::Call(call) => call.generate_code(operations, tree),
             Node::Return(value) => Self::generate_return(*value, operations, tree),
         }
@@ -292,14 +301,14 @@ impl Call {
     }
 
     fn generate_code(&self, operations: &mut CodeBlockBuilder, tree: &ExpressionTree) {
-        for &arg in &self.args {
-            let arg = tree.node(arg);
-            arg.generate_code(operations, tree);
-        }
-
         match (self.target, self.name.as_ref()) {
             (None, None) => {
                 // Recursive call
+                for &arg in &self.args {
+                    let arg = tree.node(arg);
+                    arg.generate_code(operations, tree);
+                }
+
                 operations.push(IntermediateOp::Call {
                     function: None,
                     arg_count: self.args.len(),
@@ -307,6 +316,11 @@ impl Call {
             }
             (None, Some(symbol)) => {
                 // Global call
+                for &arg in &self.args {
+                    let arg = tree.node(arg);
+                    arg.generate_code(operations, tree);
+                }
+
                 match operations.scope.get(symbol) {
                     Some(ScopeSymbol::Argument(_) | ScopeSymbol::Variable(_)) => {
                         todo!("calling a lambda function in an argument")
@@ -323,7 +337,25 @@ impl Call {
                     }),
                 }
             }
-            _ => todo!("message"),
+            (Some(target), Some(name)) => {
+                // Evaluate the target expression
+                let target = tree.node(target);
+                target.generate_code(operations, tree);
+
+                // Push the arguments
+                for &arg in &self.args {
+                    let arg = tree.node(arg);
+                    arg.generate_code(operations, tree);
+                }
+
+                // Invoke the call
+                operations.push(IntermediateOp::CallInstance {
+                    target: None,
+                    name: name.clone(),
+                    arg_count: self.args.len(),
+                });
+            }
+            (Some(_), None) => todo!("invalid instruction"),
         }
     }
 }
@@ -348,6 +380,18 @@ impl Assign {
         }
     }
 }
+
+// #[derive(Debug, Clone)]
+// pub struct Lookup {
+//     base: NodeId,
+//     name: Symbol,
+// }
+
+// impl Lookup {
+//     fn generate_code(&self, operations: &mut CodeBlockBuilder, tree: &ExpressionTree) {
+//         todo!()
+//     }
+// }
 
 #[derive(Debug, Default)]
 pub struct SyntaxTreeBuilder(RefCell<Vec<Node>>);
@@ -452,10 +496,12 @@ impl CodeBlockBuilder {
     pub fn push_from_symbol(&mut self, symbol: &Symbol) {
         match self.scope.get(symbol).unwrap() {
             ScopeSymbol::Argument(index) => {
-                self.ops.push(IntermediateOp::PushCopy(*index));
+                self.ops
+                    .push(IntermediateOp::PushCopy(ValueSource::Argument(*index)));
             }
-            ScopeSymbol::Variable(index) => {
-                self.ops.push(IntermediateOp::PushVariable(*index));
+            ScopeSymbol::Variable(variable) => {
+                self.ops
+                    .push(IntermediateOp::PushCopy(ValueSource::Variable(variable.0)));
             }
             ScopeSymbol::Function { .. } => todo!("pushing a vtable entry?"),
         }
@@ -499,8 +545,7 @@ impl CodeBlockBuilder {
                     }
                     IntermediateOp::Compare(comparison) => Instruction::Compare(comparison),
                     IntermediateOp::Push(value) => Instruction::Push(value),
-                    IntermediateOp::PushVariable(variable) => Instruction::PushVariable(variable.0),
-                    IntermediateOp::PushCopy(arg) => Instruction::PushArg(arg),
+                    IntermediateOp::PushCopy(source) => Instruction::PushCopy(source),
                     IntermediateOp::PopAndDrop => Instruction::PopAndDrop,
                     IntermediateOp::Return => Instruction::Return,
                     IntermediateOp::CopyToVariable(variable_index) => {
@@ -522,6 +567,15 @@ impl CodeBlockBuilder {
                             arg_count,
                         }
                     }
+                    IntermediateOp::CallInstance {
+                        target,
+                        name,
+                        arg_count,
+                    } => Instruction::CallInstance {
+                        target,
+                        name,
+                        arg_count,
+                    },
                 })
             })
             .collect::<Result<_, CompilationError>>()
@@ -731,13 +785,17 @@ pub enum IntermediateOp {
     JumpTo(Label),
     Compare(Comparison),
     Push(Value),
-    PushVariable(Variable),
-    PushCopy(usize),
+    PushCopy(ValueSource),
     PopAndDrop,
     Return,
     CopyToVariable(Variable),
     Call {
         function: Option<Symbol>,
+        arg_count: usize,
+    },
+    CallInstance {
+        target: Option<ValueSource>,
+        name: Symbol,
         arg_count: usize,
     },
 }

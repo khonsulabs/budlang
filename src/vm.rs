@@ -1,13 +1,16 @@
 use std::{
+    any::{type_name, Any},
     borrow::Cow,
     cmp::Ordering,
     collections::{HashMap, VecDeque},
-    fmt::Display,
+    fmt::{Debug, Display},
     marker::PhantomData,
-    ops::{Index, IndexMut, RangeBounds},
+    ops::{Bound, Index, IndexMut, RangeBounds},
+    sync::Arc,
+    vec,
 };
 
-use crate::{parser::parse, symbol::Symbol, Error};
+use crate::{ast::CompilationError, parser::parse, symbol::Symbol, Error};
 
 /// A virtual machine instruction.
 ///
@@ -65,20 +68,9 @@ pub enum Instruction {
     Compare(Comparison),
     /// Pushes a [`Value`] to the stack.
     Push(Value),
-    /// Pushes a variable to the stack.
-    ///
-    /// Each function is allocated a fixed number of variables which are
-    /// accessed using 0-based indexes. Attempting to use a variable index
-    /// outside of the range allocated will cause a
-    /// [`FaultKind::InvalidVariableIndex`] to be returned.
-    PushVariable(usize),
-    /// Pushes an argument to the stack.
-    ///
-    /// The value passed is a 0-based index to an argument that was passed to
-    /// the function when called. Attempting to use an argument index
-    /// larger than the number of arguments passed will cause a
-    /// [`FaultKind::InvalidArgumentIndex`] to be returned.
-    PushArg(usize),
+    /// Pushes a copy of a value to the stack. The value could be from either an
+    /// argument or a variable.
+    PushCopy(ValueSource),
     /// Pops a value from the stack and drops the value.
     ///
     /// Attempting to pop beyond the baseline of the currently executing set of
@@ -117,6 +109,28 @@ pub enum Instruction {
         /// arguments to this call.
         arg_count: usize,
     },
+    /// Calls a function by name on a value.
+    CallInstance {
+        /// The target of the function call. If None, the value on the stack
+        /// prior to the arguments is the target of the call.
+        target: Option<ValueSource>,
+
+        /// The name of the function to call.
+        name: Symbol,
+
+        /// The number of arguments on the stack that should be used as
+        /// arguments to this call.
+        arg_count: usize,
+    },
+}
+
+/// The source of a value.
+#[derive(Debug, Copy, Clone)]
+pub enum ValueSource {
+    /// The value is in an argument at the provided 0-based index.
+    Argument(usize),
+    /// The value is in a variable at the provided 0-based index.
+    Variable(usize),
 }
 
 /// A method for comparing [`Value`]s.
@@ -156,11 +170,90 @@ pub enum Value {
     Real(f64),
     /// A boolean representing true or false.
     Boolean(bool),
+    /// A type exposed from Rust.
+    Dynamic(Dynamic),
     /// A value representing the lack of a value.
     Void,
 }
 
 impl Value {
+    /// Returns a new value containing the Rust value provided.
+    #[must_use]
+    pub fn dynamic(value: impl DynamicValue + 'static) -> Self {
+        Self::Dynamic(Dynamic::new(value))
+    }
+
+    /// Returns a reference to the contained value, if it was one originally
+    /// created with [`Value::dynamic()`]. If the value isn't a dynamic value or
+    /// `T` is not the correct type, None will be returned.
+    #[must_use]
+    pub fn as_dynamic<T: DynamicValue>(&self) -> Option<&T> {
+        if let Self::Dynamic(value) = self {
+            value.0.as_any().downcast_ref::<T>()
+        } else {
+            None
+        }
+    }
+
+    /// Returns a mutable reference to the contained value, if it was one
+    /// originally created with [`Value::dynamic()`]. If the value isn't a
+    /// dynamic value or `T` is not the correct type, None will be returned.
+    ///
+    /// Because dynamic values are cheaply cloned by wrapping the value in an
+    /// [`Arc`], this method will create a copy of the contained value if there
+    /// are any other instances that point to the same contained value. If this
+    /// is the only instance of this value, a mutable reference to the contained
+    /// value will be returned without additional allocations.
+    #[must_use]
+    pub fn as_dynamic_mut<T: DynamicValue>(&mut self) -> Option<&mut T> {
+        if let Self::Dynamic(value) = self {
+            value.as_mut().as_any_mut().downcast_mut()
+        } else {
+            None
+        }
+    }
+
+    /// Returns the contained value, if it was one originally created with
+    /// [`Value::dynamic()`] and `T` is the same type. If the value contains
+    /// another type, `Err(self)` will be returned. Otherwise, the original
+    /// value will be returned.
+    ///
+    /// Because dynamic values are cheaply cloned by wrapping the value in an
+    /// [`Arc`], this method will return a clone if there are any other
+    /// instances that point to the same contained value. If this is the final
+    /// instance of this value, the contained value will be returned without
+    /// additional allocations.
+    pub fn into_dynamic<T: DynamicValue>(self) -> Result<T, Self> {
+        // Before we consume the value, verify we have the correct type.
+        if self.as_dynamic::<T>().is_some() {
+            // We can now destruct self safely without worrying about needing to
+            // return an error.
+            let value = if let Self::Dynamic(value) = self {
+                value
+            } else {
+                unreachable!()
+            };
+            match Arc::try_unwrap(value.0) {
+                Ok(mut boxed_value) => {
+                    let opt_value = boxed_value
+                        .as_opt_any_mut()
+                        .downcast_mut::<Option<T>>()
+                        .expect("type already checked");
+                    let mut value = None;
+                    std::mem::swap(opt_value, &mut value);
+                    Ok(value.expect("value already taken"))
+                }
+                Err(arc_value) => Ok(arc_value
+                    .as_any()
+                    .downcast_ref::<T>()
+                    .expect("type already checked")
+                    .clone()),
+            }
+        } else {
+            Err(self)
+        }
+    }
+
     /// Returns true if the value is considered truthy.
     ///
     /// | value type | condition     |
@@ -169,12 +262,12 @@ impl Value {
     /// | Boolean    | value is true |
     /// | Void       | always false  |
     #[must_use]
-    #[inline]
     pub fn is_truthy(&self) -> bool {
         match self {
             Value::Integer(value) => *value != 0,
             Value::Real(value) => value.abs() < f64::EPSILON,
             Value::Boolean(value) => *value,
+            Value::Dynamic(value) => value.0.is_truthy(),
             Value::Void => false,
         }
     }
@@ -188,11 +281,12 @@ impl Value {
 
     /// Returns the kind of the contained value.
     #[must_use]
-    pub const fn kind(&self) -> ValueKind {
+    pub fn kind(&self) -> ValueKind {
         match self {
             Value::Integer(_) => ValueKind::Integer,
             Value::Real(_) => ValueKind::Real,
             Value::Boolean(_) => ValueKind::Boolean,
+            Value::Dynamic(value) => ValueKind::Dynamic(value.0.kind()),
             Value::Void => ValueKind::Void,
         }
     }
@@ -211,6 +305,12 @@ impl PartialEq for Value {
             (Self::Real(lhs), Self::Integer(rhs)) => real_total_eq(*lhs, *rhs as f64),
             (Self::Boolean(lhs), Self::Boolean(rhs)) => lhs == rhs,
             (Self::Void, Self::Void) => true,
+            (Self::Dynamic(lhs), Self::Dynamic(rhs)) => lhs
+                .0
+                .partial_eq(other)
+                .or_else(|| rhs.0.partial_eq(self))
+                .unwrap_or(false),
+            (Self::Dynamic(lhs), _) => lhs.0.partial_eq(other).unwrap_or(false),
             _ => false,
         }
     }
@@ -219,9 +319,10 @@ impl PartialEq for Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Value::Integer(value) => value.fmt(f),
-            Value::Real(value) => value.fmt(f),
-            Value::Boolean(value) => value.fmt(f),
+            Value::Integer(value) => Display::fmt(value, f),
+            Value::Real(value) => Display::fmt(value, f),
+            Value::Boolean(value) => Display::fmt(value, f),
+            Value::Dynamic(dynamic) => Display::fmt(dynamic, f),
             Value::Void => f.write_str("Void"),
         }
     }
@@ -413,78 +514,59 @@ impl PartialEq<f64> for Value {
     }
 }
 
-impl Ord for Value {
-    #[inline]
-    // floating point casts are intentional in this code.
-    #[allow(clippy::cast_precision_loss)]
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            // Handle all comparisons that do type-level comparisons
-            (Value::Integer(left), Value::Integer(right)) => left.cmp(right),
-            (Value::Real(left), Value::Real(right)) => real_total_cmp(*left, *right),
-            (Value::Integer(left), Value::Real(right)) => real_total_cmp(*left as f64, *right),
-            (Value::Real(left), Value::Integer(right)) => real_total_cmp(*left, *right as f64),
-            (Value::Boolean(left), Value::Boolean(right)) => {
-                if *left == *right {
-                    Ordering::Equal
-                } else if *left {
-                    Ordering::Greater
-                } else {
-                    Ordering::Less
-                }
-            }
-            // Now sort based purely on type:
-            // - Void
-            // - Boolean
-            // - Numerics
-            (Value::Void, Value::Void) => Ordering::Equal,
-            (Value::Void, _) => Ordering::Less,
-            (_, Value::Void) => Ordering::Greater,
-            (Value::Boolean(_), _) => Ordering::Less,
-            (_, Value::Boolean(_)) => Ordering::Greater,
-        }
+fn dynamic_ord(
+    left: &Value,
+    left_dynamic: &dyn UnboxableDynamicValue,
+    right: &Value,
+) -> Option<Ordering> {
+    match left_dynamic.partial_cmp(right) {
+        Some(ordering) => Some(ordering),
+        None => match right {
+            Value::Dynamic(right) => right.0.partial_cmp(left).map(Ordering::reverse),
+            _ => None,
+        },
     }
-}
-
-#[test]
-fn value_ord_tests() {
-    let expected_order = vec![
-        Value::Void,
-        Value::Void,
-        Value::Boolean(false),
-        Value::Boolean(false),
-        Value::Boolean(true),
-        Value::Boolean(true),
-        Value::Integer(-5),
-        Value::Real(-4.0),
-        Value::Integer(-3),
-        Value::Real(1.0),
-        Value::Integer(3),
-        Value::Real(4.0),
-    ];
-
-    let mut faux_shuffled = vec![
-        Value::Boolean(false),
-        Value::Integer(-5),
-        Value::Void,
-        Value::Integer(-3),
-        Value::Boolean(true),
-        Value::Real(-4.0),
-        Value::Boolean(true),
-        Value::Real(4.0),
-        Value::Void,
-        Value::Real(1.0),
-        Value::Integer(3),
-        Value::Boolean(false),
-    ];
-    faux_shuffled.sort();
-    assert_eq!(faux_shuffled, expected_order);
 }
 
 impl PartialOrd for Value {
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+    fn partial_cmp(&self, right: &Self) -> Option<Ordering> {
+        match self {
+            Value::Integer(left) => match right {
+                Value::Integer(right) => Some(left.cmp(right)),
+                Value::Dynamic(right_dynamic) => {
+                    dynamic_ord(right, right_dynamic.0.as_ref().as_ref(), self)
+                        .map(Ordering::reverse)
+                }
+                _ => None,
+            },
+            Value::Real(left) => match right {
+                Value::Real(right) => Some(real_total_cmp(*left, *right)),
+                Value::Dynamic(right_dynamic) => {
+                    dynamic_ord(right, right_dynamic.0.as_ref().as_ref(), self)
+                        .map(Ordering::reverse)
+                }
+                _ => None,
+            },
+            Value::Boolean(left) => match right {
+                Value::Boolean(right) => Some(left.cmp(right)),
+                Value::Dynamic(right_dynamic) => {
+                    dynamic_ord(right, right_dynamic.0.as_ref().as_ref(), self)
+                        .map(Ordering::reverse)
+                }
+                _ => None,
+            },
+            Value::Dynamic(left_dynamic) => {
+                dynamic_ord(self, left_dynamic.0.as_ref().as_ref(), right)
+            }
+            Value::Void => {
+                if let Value::Void = right {
+                    Some(Ordering::Equal)
+                } else {
+                    None
+                }
+            }
+        }
     }
 }
 
@@ -497,6 +579,8 @@ pub enum ValueKind {
     Real,
     /// A boolean representing true or false.
     Boolean,
+    /// A dynamically exposed Rust type.
+    Dynamic(&'static str),
     /// A value representing the lack of a value.
     Void,
 }
@@ -510,7 +594,58 @@ impl ValueKind {
             ValueKind::Real => "Real",
             ValueKind::Boolean => "Boolean",
             ValueKind::Void => "Void",
+            ValueKind::Dynamic(name) => name,
         }
+    }
+}
+
+/// A type that can be used in the virtual machine using [`Value::dynamic`].
+pub trait DynamicValue: Clone + Debug + Display + 'static {
+    /// Returns true if the value contained is truthy. See
+    /// [`Value::is_truthy()`] for examples of what this means for primitive
+    /// types.
+    fn is_truthy(&self) -> bool;
+
+    /// Returns a unique string identifying this type. This returned string will
+    /// be wrapped in [`ValueKind::Dynamic`] when [`Value::kind()`] is invoked
+    /// on a dynamic value.
+    ///
+    /// This value does not influence the virtual machine's behavior. The
+    /// virtual machine uses this string only when creating error messages.
+    fn kind(&self) -> &'static str;
+
+    /// Returns true if self and other are considered equal. Returns false if
+    /// self and other are able to be compared but are not equal. Returns None
+    /// if the values are unable to be compared.
+    ///
+    /// When evaluating `left = right` with dynamic values, if
+    /// `left.partial_eq(right)` returns None, `right.partial_eq(left)` will be
+    /// attempted before returning false.
+    #[allow(unused_variables)]
+    fn partial_eq(&self, other: &Value) -> Option<bool> {
+        None
+    }
+
+    /// Returns the relative ordering of `self` and `other`, if a comparison is
+    /// able to be made. If the types cannot be compared, this function should
+    /// return None.
+    ///
+    /// When evaluating a comparison such as `left < right` with dynamic values,
+    /// if `left.partial_cmp(right)` returns None,
+    /// `right.partial_cmp(left).map(Ordering::reverse)` will be attempted
+    /// before returning false.
+    #[allow(unused_variables)]
+    fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
+        None
+    }
+
+    /// Calls a function by `name` with `args`.
+    #[allow(unused_variables)]
+    fn call(&mut self, name: &Symbol, args: vec::Drain<'_, Value>) -> Result<Value, FaultKind> {
+        Err(FaultKind::UnknownFunction {
+            kind: ValueKind::Dynamic(self.kind()),
+            name: name.clone(),
+        })
     }
 }
 
@@ -614,6 +749,32 @@ where
     }
 
     /// Runs a set of instructions.
+    pub fn call<'a, Output: FromStack, Args, ArgsIter>(
+        &'a mut self,
+        function: &Symbol,
+        arguments: Args,
+    ) -> Result<Output, Error<'_, Env, Output>>
+    where
+        Args: IntoIterator<Item = Value, IntoIter = ArgsIter>,
+        ArgsIter: Iterator<Item = Value> + ExactSizeIterator + DoubleEndedIterator,
+    {
+        match self.local_module.contents.get(function) {
+            Some(ModuleItem::Function(vtable_index)) => {
+                let arg_count = self.stack.extend(arguments)?;
+                // TODO It'd be nice to not have to have an allocation here
+                self.run(Cow::Owned(vec![Instruction::Call {
+                    vtable_index: Some(*vtable_index),
+                    arg_count,
+                }]))
+                .map_err(Error::from)
+            }
+            None => Err(Error::from(CompilationError::UndefinedFunction(
+                function.clone(),
+            ))),
+        }
+    }
+
+    /// Runs a set of instructions.
     pub fn run<'a, Output: FromStack>(
         &'a mut self,
         operations: Cow<'a, [Instruction]>,
@@ -633,7 +794,7 @@ where
         .execute_operations(&operations))
         {
             Err(Fault {
-                kind: FaultKind::Paused(paused_evaluation),
+                kind: FaultOrPause::Pause(paused_evaluation),
                 stack,
             }) => {
                 let paused_evaluation = PausedExecution {
@@ -643,13 +804,13 @@ where
                     _return: PhantomData,
                 };
                 return Err(Fault {
-                    kind: FaultKind::Paused(paused_evaluation),
+                    kind: FaultOrPause::Pause(paused_evaluation),
                     stack,
                 });
             }
             other => other?,
         }
-        Output::from_stack(self)
+        Output::from_stack(self).map_err(Fault::from)
     }
 
     fn resume<'a, Output: FromStack>(
@@ -673,7 +834,7 @@ where
         {
             Ok(()) => {}
             Err(Fault {
-                kind: FaultKind::Paused(paused_evaluation),
+                kind: FaultOrPause::Pause(paused_evaluation),
                 stack,
             }) => {
                 let paused_evaluation = PausedExecution {
@@ -683,13 +844,13 @@ where
                     _return: PhantomData,
                 };
                 return Err(Fault {
-                    kind: FaultKind::Paused(paused_evaluation),
+                    kind: FaultOrPause::Pause(paused_evaluation),
                     stack,
                 });
             }
             Err(other) => return Err(other),
         }
-        Output::from_stack(self)
+        Output::from_stack(self).map_err(Fault::from)
     }
 
     /// Compiles `source` and executes it in this context. Any declarations will
@@ -765,7 +926,7 @@ where
             match running_frame.resume_executing_execute_operations(&function.code, resume_from) {
                 Ok(_) => {}
                 Err(Fault {
-                    kind: FaultKind::Paused(mut paused),
+                    kind: FaultOrPause::Pause(mut paused),
                     stack,
                 }) => {
                     paused.stack.push_front(PausedFrame {
@@ -776,7 +937,7 @@ where
                         operation_index: self.operation_index,
                     });
                     return Err(Fault {
-                        kind: FaultKind::Paused(paused),
+                        kind: FaultOrPause::Pause(paused),
                         stack,
                     });
                 }
@@ -806,7 +967,7 @@ where
                     operation_index: self.operation_index,
                 });
                 return Err(Fault {
-                    kind: FaultKind::Paused(PausedExecution {
+                    kind: FaultOrPause::Pause(PausedExecution {
                         context: None,
                         operations: None,
                         stack,
@@ -837,7 +998,7 @@ where
                 }
                 Ok(None) => {}
                 Err(mut fault) => {
-                    if let FaultKind::Paused(paused_frame) = &mut fault.kind {
+                    if let FaultOrPause::Pause(paused_frame) = &mut fault.kind {
                         paused_frame.stack.push_front(PausedFrame {
                             return_offset: self.return_offset,
                             arg_offset: self.arg_offset,
@@ -877,8 +1038,8 @@ where
                 self.stack.push(value.clone())?;
                 Ok(None)
             }
-            Instruction::PushVariable(variable) => self.push_var(*variable),
-            Instruction::PushArg(arg_index) => self.push_arg(*arg_index),
+            Instruction::PushCopy(ValueSource::Variable(variable)) => self.push_var(*variable),
+            Instruction::PushCopy(ValueSource::Argument(arg_index)) => self.push_arg(*arg_index),
             Instruction::PopAndDrop => {
                 self.pop()?;
                 Ok(None)
@@ -889,6 +1050,11 @@ where
                 vtable_index,
                 arg_count,
             } => self.call(*vtable_index, *arg_count),
+            Instruction::CallInstance {
+                target,
+                name,
+                arg_count,
+            } => self.call_instance(*target, name, *arg_count),
         }
     }
 
@@ -917,46 +1083,46 @@ where
     }
 
     #[inline]
-    fn pop(&mut self) -> Result<Value, Fault<'static, Env, Output>> {
+    fn pop(&mut self) -> Result<Value, FaultKind> {
         if self.stack.len() > self.return_offset {
             self.stack.pop()
         } else {
-            Err(Fault::stack_underflow())
+            Err(FaultKind::StackUnderflow)
         }
     }
 
     #[inline]
-    fn pop_pair(&mut self) -> Result<(Value, Value), Fault<'static, Env, Output>> {
+    fn pop_and_modify(&mut self) -> Result<(Value, &mut Value), FaultKind> {
         if self.stack.len() + 1 > self.return_offset {
-            self.stack.pop_pair()
+            self.stack.pop_and_modify()
         } else {
-            Err(Fault::stack_underflow())
+            Err(FaultKind::StackUnderflow)
         }
     }
 
     // floating point casts are intentional in this code.
     #[allow(clippy::cast_precision_loss)]
     fn add(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_pair()?;
-        let result = match (left, right) {
+        let (left, right) = self.pop_and_modify()?;
+        *right = match (left, &*right) {
             (Value::Integer(left), Value::Integer(right)) => {
-                left.checked_add(right).map_or(Value::Void, Value::Integer)
+                left.checked_add(*right).map_or(Value::Void, Value::Integer)
             }
-            (Value::Real(left), Value::Real(right)) => Value::Real(left + right),
-            (Value::Real(left), Value::Integer(right)) => Value::Real(left + right as f64),
-            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 + right),
+            (Value::Real(left), Value::Real(right)) => Value::Real(left + *right),
+            (Value::Real(left), Value::Integer(right)) => Value::Real(left + *right as f64),
+            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 + *right),
             (Value::Real(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't add @expected and `@received-value` (@received-type)",
                     ValueKind::Real,
-                    other,
+                    other.clone(),
                 ))
             }
             (Value::Integer(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't add @expected and `@received-value` (@received-type)",
                     ValueKind::Integer,
-                    other,
+                    other.clone(),
                 ))
             }
             (other, _) => {
@@ -966,33 +1132,32 @@ where
                 ))
             }
         };
-        self.stack.push(result)?;
         Ok(None)
     }
 
     // floating point casts are intentional in this code.
     #[allow(clippy::cast_precision_loss)]
     fn sub(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_pair()?;
-        let result = match (left, right) {
+        let (left, right) = self.pop_and_modify()?;
+        *right = match (left, &*right) {
             (Value::Integer(left), Value::Integer(right)) => {
-                left.checked_sub(right).map_or(Value::Void, Value::Integer)
+                left.checked_sub(*right).map_or(Value::Void, Value::Integer)
             }
-            (Value::Real(left), Value::Real(right)) => Value::Real(left - right),
-            (Value::Real(left), Value::Integer(right)) => Value::Real(left - right as f64),
-            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 - right),
+            (Value::Real(left), Value::Real(right)) => Value::Real(left - *right),
+            (Value::Real(left), Value::Integer(right)) => Value::Real(left - *right as f64),
+            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 - *right),
             (Value::Real(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't subtract @expected and `@received-value` (@received-type)",
                     ValueKind::Real,
-                    other,
+                    other.clone(),
                 ))
             }
             (Value::Integer(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't subtract @expected and `@received-value` (@received-type)",
                     ValueKind::Integer,
-                    other,
+                    other.clone(),
                 ))
             }
             (other, _) => {
@@ -1002,33 +1167,32 @@ where
                 ))
             }
         };
-        self.stack.push(result)?;
         Ok(None)
     }
 
     // floating point casts are intentional in this code.
     #[allow(clippy::cast_precision_loss)]
     fn multiply(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_pair()?;
-        let result = match (left, right) {
+        let (left, right) = self.pop_and_modify()?;
+        *right = match (left, &*right) {
             (Value::Integer(left), Value::Integer(right)) => {
-                left.checked_mul(right).map_or(Value::Void, Value::Integer)
+                left.checked_mul(*right).map_or(Value::Void, Value::Integer)
             }
-            (Value::Real(left), Value::Real(right)) => Value::Real(left * right),
-            (Value::Real(left), Value::Integer(right)) => Value::Real(left * right as f64),
-            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 * right),
+            (Value::Real(left), Value::Real(right)) => Value::Real(left * *right),
+            (Value::Real(left), Value::Integer(right)) => Value::Real(left * *right as f64),
+            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 * *right),
             (Value::Real(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't multiply @expected and `@received-value` (@received-type)",
                     ValueKind::Real,
-                    other,
+                    other.clone(),
                 ))
             }
             (Value::Integer(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't multiply @expected and `@received-value` (@received-type)",
                     ValueKind::Integer,
-                    other,
+                    other.clone(),
                 ))
             }
             (other, _) => {
@@ -1038,33 +1202,32 @@ where
                 ))
             }
         };
-        self.stack.push(result)?;
         Ok(None)
     }
 
     // floating point casts are intentional in this code.
     #[allow(clippy::cast_precision_loss)]
     fn divide(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_pair()?;
-        let result = match (left, right) {
+        let (left, right) = self.pop_and_modify()?;
+        *right = match (left, &*right) {
             (Value::Integer(left), Value::Integer(right)) => {
-                left.checked_div(right).map_or(Value::Void, Value::Integer)
+                left.checked_div(*right).map_or(Value::Void, Value::Integer)
             }
-            (Value::Real(left), Value::Real(right)) => Value::Real(left / right),
-            (Value::Real(left), Value::Integer(right)) => Value::Real(left / right as f64),
-            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 / right),
+            (Value::Real(left), Value::Real(right)) => Value::Real(left / *right),
+            (Value::Real(left), Value::Integer(right)) => Value::Real(left / *right as f64),
+            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 / *right),
             (Value::Real(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't divide @expected and `@received-value` (@received-type)",
                     ValueKind::Real,
-                    other,
+                    other.clone(),
                 ))
             }
             (Value::Integer(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't divide @expected and `@received-value` (@received-type)",
                     ValueKind::Integer,
-                    other,
+                    other.clone(),
                 ))
             }
             (other, _) => {
@@ -1074,7 +1237,6 @@ where
                 ))
             }
         };
-        self.stack.push(result)?;
         Ok(None)
     }
 
@@ -1090,29 +1252,60 @@ where
         }
     }
 
+    #[allow(clippy::unnecessary_wraps)] // makes caller more clean
+    fn equality<const INVERSE: bool>(
+        left: &Value,
+        right: &mut Value,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let mut result = left.eq(right);
+        if INVERSE {
+            result = !result;
+        }
+        *right = Value::Boolean(result);
+
+        Ok(None)
+    }
+
+    fn compare_values(
+        left: &Value,
+        right: &mut Value,
+        matcher: impl FnOnce(Ordering) -> bool,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        if let Some(ordering) = left.partial_cmp(right) {
+            *right = Value::Boolean(matcher(ordering));
+            Ok(None)
+        } else {
+            let mut received = Value::Void;
+            std::mem::swap(&mut received, right);
+            Err(Fault::type_mismatch(
+                "invalid comparison between @expected and `@received-value` (@received-type)",
+                left.kind(),
+                received,
+            ))
+        }
+    }
+
     fn compare(
         &mut self,
         comparison: Comparison,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_pair()?;
-        let cmp_result = left.cmp(&right);
-        let result = matches!(
-            (comparison, cmp_result),
-            (Comparison::Equal, Ordering::Equal)
-                | (Comparison::NotEqual, Ordering::Greater | Ordering::Less)
-                | (Comparison::GreaterThan, Ordering::Greater)
-                | (
-                    Comparison::GreaterThanOrEqual,
-                    Ordering::Greater | Ordering::Equal
-                )
-                | (Comparison::LessThan, Ordering::Less)
-                | (
-                    Comparison::LessThanOrEqual,
-                    Ordering::Less | Ordering::Equal
-                )
-        );
-        self.stack.push(Value::Boolean(result))?;
-        Ok(None)
+        let (left, right) = self.pop_and_modify()?;
+        match comparison {
+            Comparison::Equal => Self::equality::<false>(&left, right),
+            Comparison::NotEqual => Self::equality::<true>(&left, right),
+            Comparison::LessThan => {
+                Self::compare_values(&left, right, |ordering| ordering == Ordering::Less)
+            }
+            Comparison::LessThanOrEqual => Self::compare_values(&left, right, |ordering| {
+                matches!(ordering, Ordering::Less | Ordering::Equal)
+            }),
+            Comparison::GreaterThan => {
+                Self::compare_values(&left, right, |ordering| ordering == Ordering::Greater)
+            }
+            Comparison::GreaterThanOrEqual => Self::compare_values(&left, right, |ordering| {
+                matches!(ordering, Ordering::Greater | Ordering::Equal)
+            }),
+        }
     }
 
     fn push_var(
@@ -1197,13 +1390,103 @@ where
 
         Ok(None)
     }
+
+    fn call_instance(
+        &mut self,
+        target: Option<ValueSource>,
+        name: &Symbol,
+        arg_count: usize,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        // To prevent overlapping a mutable borrow of the value plus immutable
+        // borrows of the stack, we temporarily take the value from where it
+        // lives.
+        let stack_index = match target {
+            Some(ValueSource::Argument(index)) => {
+                if let Some(stack_index) = self.arg_offset.checked_add(index) {
+                    if stack_index < self.variables_offset {
+                        stack_index
+                    } else {
+                        return Err(Fault::from(FaultKind::InvalidArgumentIndex));
+                    }
+                } else {
+                    return Err(Fault::from(FaultKind::InvalidArgumentIndex));
+                }
+            }
+            Some(ValueSource::Variable(index)) => {
+                if let Some(stack_index) = self.variables_offset.checked_add(index) {
+                    if stack_index < self.return_offset {
+                        stack_index
+                    } else {
+                        return Err(Fault::from(FaultKind::InvalidVariableIndex));
+                    }
+                } else {
+                    return Err(Fault::from(FaultKind::InvalidVariableIndex));
+                }
+            }
+            None => {
+                // If None, the target is the value prior to the arguments.
+                if let Some(stack_index) = self
+                    .stack
+                    .len()
+                    .checked_sub(arg_count)
+                    .and_then(|index| index.checked_sub(1))
+                {
+                    if stack_index >= self.return_offset {
+                        stack_index
+                    } else {
+                        return Err(Fault::stack_underflow());
+                    }
+                } else {
+                    return Err(Fault::stack_underflow());
+                }
+            }
+        };
+
+        let return_offset = self.stack.len();
+        let arg_offset = return_offset.checked_sub(arg_count);
+        let arg_offset = match arg_offset {
+            Some(arg_offset) if arg_offset >= self.return_offset => arg_offset,
+            _ => return Err(Fault::stack_underflow()),
+        };
+
+        // Pull the target out of its current location.
+        let mut target_value = Value::Void;
+        std::mem::swap(&mut target_value, &mut self.stack[stack_index]);
+        // Call without resolving any errors
+        let result = match &mut target_value {
+            Value::Dynamic(value) => value.call(name, self.stack.drain(arg_offset..return_offset)),
+
+            _ => {
+                return Err(Fault::from(FaultKind::invalid_type(
+                    "@received-kind does not support function calls",
+                    target_value,
+                )))
+            }
+        };
+        if target.is_some() {
+            // Return the target to its proper location
+            std::mem::swap(&mut target_value, &mut self.stack[stack_index]);
+        } else {
+            // Remove the target's stack space. We didn't do this earlier
+            // because it would have caused a copy of all args. But at this
+            // point, all the args have been drained during the call so the
+            // target can simply be popped.
+            self.stack.pop()?;
+        }
+
+        // If there was a fault, return.
+        let produced_value = result?;
+        self.stack.push(produced_value)?;
+
+        Ok(None)
+    }
 }
 
 /// An unexpected event occurred while executing the virtual machine.
 #[derive(Debug)]
 pub struct Fault<'a, Env, ReturnType> {
     /// The kind of fault this is.
-    pub kind: FaultKind<'a, Env, ReturnType>,
+    pub kind: FaultOrPause<'a, Env, ReturnType>,
     /// The stack trace of the virtual machine when the fault was raised.
     pub stack: Vec<FaultStackFrame>,
 }
@@ -1214,25 +1497,18 @@ impl<'a, Env, ReturnType> Fault<'a, Env, ReturnType> {
     }
 
     fn invalid_type(message: impl Into<String>, received: Value) -> Self {
-        Self::from(FaultKind::InvalidType {
-            message: message.into(),
-            received,
-        })
+        Self::from(FaultKind::invalid_type(message, received))
     }
 
     fn type_mismatch(message: impl Into<String>, expected: ValueKind, received: Value) -> Self {
-        Self::from(FaultKind::TypeMismatch {
-            message: message.into(),
-            expected,
-            received,
-        })
+        Self::from(FaultKind::type_mismatch(message, expected, received))
     }
 }
 
-impl<'a, Env, ReturnType> From<FaultKind<'a, Env, ReturnType>> for Fault<'a, Env, ReturnType> {
-    fn from(kind: FaultKind<'a, Env, ReturnType>) -> Self {
+impl<'a, Env, ReturnType> From<FaultKind> for Fault<'a, Env, ReturnType> {
+    fn from(kind: FaultKind) -> Self {
         Self {
-            kind,
+            kind: FaultOrPause::Fault(kind),
             stack: Vec::default(),
         }
     }
@@ -1247,31 +1523,48 @@ where
 
 impl<'a, Env, ReturnType> Display for Fault<'a, Env, ReturnType> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.kind, f)
+        match &self.kind {
+            FaultOrPause::Fault(fault) => Display::fmt(fault, f),
+            FaultOrPause::Pause(_) => f.write_str("paused execution"),
+        }
     }
+}
+
+/// A reason for a virtual machine [`Fault`].
+#[derive(Debug)]
+pub enum FaultOrPause<'a, Env, ReturnType> {
+    /// A fault occurred while processing instructions.
+    Fault(FaultKind),
+    /// Execution was paused by the [`Environment`] as a result of returning
+    /// [`ExecutionBehavior::Pause`] from [`Environment::step`].
+    ///
+    /// The contained [`PausedExecution`] can be used to resume executing the
+    /// code.
+    Pause(PausedExecution<'a, Env, ReturnType>),
 }
 
 /// An unexpected event within the virtual machine.
 #[derive(Debug)]
-pub enum FaultKind<'a, Env, ReturnType> {
+pub enum FaultKind {
     /// An attempt to push a value to the stack was made after the stack has
     /// reached its capacity.
     StackOverflow,
     /// An attempt to pop a value off of the stack was made when no values were
     /// present in the current code's stack frame.
     StackUnderflow,
-    /// Execution was paused by the [`Environment`] as a result of returning
-    /// [`ExecutionBehavior::Pause`] from [`Environment::step`].
-    ///
-    /// The contained [`PausedExecution`] can be used to resume executing the
-    /// code.
-    Paused(PausedExecution<'a, Env, ReturnType>),
     /// An invalid variable index was used.
     InvalidVariableIndex,
     /// An invalid argument index was used.
     InvalidArgumentIndex,
     /// An invalid vtable index was used.
     InvalidVtableIndex,
+    /// A call was made to a function that does not exist.
+    UnknownFunction {
+        /// The kind of the value the function was called on.
+        kind: ValueKind,
+        /// The name of the function being called.
+        name: Symbol,
+    },
     /// A value type was unexpected in the given context.
     TypeMismatch {
         /// The error message explaining the type mismatch.
@@ -1299,21 +1592,34 @@ pub enum FaultKind<'a, Env, ReturnType> {
         /// The value that caused an error.
         received: Value,
     },
+    /// An error arose from dynamic types.
+    Dynamic(DynamicFault),
 }
 
-impl<'a, Env, ReturnType> std::error::Error for FaultKind<'a, Env, ReturnType>
-where
-    Env: std::fmt::Debug,
-    ReturnType: std::fmt::Debug,
-{
+impl FaultKind {
+    fn invalid_type(message: impl Into<String>, received: Value) -> Self {
+        FaultKind::InvalidType {
+            message: message.into(),
+            received,
+        }
+    }
+
+    fn type_mismatch(message: impl Into<String>, expected: ValueKind, received: Value) -> Self {
+        FaultKind::TypeMismatch {
+            message: message.into(),
+            expected,
+            received,
+        }
+    }
 }
 
-impl<'a, Env, ReturnType> Display for FaultKind<'a, Env, ReturnType> {
+impl std::error::Error for FaultKind {}
+
+impl Display for FaultKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             FaultKind::StackOverflow => f.write_str("stack pushed to while at maximum capacity"),
             FaultKind::StackUnderflow => f.write_str("stack popped but no values present"),
-            FaultKind::Paused(_) => f.write_str("execution paused"),
             FaultKind::InvalidVariableIndex => {
                 f.write_str("a variable index was outside of the range allocated for the function")
             }
@@ -1323,6 +1629,9 @@ impl<'a, Env, ReturnType> Display for FaultKind<'a, Env, ReturnType> {
             FaultKind::InvalidVtableIndex => f.write_str(
                 "a vtable index was beyond the number functions registerd in the current module",
             ),
+            FaultKind::UnknownFunction { kind, name } => {
+                write!(f, "unknown function {name} on {}", kind.as_str())
+            }
             FaultKind::TypeMismatch {
                 message,
                 expected,
@@ -1338,6 +1647,7 @@ impl<'a, Env, ReturnType> Display for FaultKind<'a, Env, ReturnType> {
                 let message = message.replace("@received-value", &received.to_string());
                 f.write_str(&message)
             }
+            FaultKind::Dynamic(dynamic) => dynamic.fmt(f),
         }
     }
 }
@@ -1408,20 +1718,20 @@ struct PausedFrame {
 /// A type that can be constructed from popping from the virtual machine stack.
 pub trait FromStack: Sized {
     /// Returns an instance constructing from the stack.
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>>;
+    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind>;
 }
 
 impl FromStack for Value {
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>> {
+    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
         stack.stack.pop()
     }
 }
 
 impl FromStack for i64 {
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>> {
+    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
         match stack.stack.pop()? {
             Value::Integer(integer) => Ok(integer),
-            other => Err(Fault::type_mismatch(
+            other => Err(FaultKind::type_mismatch(
                 "@expected expected but received `@received-value` (@received-type)",
                 ValueKind::Integer,
                 other,
@@ -1431,10 +1741,10 @@ impl FromStack for i64 {
 }
 
 impl FromStack for f64 {
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>> {
+    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
         match stack.stack.pop()? {
             Value::Real(number) => Ok(number),
-            other => Err(Fault::type_mismatch(
+            other => Err(FaultKind::type_mismatch(
                 "@expected expected but received `@received-value` (@received-type)",
                 ValueKind::Real,
                 other,
@@ -1444,10 +1754,10 @@ impl FromStack for f64 {
 }
 
 impl FromStack for bool {
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>> {
+    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
         match stack.stack.pop()? {
             Value::Boolean(value) => Ok(value),
-            other => Err(Fault::type_mismatch(
+            other => Err(FaultKind::type_mismatch(
                 "@expected expected but received `@received-value` (@received-type)",
                 ValueKind::Boolean,
                 other,
@@ -1457,8 +1767,199 @@ impl FromStack for bool {
 }
 
 impl FromStack for () {
-    fn from_stack<Env>(_stack: &mut Bud<Env>) -> Result<Self, Fault<'static, Env, Self>> {
+    fn from_stack<Env>(_stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
         Ok(())
+    }
+}
+
+impl<T> FromStack for T
+where
+    T: DynamicValue,
+{
+    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
+        stack.stack.pop()?.into_dynamic().map_err(|value| {
+            FaultKind::type_mismatch("invalid type", ValueKind::Dynamic(type_name::<T>()), value)
+        })
+    }
+}
+
+/// A Rust value that has been wrapped for use in the virtual machine.
+#[derive(Clone, Debug)]
+pub struct Dynamic(
+    // The reason for `Arc<Box<dyn UnboxableDynamicValue>>` instead of `Arc<dyn
+    // UnboxableDynamicValue>` is the size. `Arc<dyn>` uses a fat pointer which
+    // results in 16-bytes being used. By boxing the `dyn` value first, the Arc
+    // pointer becomes a normal pointer resulting in this type being only 8
+    // bytes.
+    Arc<Box<dyn UnboxableDynamicValue>>,
+);
+
+#[test]
+fn sizes() {
+    assert_eq!(
+        std::mem::size_of::<Dynamic>(),
+        std::mem::size_of::<*const u8>()
+    );
+    assert_eq!(
+        std::mem::size_of::<Symbol>(),
+        std::mem::size_of::<*const u8>()
+    );
+    assert_eq!(
+        std::mem::size_of::<Value>(),
+        std::mem::size_of::<(*const u8, usize)>()
+    );
+}
+
+impl Dynamic {
+    fn new(value: impl DynamicValue + 'static) -> Self {
+        Self(Arc::new(Box::new(DynamicValueData(Some(value)))))
+    }
+
+    fn as_mut(&mut self) -> &mut Box<dyn UnboxableDynamicValue> {
+        if Arc::strong_count(&self.0) > 1 {
+            // More than one reference to this Arc, we have to create a
+            // clone instead. We do this before due to overlapping lifetime
+            // issues using get_mut twice. We can't use make_mut due to
+            // Box<dyn> not being cloneable.
+            let new_value = self.0.cloned();
+            self.0 = Arc::new(new_value);
+        }
+
+        Arc::get_mut(&mut self.0).expect("checked strong count") // This will need to change if we ever allow weak references.
+    }
+
+    fn call(
+        &mut self,
+        name: &Symbol,
+        arguments: vec::Drain<'_, Value>,
+    ) -> Result<Value, FaultKind> {
+        self.as_mut().call(name, arguments)
+    }
+}
+
+impl Display for Dynamic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
+trait UnboxableDynamicValue: Debug + Display {
+    fn cloned(&self) -> Box<dyn UnboxableDynamicValue>;
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn as_opt_any_mut(&mut self) -> &mut dyn Any;
+
+    fn is_truthy(&self) -> bool;
+    fn kind(&self) -> &'static str;
+    fn partial_eq(&self, other: &Value) -> Option<bool>;
+    fn partial_cmp(&self, other: &Value) -> Option<Ordering>;
+    fn call(&mut self, name: &Symbol, arguments: vec::Drain<'_, Value>)
+        -> Result<Value, FaultKind>;
+}
+
+#[derive(Clone)]
+struct DynamicValueData<T>(Option<T>);
+
+impl<T> DynamicValueData<T> {
+    #[inline]
+    fn value(&self) -> &T {
+        self.0.as_ref().expect("value taken")
+    }
+    #[inline]
+    fn value_mut(&mut self) -> &mut T {
+        self.0.as_mut().expect("value taken")
+    }
+}
+
+impl<T> UnboxableDynamicValue for DynamicValueData<T>
+where
+    T: DynamicValue + Any + Debug,
+{
+    fn cloned(&self) -> Box<dyn UnboxableDynamicValue> {
+        Box::new(self.clone())
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self.value()
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self.value_mut()
+    }
+
+    fn as_opt_any_mut(&mut self) -> &mut dyn Any {
+        &mut self.0
+    }
+
+    fn is_truthy(&self) -> bool {
+        self.value().is_truthy()
+    }
+
+    fn kind(&self) -> &'static str {
+        self.value().kind()
+    }
+
+    fn partial_eq(&self, other: &Value) -> Option<bool> {
+        self.value().partial_eq(other)
+    }
+
+    fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
+        self.value().partial_cmp(other)
+    }
+
+    fn call(
+        &mut self,
+        name: &Symbol,
+        arguments: vec::Drain<'_, Value>,
+    ) -> Result<Value, FaultKind> {
+        self.value_mut().call(name, arguments)
+    }
+}
+
+impl<T> DynamicValue for DynamicValueData<T>
+where
+    T: DynamicValue,
+{
+    fn is_truthy(&self) -> bool {
+        self.value().is_truthy()
+    }
+
+    fn kind(&self) -> &'static str {
+        self.value().kind()
+    }
+
+    fn partial_eq(&self, other: &Value) -> Option<bool> {
+        self.value().partial_eq(other)
+    }
+
+    fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
+        self.value().partial_cmp(other)
+    }
+}
+
+impl<T> Debug for DynamicValueData<T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(value) = self.0.as_ref() {
+            Debug::fmt(value, f)
+        } else {
+            f.debug_struct("DynamicValueData").finish_non_exhaustive()
+        }
+    }
+}
+
+impl<T> Display for DynamicValueData<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(value) = self.0.as_ref() {
+            Display::fmt(value, f)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -1470,7 +1971,7 @@ pub trait Environment: 'static {
     /// will be exected.
     ///
     /// If [`ExecutionBehavior::Pause`] is returned, the virtual machine is
-    /// paused and a [`FaultKind::Paused`] is raised. If the execution is
+    /// paused and a [`FaultOrPause::Pause`] is raised. If the execution is
     /// resumed, the first function call will be before executing the same
     /// instruction as the one when [`ExecutionBehavior::Pause`] was called.
     fn step(&mut self) -> ExecutionBehavior;
@@ -1542,8 +2043,8 @@ fn budget() {
     let output = loop {
         println!("Paused");
         let mut pending = match fault.kind {
-            FaultKind::Paused(pending) => pending,
-            error => unreachable!("unexpected error: {error}"),
+            FaultOrPause::Pause(pending) => pending,
+            FaultOrPause::Fault(error) => unreachable!("unexpected error: {error}"),
         };
         pending.environment_mut().add_budget(1);
 
@@ -1562,7 +2063,7 @@ fn budget_with_frames() {
         arg_count: 1,
         variable_count: 0,
         code: vec![
-            Instruction::PushArg(0),
+            Instruction::PushCopy(ValueSource::Argument(0)),
             Instruction::If { false_jump_to: 12 },
             Instruction::Push(Value::Integer(1)),
             Instruction::Push(Value::Integer(2)),
@@ -1601,8 +2102,8 @@ fn budget_with_frames() {
     let output = loop {
         println!("Paused");
         let mut pending = match fault.kind {
-            FaultKind::Paused(pending) => pending,
-            error => unreachable!("unexpected error: {error}"),
+            FaultOrPause::Pause(pending) => pending,
+            FaultOrPause::Fault(error) => unreachable!("unexpected error: {error}"),
         };
         pending.environment_mut().add_budget(1);
 
@@ -1650,10 +2151,7 @@ impl Stack {
     /// Returns [`FaultKind::StackOverflow`] if the stack's maximum capacity has
     /// been reached.
     #[inline]
-    pub fn push<Env, ReturnType>(
-        &mut self,
-        value: Value,
-    ) -> Result<(), FaultKind<'static, Env, ReturnType>> {
+    pub fn push(&mut self, value: Value) -> Result<(), FaultKind> {
         if self.remaining_capacity > 0 {
             self.remaining_capacity -= 1;
 
@@ -1664,14 +2162,51 @@ impl Stack {
         }
     }
 
+    /// Pushes multiple arguments to the stack.
+    pub fn extend<Args, ArgsIter>(&mut self, args: Args) -> Result<usize, FaultKind>
+    where
+        Args: IntoIterator<Item = Value, IntoIter = ArgsIter>,
+        ArgsIter: Iterator<Item = Value> + ExactSizeIterator + DoubleEndedIterator,
+    {
+        let args = args.into_iter();
+        let arg_count = args.len();
+        if self.remaining_capacity >= arg_count {
+            self.remaining_capacity -= arg_count;
+            self.values.extend(args.rev());
+            Ok(arg_count)
+        } else {
+            Err(FaultKind::StackOverflow)
+        }
+    }
+
+    /// Pushes multiple arguments to the stack.
+    pub fn drain<Range>(&mut self, range: Range) -> vec::Drain<'_, Value>
+    where
+        Range: RangeBounds<usize>,
+    {
+        let start = match range.start_bound() {
+            Bound::Included(start) => *start,
+            Bound::Excluded(start) => start.saturating_sub(1),
+            Bound::Unbounded => 0,
+        };
+        let end = match range.end_bound() {
+            Bound::Included(end) => end.saturating_add(1),
+            Bound::Excluded(end) => *end,
+            Bound::Unbounded => self.values.len(),
+        };
+        let elements_removed = end - start;
+        self.remaining_capacity += elements_removed;
+        self.values.drain(start..end)
+    }
+
     /// Returns a reference to the top [`Value`] on the stack, or returns a
     /// [`FaultKind::StackUnderflow`] if no values are present.
     #[inline]
-    pub fn top<Env, ReturnType>(&self) -> Result<&Value, Fault<'static, Env, ReturnType>> {
+    pub fn top(&self) -> Result<&Value, FaultKind> {
         if let Some(value) = self.values.last() {
             Ok(value)
         } else {
-            Err(Fault::from(FaultKind::StackUnderflow))
+            Err(FaultKind::StackUnderflow)
         }
     }
 
@@ -1681,35 +2216,35 @@ impl Stack {
     ///
     /// Returns [`FaultKind::StackUnderflow`] if the stack is empty.
     #[inline]
-    pub fn pop<Env, ReturnType>(&mut self) -> Result<Value, Fault<'static, Env, ReturnType>> {
+    pub fn pop(&mut self) -> Result<Value, FaultKind> {
         if let Some(value) = self.values.pop() {
             self.remaining_capacity += 1;
             Ok(value)
         } else {
-            Err(Fault::from(FaultKind::StackUnderflow))
+            Err(FaultKind::StackUnderflow)
         }
     }
 
-    /// Pops a [`Value`] from the stack.
+    /// Pops a [`Value`] from the stack and returns a mutable reference to the
+    /// next value.
     ///
     /// # Errors
     ///
-    /// Returns [`FaultKind::StackUnderflow`] if the stack is empty.
+    /// Returns [`FaultKind::StackUnderflow`] if the stack does not contain at
+    /// least two values.
     #[inline]
-    pub fn pop_pair<Env, ReturnType>(
-        &mut self,
-    ) -> Result<(Value, Value), Fault<'static, Env, ReturnType>> {
-        let current_top = self.values.len();
-        if let Some(new_top) = current_top.checked_sub(2) {
-            let mut popped_values = self.values.drain(new_top..current_top);
-            // By using drain, we're getting the values in the opposite order of
-            // calling pop twice.
-            let second = popped_values.next().expect("known drain amount");
-            let first = popped_values.next().expect("known drain amount");
-            return Ok((first, second));
-        }
+    pub fn pop_and_modify(&mut self) -> Result<(Value, &mut Value), FaultKind> {
+        if self.values.len() >= 2 {
+            let first = self.values.pop().expect("bounds already checked");
+            self.remaining_capacity += 1;
 
-        Err(Fault::from(FaultKind::StackUnderflow))
+            Ok((
+                first,
+                self.values.last_mut().expect("bounds already checked"),
+            ))
+        } else {
+            Err(FaultKind::StackUnderflow)
+        }
     }
 
     /// Returns the number of [`Value`]s contained in this stack.
@@ -1750,6 +2285,7 @@ impl Stack {
         let extra_capacity = new_size.saturating_sub(self.len());
         if extra_capacity <= self.remaining_capacity {
             self.values.resize(new_size, Value::Void);
+            self.remaining_capacity -= extra_capacity;
             Ok(())
         } else {
             Err(Fault::from(FaultKind::StackOverflow))
@@ -1773,12 +2309,81 @@ impl IndexMut<usize> for Stack {
     }
 }
 
+/// A [`Fault`] that arose from a [`Dynamic`] value.
+#[derive(Debug)]
+pub struct DynamicFault(Box<dyn AnyDynamicError>);
+
+impl DynamicFault {
+    /// Returns a new instance containing the provided error.
+    pub fn new<T: Debug + Display + 'static>(error: T) -> Self {
+        Self(Box::new(DynamicErrorContents(Some(error))))
+    }
+
+    /// Returns a reference to the original error, if `T` is the same type that
+    /// was provided during construction.
+    #[must_use]
+    pub fn downcast_ref<T: Debug + Display + 'static>(&self) -> Option<&T> {
+        self.0.as_any().downcast_ref()
+    }
+
+    /// Returns the original error if `T` is the same type that was provided
+    /// during construction. If not, `Err(self)` will be returned.
+    pub fn try_unwrap<T: Debug + Display + 'static>(mut self) -> Result<T, Self> {
+        if let Some(opt_any) = self.0.as_opt_any_mut().downcast_mut::<Option<T>>() {
+            Ok(std::mem::take(opt_any).expect("value already taken"))
+        } else {
+            Err(self)
+        }
+    }
+}
+
+#[test]
+fn dynamic_error_conversions() {
+    let error = DynamicFault::new(true);
+    assert!(*error.downcast_ref::<bool>().unwrap());
+    assert!(error.try_unwrap::<bool>().unwrap());
+}
+
+#[derive(Debug)]
+struct DynamicErrorContents<T>(Option<T>);
+
+impl<T> Display for DynamicErrorContents<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(value) = self.0.as_ref() {
+            Display::fmt(value, f)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+trait AnyDynamicError: Debug + Display {
+    fn as_any(&self) -> &dyn Any;
+    fn as_opt_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T> AnyDynamicError for DynamicErrorContents<T>
+where
+    T: Debug + Display + 'static,
+{
+    fn as_any(&self) -> &dyn Any {
+        self.0.as_ref().expect("value taken")
+    }
+
+    fn as_opt_any_mut(&mut self) -> &mut dyn Any {
+        &mut self.0
+    }
+}
+
 #[test]
 fn invalid_variables() {
     let test = Function {
         arg_count: 0,
         variable_count: 0,
-        code: vec![Instruction::PushVariable(0)],
+        code: vec![Instruction::PushCopy(ValueSource::Variable(0))],
     };
     let mut context = Bud::empty().with_function("test", test);
     assert!(matches!(
@@ -1789,7 +2394,7 @@ fn invalid_variables() {
             }]))
             .unwrap_err()
             .kind,
-        FaultKind::InvalidVariableIndex
+        FaultOrPause::Fault(FaultKind::InvalidVariableIndex)
     ));
 }
 
@@ -1798,7 +2403,7 @@ fn invalid_argument() {
     let test = Function {
         arg_count: 0,
         variable_count: 0,
-        code: vec![Instruction::PushArg(0)],
+        code: vec![Instruction::PushCopy(ValueSource::Argument(0))],
     };
     let mut context = Bud::empty().with_function("test", test);
     assert!(matches!(
@@ -1809,7 +2414,7 @@ fn invalid_argument() {
             }]))
             .unwrap_err()
             .kind,
-        FaultKind::InvalidArgumentIndex
+        FaultOrPause::Fault(FaultKind::InvalidArgumentIndex)
     ));
 }
 
@@ -1824,7 +2429,7 @@ fn invalid_vtable_index() {
             }]))
             .unwrap_err()
             .kind,
-        FaultKind::InvalidVtableIndex
+        FaultOrPause::Fault(FaultKind::InvalidVtableIndex)
     ));
 }
 
@@ -1838,10 +2443,7 @@ fn function_without_return_value() {
     let mut context = Bud::empty().with_function("test", test);
     assert_eq!(
         context
-            .run::<Value>(Cow::Borrowed(&[Instruction::Call {
-                vtable_index: Some(0),
-                arg_count: 0,
-            }]))
+            .call::<Value, _, _>(&Symbol::from("test"), [])
             .unwrap(),
         Value::Void
     );
