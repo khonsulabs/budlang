@@ -73,7 +73,7 @@
                 
             </div>
             <div class="column has-background-white p-0">
-                <pre class="has-background-white py-0 px-2">use budlang::vm::{Bud, Comparison, Function, Instruction, Value};</pre>
+                <pre class="has-background-white py-0 px-2">use budlang::vm::{Bud, Comparison, Function, Instruction, Value, ValueSource};</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -203,7 +203,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Instruction::PushArg(ARG_N),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::PushCopy(ValueSource::Argument(ARG_N)),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -294,7 +294,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Instruction::PushArg(ARG_N),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::PushCopy(ValueSource::Argument(ARG_N)),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -398,7 +398,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            Instruction::PushArg(ARG_N),</pre>
+                <pre class="has-background-success-light py-0 px-2">            Instruction::PushCopy(ValueSource::Argument(ARG_N)),</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -754,7 +754,7 @@
         </div></div>
         <footer class="footer">
             <div class="content has-text-centered">
-                <p class="heading">Date: 2022-09-30 22:21</p>
+                <p class="heading">Date: 2022-10-03 03:31</p>
             </div>
         </footer>
     </body>
