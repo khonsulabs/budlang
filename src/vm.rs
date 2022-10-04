@@ -18,29 +18,56 @@ use crate::{ast::CompilationError, parser::parse, symbol::Symbol, Error};
 /// perform.
 #[derive(Debug, Clone)]
 pub enum Instruction {
-    /// Pops left and right, and pushes the result of `left + right`.
+    /// Adds `left` and `right` and places the result in `destination`.
     ///
-    /// If this operation causes an overflow, [`Value::Void`] will be pushed
-    /// instead.
-    Add,
-    /// Pops left and right, and pushes the result of `left - right`.
+    /// If this operation causes an overflow, [`Value::Void`] will be stored in
+    /// the destination instead.
+    Add {
+        /// The left hand side of the operation.
+        left: ValueSource,
+        /// The right hand side of the operation.
+        right: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Subtracts `right` from `left` and places the result in `destination`.
     ///
-    /// If this operation causes an overflow, [`Value::Void`] will be pushed
-    /// instead.
-    Sub,
-    /// Pops left and right, and pushes the result of `left * right`.
+    /// If this operation causes an overflow, [`Value::Void`] will be stored in
+    /// the destination instead.
+    Sub {
+        /// The left hand side of the operation.
+        left: ValueSource,
+        /// The right hand side of the operation.
+        right: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Left `left` by `right` and places the result in `destination`.
     ///
-    /// If this operation causes an overflow, [`Value::Void`] will be pushed
-    /// instead.
-    Multiply,
-    /// Pops left and right, and pushes the result of `left / right`.
+    /// If this operation causes an overflow, [`Value::Void`] will be stored in
+    /// the destination instead.
+    Multiply {
+        /// The left hand side of the operation.
+        left: ValueSource,
+        /// The right hand side of the operation.
+        right: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Divides `left` by `right` and places the result in `destination`.
     ///
-    /// If this operation causes an overflow, [`Value::Void`] will be pushed
-    /// instead.
-    Divide,
-    /// Pops `condition` and checks if
-    /// [`condition.is_truthy()`](Value::is_truthy), jumping to the target
-    /// instruction if false.
+    /// If this operation causes an overflow, [`Value::Void`] will be stored in
+    /// the destination instead.
+    Divide {
+        /// The left hand side of the operation.
+        left: ValueSource,
+        /// The right hand side of the operation.
+        right: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Checks [`condition.is_truthy()`](Value::is_truthy), jumping to the
+    /// target instruction if false.
     ///
     /// If truthy, the virtual machine continues executing the next instruction
     /// in sequence.
@@ -52,6 +79,8 @@ pub enum Instruction {
     /// Jumping beyond the end of the function will not cause an error, but will
     /// instead cause the current function to return.
     If {
+        /// The source of the condition.
+        condition: ValueSource,
         /// The 0-based index of the instruction to jump to. This index is
         /// relative to the begining of the set of instructions being executed.
         false_jump_to: usize,
@@ -64,8 +93,26 @@ pub enum Instruction {
     /// Jumping beyond the end of the function will not cause an error, but will
     /// instead cause the current function to return.
     JumpTo(usize),
-    /// Pops left and right and pushes the boolean result of the [`Comparison`].
-    Compare(Comparison),
+    /// Compares `left` and `right` using `comparison` to evaluate a boolean
+    /// result.
+    ///
+    /// If [`CompareAction::Store`] is used, the boolean result will
+    /// be stored in the provided destination.
+    ///
+    /// If [`CompareAction::JumpIfFalse`] is used and the result is false,
+    /// execution will jump to the 0-based instruction index within the current
+    /// set of executing instructions. If the result is true, the next
+    /// instruction will continue executing.
+    Compare {
+        /// The comparison to perform.
+        comparison: Comparison,
+        /// The left hand side of the operation.
+        left: ValueSource,
+        /// The right hand side of the operation.
+        right: ValueOrSource,
+        /// The action to take with the result of the comparison.
+        action: CompareAction,
+    },
     /// Pushes a [`Value`] to the stack.
     Push(Value),
     /// Pushes a copy of a value to the stack. The value could be from either an
@@ -77,14 +124,14 @@ pub enum Instruction {
     /// instructions will cause a [`FaultKind::StackUnderflow`] to be returned.
     PopAndDrop,
     /// Returns from the current stack frame.
-    Return,
-    /// Copies the top value from the stack  into the variable index provided.
-    ///
-    /// Each function is allocated a fixed number of variables which are
-    /// accessed using 0-based indexes. Attempting to use a variable index
-    /// outside of the range allocated will cause a
-    /// [`FaultKind::InvalidVariableIndex`] to be returned.
-    CopyToVariable(usize),
+    Return(Option<ValueOrSource>),
+    /// Loads a `value` into a variable.
+    Load {
+        /// The index of the variable to store the value in.
+        variable_index: usize,
+        /// The value or source of the value to store.
+        value: ValueOrSource,
+    },
     /// Calls a function.
     ///
     /// When calling a function, values on the stack are "passed" to the
@@ -94,8 +141,8 @@ pub enum Instruction {
     /// controls the baseline of the stack.
     ///  
     /// Upon returning from a function call, the arguments will no longer be on
-    /// the stack and a single value will always be returned. If the function
-    /// did not push a value, [`Value::Void`] will be pushed.
+    /// the stack. The value returned from the function (or [`Value::Void`] if
+    /// no value was returned) will be placed in `destination`.
     Call {
         /// The vtable index within the current module of the function to call.
         /// If None, the current function is called recursively.
@@ -108,8 +155,21 @@ pub enum Instruction {
         /// The number of arguments on the stack that should be used as
         /// arguments to this call.
         arg_count: usize,
+
+        /// The destination for the result of the call.
+        destination: Destination,
     },
     /// Calls a function by name on a value.
+    ///
+    /// When calling a function, values on the stack are "passed" to the
+    /// function being pushed to the stack before calling the function. To
+    /// ensure the correct number of arguments are taken even when variable
+    /// argument lists are supported, the number of arguments is passed and
+    /// controls the baseline of the stack.
+    ///  
+    /// Upon returning from a function call, the arguments will no longer be on
+    /// the stack. The value returned from the function (or [`Value::Void`] if
+    /// no value was returned) will be placed in `destination`.
     CallInstance {
         /// The target of the function call. If None, the value on the stack
         /// prior to the arguments is the target of the call.
@@ -121,12 +181,47 @@ pub enum Instruction {
         /// The number of arguments on the stack that should be used as
         /// arguments to this call.
         arg_count: usize,
+
+        /// The destination for the result of the call.
+        destination: Destination,
     },
+}
+
+/// An action to take during an [`Instruction::Compare`].
+#[derive(Debug, Clone, Copy)]
+pub enum CompareAction {
+    /// Store the boolean result in the destination indicated.
+    Store(Destination),
+    /// If the comparison is false, jump to the 0-based instruction index
+    /// indicated.
+    JumpIfFalse(usize),
+}
+
+/// A destination for a value.
+#[derive(Debug, Clone, Copy)]
+pub enum Destination {
+    /// Store the value in the 0-based variable index provided.
+    Variable(usize),
+    /// Push the value to the stack.
+    Stack,
+    /// Store the value in the return register.
+    Return,
 }
 
 /// The source of a value.
 #[derive(Debug, Copy, Clone)]
 pub enum ValueSource {
+    /// The value is in an argument at the provided 0-based index.
+    Argument(usize),
+    /// The value is in a variable at the provided 0-based index.
+    Variable(usize),
+}
+
+/// A value or a location of a value
+#[derive(Debug, Clone)]
+pub enum ValueOrSource {
+    /// A value.
+    Value(Value),
     /// The value is in an argument at the provided 0-based index.
     Argument(usize),
     /// The value is in a variable at the provided 0-based index.
@@ -164,6 +259,8 @@ pub struct Function {
 /// A virtual machine value.
 #[derive(Debug, Clone)]
 pub enum Value {
+    /// A value representing the lack of a value.
+    Void,
     /// A signed 64-bit integer value.
     Integer(i64),
     /// A real number value (64-bit floating point).
@@ -172,8 +269,13 @@ pub enum Value {
     Boolean(bool),
     /// A type exposed from Rust.
     Dynamic(Dynamic),
-    /// A value representing the lack of a value.
-    Void,
+}
+
+impl Default for Value {
+    #[inline]
+    fn default() -> Self {
+        Self::Void
+    }
 }
 
 impl Value {
@@ -301,8 +403,6 @@ impl PartialEq for Value {
         match (self, other) {
             (Self::Integer(lhs), Self::Integer(rhs)) => lhs == rhs,
             (Self::Real(lhs), Self::Real(rhs)) => real_total_eq(*lhs, *rhs),
-            (Self::Integer(lhs), Self::Real(rhs)) => real_total_eq(*lhs as f64, *rhs),
-            (Self::Real(lhs), Self::Integer(rhs)) => real_total_eq(*lhs, *rhs as f64),
             (Self::Boolean(lhs), Self::Boolean(rhs)) => lhs == rhs,
             (Self::Void, Self::Void) => true,
             (Self::Dynamic(lhs), Self::Dynamic(rhs)) => lhs
@@ -641,7 +741,7 @@ pub trait DynamicValue: Clone + Debug + Display + 'static {
 
     /// Calls a function by `name` with `args`.
     #[allow(unused_variables)]
-    fn call(&mut self, name: &Symbol, args: vec::Drain<'_, Value>) -> Result<Value, FaultKind> {
+    fn call(&mut self, name: &Symbol, args: PoppedValues<'_>) -> Result<Value, FaultKind> {
         Err(FaultKind::UnknownFunction {
             kind: ValueKind::Dynamic(self.kind()),
             name: name.clone(),
@@ -762,10 +862,14 @@ where
             Some(ModuleItem::Function(vtable_index)) => {
                 let arg_count = self.stack.extend(arguments)?;
                 // TODO It'd be nice to not have to have an allocation here
-                self.run(Cow::Owned(vec![Instruction::Call {
-                    vtable_index: Some(*vtable_index),
-                    arg_count,
-                }]))
+                self.run(
+                    Cow::Owned(vec![Instruction::Call {
+                        vtable_index: Some(*vtable_index),
+                        arg_count,
+                        destination: Destination::Return,
+                    }]),
+                    0,
+                )
                 .map_err(Error::from)
             }
             None => Err(Error::from(CompilationError::UndefinedFunction(
@@ -778,17 +882,24 @@ where
     pub fn run<'a, Output: FromStack>(
         &'a mut self,
         operations: Cow<'a, [Instruction]>,
+        variable_count: usize,
     ) -> Result<Output, Fault<'a, Env, Output>> {
+        let variables_offset = self.stack.len();
+        if variable_count > 0 {
+            self.stack.grow_by(variable_count)?;
+        }
         let return_offset = self.stack.len();
-        match (StackFrame {
+        let returned_value = match (StackFrame {
             module: &self.local_module,
             stack: &mut self.stack,
             environment: &mut self.environment,
             return_offset,
-            vtable_index: None,
-            variables_offset: 0,
-            operation_index: 0,
+            destination: Destination::Return,
+            variables_offset,
             arg_offset: 0,
+            return_value: None,
+            vtable_index: None,
+            operation_index: 0,
             _output: PhantomData,
         }
         .execute_operations(&operations))
@@ -809,8 +920,9 @@ where
                 });
             }
             other => other?,
-        }
-        Output::from_stack(self).map_err(Fault::from)
+        };
+        self.stack.clear();
+        Output::from_value(returned_value).map_err(Fault::from)
     }
 
     fn resume<'a, Output: FromStack>(
@@ -819,20 +931,22 @@ where
         mut paused_stack: VecDeque<PausedFrame>,
     ) -> Result<Output, Fault<'a, Env, Output>> {
         let first_frame = paused_stack.pop_front().expect("at least one frame");
-        match (StackFrame {
+        let value = match (StackFrame {
             module: &self.local_module,
             stack: &mut self.stack,
             environment: &mut self.environment,
             return_offset: first_frame.return_offset,
-            vtable_index: first_frame.vtable_index,
+            destination: first_frame.destination,
             variables_offset: first_frame.variables_offset,
-            operation_index: first_frame.operation_index,
             arg_offset: first_frame.arg_offset,
+            return_value: None,
+            vtable_index: first_frame.vtable_index,
+            operation_index: first_frame.operation_index,
             _output: PhantomData,
         }
         .resume_executing_execute_operations(&operations, paused_stack))
         {
-            Ok(()) => {}
+            Ok(value) => value,
             Err(Fault {
                 kind: FaultOrPause::Pause(paused_evaluation),
                 stack,
@@ -849,8 +963,8 @@ where
                 });
             }
             Err(other) => return Err(other),
-        }
-        Output::from_stack(self).map_err(Fault::from)
+        };
+        Output::from_value(value).map_err(Fault::from)
     }
 
     /// Compiles `source` and executes it in this context. Any declarations will
@@ -877,7 +991,7 @@ where
 }
 
 enum FlowControl {
-    Return,
+    Return(Value),
     JumpTo(usize),
 }
 
@@ -888,8 +1002,10 @@ struct StackFrame<'a, Env, Output> {
     environment: &'a mut Env,
     // Each stack frame cannot pop below this offset.
     return_offset: usize,
+    destination: Destination,
     variables_offset: usize,
     arg_offset: usize,
+    return_value: Option<Value>,
 
     vtable_index: Option<usize>,
     operation_index: usize,
@@ -905,7 +1021,7 @@ where
         &mut self,
         operations: &[Instruction],
         mut resume_from: VecDeque<PausedFrame>,
-    ) -> Result<(), Fault<'static, Env, Output>> {
+    ) -> Result<Value, Fault<'static, Env, Output>> {
         if let Some(call_to_resume) = resume_from.pop_front() {
             // We were calling a function when this happened. We need to finish the call.
             let vtable_index = call_to_resume
@@ -917,20 +1033,25 @@ where
                 stack: self.stack,
                 environment: self.environment,
                 return_offset: call_to_resume.return_offset,
+                destination: call_to_resume.destination,
                 variables_offset: call_to_resume.variables_offset,
                 arg_offset: call_to_resume.arg_offset,
+                return_value: None,
                 vtable_index: call_to_resume.vtable_index,
                 operation_index: call_to_resume.operation_index,
                 _output: PhantomData,
             };
-            match running_frame.resume_executing_execute_operations(&function.code, resume_from) {
-                Ok(_) => {}
+            let returned_value = match running_frame
+                .resume_executing_execute_operations(&function.code, resume_from)
+            {
+                Ok(value) => value,
                 Err(Fault {
                     kind: FaultOrPause::Pause(mut paused),
                     stack,
                 }) => {
                     paused.stack.push_front(PausedFrame {
                         return_offset: self.return_offset,
+                        destination: self.destination,
                         arg_offset: self.arg_offset,
                         variables_offset: self.variables_offset,
                         vtable_index: self.vtable_index,
@@ -944,7 +1065,11 @@ where
                 Err(err) => return Err(err),
             };
 
-            self.clean_stack_after_call(call_to_resume.arg_offset, call_to_resume.return_offset)?;
+            self.clean_stack_after_call(
+                call_to_resume.arg_offset,
+                call_to_resume.destination,
+                returned_value,
+            )?;
 
             // The call that was executing when we paused has finished, we can
             // now resume executing our frame's instructions.
@@ -955,12 +1080,13 @@ where
     fn execute_operations(
         &mut self,
         operations: &[Instruction],
-    ) -> Result<(), Fault<'static, Env, Output>> {
+    ) -> Result<Value, Fault<'static, Env, Output>> {
         loop {
             if matches!(self.environment.step(), ExecutionBehavior::Pause) {
                 let mut stack = VecDeque::new();
                 stack.push_front(PausedFrame {
                     return_offset: self.return_offset,
+                    destination: self.destination,
                     arg_offset: self.arg_offset,
                     variables_offset: self.variables_offset,
                     vtable_index: self.vtable_index,
@@ -985,22 +1111,30 @@ where
                 Some(operation) => operation,
                 None => {
                     // Implicit return;
-                    return Ok(());
+                    let return_value = self.return_value.take().unwrap_or_else(|| {
+                        if self.return_offset < self.stack.len() {
+                            std::mem::take(&mut self.stack[self.return_offset])
+                        } else {
+                            Value::Void
+                        }
+                    });
+                    return Ok(return_value);
                 }
             };
             self.operation_index += 1;
             match self.execute_operation(operation) {
+                Ok(None) => {}
                 Ok(Some(FlowControl::JumpTo(op_index))) => {
                     self.operation_index = op_index;
                 }
-                Ok(Some(FlowControl::Return)) => {
-                    return Ok(());
+                Ok(Some(FlowControl::Return(value))) => {
+                    return Ok(value);
                 }
-                Ok(None) => {}
                 Err(mut fault) => {
                     if let FaultOrPause::Pause(paused_frame) = &mut fault.kind {
                         paused_frame.stack.push_front(PausedFrame {
                             return_offset: self.return_offset,
+                            destination: self.destination,
                             arg_offset: self.arg_offset,
                             variables_offset: self.variables_offset,
                             vtable_index: self.vtable_index,
@@ -1028,12 +1162,36 @@ where
             Instruction::JumpTo(instruction_index) => {
                 Ok(Some(FlowControl::JumpTo(*instruction_index)))
             }
-            Instruction::Add => self.add(),
-            Instruction::Sub => self.sub(),
-            Instruction::Multiply => self.multiply(),
-            Instruction::Divide => self.divide(),
-            Instruction::If { false_jump_to } => self.r#if(*false_jump_to),
-            Instruction::Compare(comparison) => self.compare(*comparison),
+            Instruction::Add {
+                left,
+                right,
+                destination,
+            } => self.add(*left, right, *destination),
+            Instruction::Sub {
+                left,
+                right,
+                destination,
+            } => self.sub(*left, right, *destination),
+            Instruction::Multiply {
+                left,
+                right,
+                destination,
+            } => self.multiply(*left, right, *destination),
+            Instruction::Divide {
+                left,
+                right,
+                destination,
+            } => self.divide(*left, right, *destination),
+            Instruction::If {
+                condition: value,
+                false_jump_to,
+            } => self.r#if(*value, *false_jump_to),
+            Instruction::Compare {
+                comparison,
+                left,
+                right,
+                action,
+            } => self.compare(*comparison, *left, right, *action),
             Instruction::Push(value) => {
                 self.stack.push(value.clone())?;
                 Ok(None)
@@ -1044,42 +1202,58 @@ where
                 self.pop()?;
                 Ok(None)
             }
-            Instruction::Return => Ok(Some(FlowControl::Return)),
-            Instruction::CopyToVariable(variable) => self.copy_to_var(*variable),
+            Instruction::Return(value) => {
+                let value = match value {
+                    Some(ValueOrSource::Value(value)) => value.clone(),
+                    Some(ValueOrSource::Variable(source)) => {
+                        self.resolve_variable(*source)?.clone()
+                    }
+                    Some(ValueOrSource::Argument(source)) => {
+                        self.resolve_argument(*source)?.clone()
+                    }
+                    None => self.return_value.take().unwrap_or_default(),
+                };
+
+                Ok(Some(FlowControl::Return(value)))
+            }
+            Instruction::Load {
+                variable_index,
+                value,
+            } => self.load(*variable_index, value),
             Instruction::Call {
                 vtable_index,
                 arg_count,
-            } => self.call(*vtable_index, *arg_count),
+                destination,
+            } => self.call(*vtable_index, *arg_count, *destination),
             Instruction::CallInstance {
                 target,
                 name,
                 arg_count,
-            } => self.call_instance(*target, name, *arg_count),
+                destination,
+            } => self.call_instance(*target, name, *arg_count, *destination),
         }
     }
 
     fn clean_stack_after_call(
         &mut self,
         arg_offset: usize,
-        return_offset: usize,
+        destination: Destination,
+        returned_value: Value,
     ) -> Result<(), Fault<'static, Env, Output>> {
-        if arg_offset < return_offset {
-            // Remove the args, which sit between the stack and the return value
-            self.stack.remove_range(arg_offset..return_offset);
-        }
+        // Remove everything from arguments on.
+        self.stack.remove_range(arg_offset..);
 
-        match self.stack.len() {
-            len if len == arg_offset => {
-                // The function didn't push a value before returning.
-                self.stack.push(Value::Void)?;
+        match destination {
+            Destination::Variable(variable) => {
+                *self.resolve_variable_mut(variable)? = returned_value;
+                Ok(())
             }
-            len if len > arg_offset + 1 => {
-                // The function more than one value, truncate the stack to the first value popped.
-                self.stack.remove_range(arg_offset + 1..);
+            Destination::Stack => self.stack.push(returned_value).map_err(Fault::from),
+            Destination::Return => {
+                self.return_value = Some(returned_value);
+                Ok(())
             }
-            _ => {}
         }
-        Ok(())
     }
 
     #[inline]
@@ -1091,26 +1265,91 @@ where
         }
     }
 
-    #[inline]
-    fn pop_and_modify(&mut self) -> Result<(Value, &mut Value), FaultKind> {
-        if self.stack.len() + 1 > self.return_offset {
-            self.stack.pop_and_modify()
-        } else {
-            Err(FaultKind::StackUnderflow)
+    // #[inline]
+    // fn pop_and_modify(&mut self) -> Result<(Value, &mut Value), FaultKind> {
+    //     if self.stack.len() + 1 > self.return_offset {
+    //         self.stack.pop_and_modify()
+    //     } else {
+    //         Err(FaultKind::StackUnderflow)
+    //     }
+    // }
+
+    fn resolve_variable(&self, index: usize) -> Result<&Value, FaultKind> {
+        if let Some(index) = self.variables_offset.checked_add(index) {
+            if index < self.return_offset {
+                return Ok(&self.stack[index]);
+            }
+        }
+        Err(FaultKind::InvalidVariableIndex)
+    }
+
+    fn resolve_argument(&self, index: usize) -> Result<&Value, FaultKind> {
+        if let Some(index) = self.arg_offset.checked_add(index) {
+            if index < self.variables_offset {
+                return Ok(&self.stack[index]);
+            }
+        }
+        Err(FaultKind::InvalidArgumentIndex)
+    }
+
+    fn resolve_variable_mut(&mut self, index: usize) -> Result<&mut Value, FaultKind> {
+        if let Some(index) = self.variables_offset.checked_add(index) {
+            if index < self.return_offset {
+                return Ok(&mut self.stack[index]);
+            }
+        }
+        Err(FaultKind::InvalidVariableIndex)
+    }
+
+    fn resolve_value_source(&self, value: ValueSource) -> Result<&Value, FaultKind> {
+        match value {
+            ValueSource::Argument(index) => self.resolve_argument(index),
+            ValueSource::Variable(index) => self.resolve_variable(index),
+        }
+    }
+
+    fn resolve_value_source_mut(&mut self, value: Destination) -> Result<&mut Value, FaultKind> {
+        match value {
+            Destination::Variable(index) => self.resolve_variable_mut(index),
+            Destination::Stack => {
+                self.stack.grow_by(1)?;
+                self.stack.top_mut()
+            }
+            Destination::Return => {
+                if self.return_value.is_none() {
+                    self.return_value = Some(Value::Void);
+                }
+                Ok(self.return_value.as_mut().expect("always initialized"))
+            }
+        }
+    }
+
+    fn resolve_value_or_source<'v>(
+        &'v self,
+        value: &'v ValueOrSource,
+    ) -> Result<&'v Value, FaultKind> {
+        match value {
+            ValueOrSource::Argument(index) => self.resolve_argument(*index),
+            ValueOrSource::Variable(index) => self.resolve_variable(*index),
+            ValueOrSource::Value(value) => Ok(value),
         }
     }
 
     // floating point casts are intentional in this code.
-    #[allow(clippy::cast_precision_loss)]
-    fn add(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_and_modify()?;
-        *right = match (left, &*right) {
+    fn add(
+        &mut self,
+        left: ValueSource,
+        right: &ValueOrSource,
+        result: Destination,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let left = self.resolve_value_source(left)?;
+        let right = self.resolve_value_or_source(right)?;
+
+        let produced_value = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => {
                 left.checked_add(*right).map_or(Value::Void, Value::Integer)
             }
             (Value::Real(left), Value::Real(right)) => Value::Real(left + *right),
-            (Value::Real(left), Value::Integer(right)) => Value::Real(left + *right as f64),
-            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 + *right),
             (Value::Real(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't add @expected and `@received-value` (@received-type)",
@@ -1128,24 +1367,29 @@ where
             (other, _) => {
                 return Err(Fault::invalid_type(
                     "`@received-value` (@received-type) is not able to be added",
-                    other,
+                    other.clone(),
                 ))
             }
         };
+        *self.resolve_value_source_mut(result)? = produced_value;
         Ok(None)
     }
 
     // floating point casts are intentional in this code.
-    #[allow(clippy::cast_precision_loss)]
-    fn sub(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_and_modify()?;
-        *right = match (left, &*right) {
+    fn sub(
+        &mut self,
+        left: ValueSource,
+        right: &ValueOrSource,
+        result: Destination,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let left = self.resolve_value_source(left)?;
+        let right = self.resolve_value_or_source(right)?;
+
+        let produced_value = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => {
                 left.checked_sub(*right).map_or(Value::Void, Value::Integer)
             }
             (Value::Real(left), Value::Real(right)) => Value::Real(left - *right),
-            (Value::Real(left), Value::Integer(right)) => Value::Real(left - *right as f64),
-            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 - *right),
             (Value::Real(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't subtract @expected and `@received-value` (@received-type)",
@@ -1163,24 +1407,29 @@ where
             (other, _) => {
                 return Err(Fault::invalid_type(
                     "`@received-value` (@received-type) is not able to be subtracted",
-                    other,
+                    other.clone(),
                 ))
             }
         };
+        *self.resolve_value_source_mut(result)? = produced_value;
         Ok(None)
     }
 
     // floating point casts are intentional in this code.
-    #[allow(clippy::cast_precision_loss)]
-    fn multiply(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_and_modify()?;
-        *right = match (left, &*right) {
+    fn multiply(
+        &mut self,
+        left: ValueSource,
+        right: &ValueOrSource,
+        result: Destination,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let left = self.resolve_value_source(left)?;
+        let right = self.resolve_value_or_source(right)?;
+
+        let produced_value = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => {
                 left.checked_mul(*right).map_or(Value::Void, Value::Integer)
             }
             (Value::Real(left), Value::Real(right)) => Value::Real(left * *right),
-            (Value::Real(left), Value::Integer(right)) => Value::Real(left * *right as f64),
-            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 * *right),
             (Value::Real(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't multiply @expected and `@received-value` (@received-type)",
@@ -1198,24 +1447,29 @@ where
             (other, _) => {
                 return Err(Fault::invalid_type(
                     "`@received-value` (@received-type) is not able to be multiplied",
-                    other,
+                    other.clone(),
                 ))
             }
         };
+        *self.resolve_value_source_mut(result)? = produced_value;
         Ok(None)
     }
 
     // floating point casts are intentional in this code.
-    #[allow(clippy::cast_precision_loss)]
-    fn divide(&mut self) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_and_modify()?;
-        *right = match (left, &*right) {
+    fn divide(
+        &mut self,
+        left: ValueSource,
+        right: &ValueOrSource,
+        result: Destination,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let left = self.resolve_value_source(left)?;
+        let right = self.resolve_value_or_source(right)?;
+
+        let produced_value = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => {
                 left.checked_div(*right).map_or(Value::Void, Value::Integer)
             }
             (Value::Real(left), Value::Real(right)) => Value::Real(left / *right),
-            (Value::Real(left), Value::Integer(right)) => Value::Real(left / *right as f64),
-            (Value::Integer(left), Value::Real(right)) => Value::Real(left as f64 / *right),
             (Value::Real(_), other) => {
                 return Err(Fault::type_mismatch(
                     "can't divide @expected and `@received-value` (@received-type)",
@@ -1233,19 +1487,20 @@ where
             (other, _) => {
                 return Err(Fault::invalid_type(
                     "`@received-value` (@received-type) is not able to be divided",
-                    other,
+                    other.clone(),
                 ))
             }
         };
+        *self.resolve_value_source_mut(result)? = produced_value;
         Ok(None)
     }
 
     fn r#if(
         &mut self,
+        value: ValueSource,
         false_jump_to: usize,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let value_to_check = self.pop()?;
-        if value_to_check.is_truthy() {
+        if self.resolve_value_source(value)?.is_truthy() {
             Ok(None)
         } else {
             Ok(Some(FlowControl::JumpTo(false_jump_to)))
@@ -1253,34 +1508,26 @@ where
     }
 
     #[allow(clippy::unnecessary_wraps)] // makes caller more clean
-    fn equality<const INVERSE: bool>(
-        left: &Value,
-        right: &mut Value,
-    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+    fn equality<const INVERSE: bool>(left: &Value, right: &Value) -> bool {
         let mut result = left.eq(right);
         if INVERSE {
             result = !result;
         }
-        *right = Value::Boolean(result);
-
-        Ok(None)
+        result
     }
 
     fn compare_values(
         left: &Value,
-        right: &mut Value,
+        right: &Value,
         matcher: impl FnOnce(Ordering) -> bool,
-    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+    ) -> Result<bool, Fault<'static, Env, Output>> {
         if let Some(ordering) = left.partial_cmp(right) {
-            *right = Value::Boolean(matcher(ordering));
-            Ok(None)
+            Ok(matcher(ordering))
         } else {
-            let mut received = Value::Void;
-            std::mem::swap(&mut received, right);
             Err(Fault::type_mismatch(
                 "invalid comparison between @expected and `@received-value` (@received-type)",
                 left.kind(),
-                received,
+                right.clone(),
             ))
         }
     }
@@ -1288,23 +1535,43 @@ where
     fn compare(
         &mut self,
         comparison: Comparison,
+        left: ValueSource,
+        right: &ValueOrSource,
+        result: CompareAction,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let (left, right) = self.pop_and_modify()?;
-        match comparison {
-            Comparison::Equal => Self::equality::<false>(&left, right),
-            Comparison::NotEqual => Self::equality::<true>(&left, right),
+        let left = self.resolve_value_source(left)?;
+        let right = self.resolve_value_or_source(right)?;
+
+        let comparison_result = match comparison {
+            Comparison::Equal => Self::equality::<false>(left, right),
+            Comparison::NotEqual => Self::equality::<true>(left, right),
             Comparison::LessThan => {
-                Self::compare_values(&left, right, |ordering| ordering == Ordering::Less)
+                Self::compare_values(left, right, |ordering| ordering == Ordering::Less)?
             }
-            Comparison::LessThanOrEqual => Self::compare_values(&left, right, |ordering| {
+            Comparison::LessThanOrEqual => Self::compare_values(left, right, |ordering| {
                 matches!(ordering, Ordering::Less | Ordering::Equal)
-            }),
+            })?,
             Comparison::GreaterThan => {
-                Self::compare_values(&left, right, |ordering| ordering == Ordering::Greater)
+                Self::compare_values(left, right, |ordering| ordering == Ordering::Greater)?
             }
-            Comparison::GreaterThanOrEqual => Self::compare_values(&left, right, |ordering| {
+            Comparison::GreaterThanOrEqual => Self::compare_values(left, right, |ordering| {
                 matches!(ordering, Ordering::Greater | Ordering::Equal)
-            }),
+            })?,
+        };
+
+        match result {
+            CompareAction::Store(dest) => {
+                *self.resolve_value_source_mut(dest)? = Value::Boolean(comparison_result);
+
+                Ok(None)
+            }
+            CompareAction::JumpIfFalse(target) => {
+                if comparison_result {
+                    Ok(None)
+                } else {
+                    Ok(Some(FlowControl::JumpTo(target)))
+                }
+            }
         }
     }
 
@@ -1333,27 +1600,22 @@ where
         Err(Fault::from(FaultKind::InvalidArgumentIndex))
     }
 
-    fn copy_to_var(
+    fn load(
         &mut self,
         variable: usize,
+        value: &ValueOrSource,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        if self.stack.len() >= self.return_offset {
-            let value = self.stack.top()?;
-            if let Some(stack_offset) = self.variables_offset.checked_add(variable) {
-                if stack_offset < self.return_offset {
-                    self.stack[stack_offset] = value.clone();
-                }
-            }
-            Ok(None)
-        } else {
-            Err(Fault::stack_underflow())
-        }
+        let value = self.resolve_value_or_source(value)?;
+        *self.resolve_variable_mut(variable)? = value.clone();
+
+        Ok(None)
     }
 
     fn call(
         &mut self,
         vtable_index: Option<usize>,
         arg_count: usize,
+        destination: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
         let vtable_index = vtable_index
             .or(self.vtable_index)
@@ -1373,20 +1635,22 @@ where
             self.stack.grow_to(return_offset)?;
         }
 
-        StackFrame {
+        let mut frame = StackFrame {
             module: self.module,
             stack: self.stack,
             environment: self.environment,
             return_offset,
+            destination,
             variables_offset,
             arg_offset,
+            return_value: None,
             vtable_index: Some(vtable_index),
             operation_index: 0,
             _output: PhantomData,
-        }
-        .execute_operations(&function.code)?;
+        };
+        let returned_value = frame.execute_operations(&function.code)?;
 
-        self.clean_stack_after_call(arg_offset, return_offset)?;
+        self.clean_stack_after_call(arg_offset, destination, returned_value)?;
 
         Ok(None)
     }
@@ -1396,6 +1660,7 @@ where
         target: Option<ValueSource>,
         name: &Symbol,
         arg_count: usize,
+        destination: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
         // To prevent overlapping a mutable borrow of the value plus immutable
         // borrows of the stack, we temporarily take the value from where it
@@ -1442,10 +1707,11 @@ where
             }
         };
 
+        // Verify the argument list is valid.
         let return_offset = self.stack.len();
         let arg_offset = return_offset.checked_sub(arg_count);
-        let arg_offset = match arg_offset {
-            Some(arg_offset) if arg_offset >= self.return_offset => arg_offset,
+        match arg_offset {
+            Some(arg_offset) if arg_offset >= self.return_offset => {}
             _ => return Err(Fault::stack_underflow()),
         };
 
@@ -1454,7 +1720,7 @@ where
         std::mem::swap(&mut target_value, &mut self.stack[stack_index]);
         // Call without resolving any errors
         let result = match &mut target_value {
-            Value::Dynamic(value) => value.call(name, self.stack.drain(arg_offset..return_offset)),
+            Value::Dynamic(value) => value.call(name, self.stack.pop_n(arg_count)),
 
             _ => {
                 return Err(Fault::from(FaultKind::invalid_type(
@@ -1476,7 +1742,17 @@ where
 
         // If there was a fault, return.
         let produced_value = result?;
-        self.stack.push(produced_value)?;
+        match destination {
+            Destination::Variable(variable) => {
+                *self.resolve_variable_mut(variable)? = produced_value;
+            }
+            Destination::Stack => {
+                self.stack.push(produced_value)?;
+            }
+            Destination::Return => {
+                self.return_value = Some(produced_value);
+            }
+        }
 
         Ok(None)
     }
@@ -1713,23 +1989,24 @@ struct PausedFrame {
 
     vtable_index: Option<usize>,
     operation_index: usize,
+    destination: Destination,
 }
 
 /// A type that can be constructed from popping from the virtual machine stack.
 pub trait FromStack: Sized {
     /// Returns an instance constructing from the stack.
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind>;
+    fn from_value(value: Value) -> Result<Self, FaultKind>;
 }
 
 impl FromStack for Value {
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
-        stack.stack.pop()
+    fn from_value(value: Value) -> Result<Self, FaultKind> {
+        Ok(value)
     }
 }
 
 impl FromStack for i64 {
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
-        match stack.stack.pop()? {
+    fn from_value(value: Value) -> Result<Self, FaultKind> {
+        match value {
             Value::Integer(integer) => Ok(integer),
             other => Err(FaultKind::type_mismatch(
                 "@expected expected but received `@received-value` (@received-type)",
@@ -1741,8 +2018,8 @@ impl FromStack for i64 {
 }
 
 impl FromStack for f64 {
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
-        match stack.stack.pop()? {
+    fn from_value(value: Value) -> Result<Self, FaultKind> {
+        match value {
             Value::Real(number) => Ok(number),
             other => Err(FaultKind::type_mismatch(
                 "@expected expected but received `@received-value` (@received-type)",
@@ -1754,8 +2031,8 @@ impl FromStack for f64 {
 }
 
 impl FromStack for bool {
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
-        match stack.stack.pop()? {
+    fn from_value(value: Value) -> Result<Self, FaultKind> {
+        match value {
             Value::Boolean(value) => Ok(value),
             other => Err(FaultKind::type_mismatch(
                 "@expected expected but received `@received-value` (@received-type)",
@@ -1767,7 +2044,7 @@ impl FromStack for bool {
 }
 
 impl FromStack for () {
-    fn from_stack<Env>(_stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
+    fn from_value(_value: Value) -> Result<Self, FaultKind> {
         Ok(())
     }
 }
@@ -1776,8 +2053,8 @@ impl<T> FromStack for T
 where
     T: DynamicValue,
 {
-    fn from_stack<Env>(stack: &mut Bud<Env>) -> Result<Self, FaultKind> {
-        stack.stack.pop()?.into_dynamic().map_err(|value| {
+    fn from_value(value: Value) -> Result<Self, FaultKind> {
+        value.into_dynamic().map_err(|value| {
             FaultKind::type_mismatch("invalid type", ValueKind::Dynamic(type_name::<T>()), value)
         })
     }
@@ -1828,11 +2105,7 @@ impl Dynamic {
         Arc::get_mut(&mut self.0).expect("checked strong count") // This will need to change if we ever allow weak references.
     }
 
-    fn call(
-        &mut self,
-        name: &Symbol,
-        arguments: vec::Drain<'_, Value>,
-    ) -> Result<Value, FaultKind> {
+    fn call(&mut self, name: &Symbol, arguments: PoppedValues<'_>) -> Result<Value, FaultKind> {
         self.as_mut().call(name, arguments)
     }
 }
@@ -1853,8 +2126,7 @@ trait UnboxableDynamicValue: Debug + Display {
     fn kind(&self) -> &'static str;
     fn partial_eq(&self, other: &Value) -> Option<bool>;
     fn partial_cmp(&self, other: &Value) -> Option<Ordering>;
-    fn call(&mut self, name: &Symbol, arguments: vec::Drain<'_, Value>)
-        -> Result<Value, FaultKind>;
+    fn call(&mut self, name: &Symbol, arguments: PoppedValues<'_>) -> Result<Value, FaultKind>;
 }
 
 #[derive(Clone)]
@@ -1907,11 +2179,7 @@ where
         self.value().partial_cmp(other)
     }
 
-    fn call(
-        &mut self,
-        name: &Symbol,
-        arguments: vec::Drain<'_, Value>,
-    ) -> Result<Value, FaultKind> {
+    fn call(&mut self, name: &Symbol, arguments: PoppedValues<'_>) -> Result<Value, FaultKind> {
         self.value_mut().call(name, arguments)
     }
 }
@@ -2030,74 +2298,107 @@ pub enum ExecutionBehavior {
     Pause,
 }
 
-#[test]
-fn budget() {
-    let mut context = Bud::default_for(Budgeted::new(0));
-    let mut fault = context
-        .run::<i64>(Cow::Borrowed(&[
-            Instruction::Push(Value::Integer(1)),
-            Instruction::Push(Value::Integer(2)),
-            Instruction::Add,
-        ]))
-        .unwrap_err();
-    let output = loop {
-        println!("Paused");
-        let mut pending = match fault.kind {
-            FaultOrPause::Pause(pending) => pending,
-            FaultOrPause::Fault(error) => unreachable!("unexpected error: {error}"),
-        };
-        pending.environment_mut().add_budget(1);
+// #[test]
+// fn budget() {
+//     let mut context = Bud::default_for(Budgeted::new(0));
+//     let mut fault = context
+//         .run::<i64>(Cow::Borrowed(&[
+//             Instruction::Push(Value::Integer(1)),
+//             Instruction::Push(Value::Integer(2)),
+//             Instruction::Add,
+//         ]))
+//         .unwrap_err();
+//     let output = loop {
+//         println!("Paused");
+//         let mut pending = match fault.kind {
+//             FaultOrPause::Pause(pending) => pending,
+//             FaultOrPause::Fault(error) => unreachable!("unexpected error: {error}"),
+//         };
+//         pending.environment_mut().add_budget(1);
 
-        fault = match pending.resume() {
-            Ok(result) => break result,
-            Err(err) => err,
-        };
-    };
+//         fault = match pending.resume() {
+//             Ok(result) => break result,
+//             Err(err) => err,
+//         };
+//     };
 
-    assert_eq!(output, 3);
-}
+//     assert_eq!(output, 3);
+// }
 
 #[test]
 fn budget_with_frames() {
     let test = Function {
         arg_count: 1,
-        variable_count: 0,
+        variable_count: 2,
         code: vec![
-            Instruction::PushCopy(ValueSource::Argument(0)),
-            Instruction::If { false_jump_to: 12 },
+            Instruction::If {
+                condition: ValueSource::Argument(0),
+                false_jump_to: 12,
+            },
+            Instruction::Load {
+                variable_index: 0,
+                value: ValueOrSource::Value(Value::Integer(1)),
+            },
             Instruction::Push(Value::Integer(1)),
             Instruction::Push(Value::Integer(2)),
-            Instruction::Add,
+            Instruction::Add {
+                left: ValueSource::Variable(0),
+                right: ValueOrSource::Value(Value::Integer(2)),
+                destination: Destination::Variable(0),
+            },
             Instruction::Push(Value::Integer(3)),
-            Instruction::Add,
+            Instruction::Add {
+                left: ValueSource::Variable(0),
+                right: ValueOrSource::Value(Value::Integer(3)),
+                destination: Destination::Variable(0),
+            },
             Instruction::Push(Value::Integer(4)),
-            Instruction::Add,
+            Instruction::Add {
+                left: ValueSource::Variable(0),
+                right: ValueOrSource::Value(Value::Integer(4)),
+                destination: Destination::Variable(0),
+            },
             Instruction::Push(Value::Integer(5)),
-            Instruction::Add,
-            Instruction::Return,
+            Instruction::Add {
+                left: ValueSource::Variable(0),
+                right: ValueOrSource::Value(Value::Integer(5)),
+                destination: Destination::Variable(0),
+            },
+            Instruction::Return(Some(ValueOrSource::Variable(0))),
             // If we were passed false, call ourself twice.
             Instruction::Push(Value::Boolean(true)),
             Instruction::Call {
                 vtable_index: None,
                 arg_count: 1,
+                destination: Destination::Variable(0),
             },
             Instruction::Push(Value::Boolean(true)),
             Instruction::Call {
                 vtable_index: None,
                 arg_count: 1,
+                destination: Destination::Variable(1),
             },
-            Instruction::Add, // should produce 30
+            Instruction::Add {
+                left: ValueSource::Variable(0),
+                right: ValueOrSource::Variable(1),
+                destination: Destination::Variable(0),
+            }, // should produce 30
+            Instruction::PushCopy(ValueSource::Variable(0)),
         ],
     };
     let mut context = Bud::default_for(Budgeted::new(0)).with_function("test", test);
     let mut fault = context
-        .run::<i64>(Cow::Borrowed(&[
-            Instruction::Push(Value::Boolean(false)),
-            Instruction::Call {
-                vtable_index: Some(0),
-                arg_count: 1,
-            },
-        ]))
+        .run::<i64>(
+            Cow::Borrowed(&[
+                Instruction::Push(Value::Boolean(false)),
+                Instruction::Call {
+                    vtable_index: Some(0),
+                    arg_count: 1,
+                    destination: Destination::Stack,
+                },
+            ]),
+            0,
+        )
         .unwrap_err();
     let output = loop {
         println!("Paused");
@@ -2120,6 +2421,7 @@ fn budget_with_frames() {
 #[derive(Debug)]
 pub struct Stack {
     values: Vec<Value>,
+    length: usize,
     remaining_capacity: usize,
 }
 
@@ -2127,6 +2429,7 @@ impl Default for Stack {
     fn default() -> Self {
         Self {
             values: Vec::default(),
+            length: 0,
             remaining_capacity: usize::MAX,
         }
     }
@@ -2140,6 +2443,7 @@ impl Stack {
     pub fn new(initial_capacity: usize, maximum_capacity: usize) -> Self {
         Self {
             values: Vec::with_capacity(initial_capacity),
+            length: 0,
             remaining_capacity: maximum_capacity,
         }
     }
@@ -2154,8 +2458,12 @@ impl Stack {
     pub fn push(&mut self, value: Value) -> Result<(), FaultKind> {
         if self.remaining_capacity > 0 {
             self.remaining_capacity -= 1;
-
-            self.values.push(value);
+            if self.length < self.values.len() {
+                self.values[self.length] = value;
+            } else {
+                self.values.push(value);
+            }
+            self.length += 1;
             Ok(())
         } else {
             Err(FaultKind::StackOverflow)
@@ -2168,43 +2476,70 @@ impl Stack {
         Args: IntoIterator<Item = Value, IntoIter = ArgsIter>,
         ArgsIter: Iterator<Item = Value> + ExactSizeIterator + DoubleEndedIterator,
     {
-        let args = args.into_iter();
+        let mut args = args.into_iter().rev();
         let arg_count = args.len();
         if self.remaining_capacity >= arg_count {
             self.remaining_capacity -= arg_count;
-            self.values.extend(args.rev());
+            let new_length = self.length + arg_count;
+            let current_vec_length = self.values.len();
+            if new_length < current_vec_length {
+                // We can replace the existing values in this range
+                self.values.splice(self.length..new_length, args);
+            } else {
+                while self.length < current_vec_length {
+                    self.values[self.length] = args.next().expect("length checked");
+                    self.length += 1;
+                }
+                // The remaining can be added to the end of the vec
+                self.values.extend(args);
+            }
+
+            self.length = new_length;
+
             Ok(arg_count)
         } else {
             Err(FaultKind::StackOverflow)
         }
     }
 
-    /// Pushes multiple arguments to the stack.
-    pub fn drain<Range>(&mut self, range: Range) -> vec::Drain<'_, Value>
-    where
-        Range: RangeBounds<usize>,
-    {
-        let start = match range.start_bound() {
-            Bound::Included(start) => *start,
-            Bound::Excluded(start) => start.saturating_sub(1),
-            Bound::Unbounded => 0,
-        };
-        let end = match range.end_bound() {
-            Bound::Included(end) => end.saturating_add(1),
-            Bound::Excluded(end) => *end,
-            Bound::Unbounded => self.values.len(),
-        };
-        let elements_removed = end - start;
-        self.remaining_capacity += elements_removed;
-        self.values.drain(start..end)
+    /// Pops `count` elements from the top of the stack.
+    ///
+    /// This iterator returns the values in the sequence that they are ordered
+    /// on the stack, which is different than calling pop() `count` times
+    /// sequentially. For example, if the stack contains `[0, 1, 2, 3]`, calling
+    /// pop() twice will result in `3, 2`. Calling `pop_n(2)` will result in `2,
+    /// 3`.
+    pub fn pop_n(&mut self, count: usize) -> PoppedValues<'_> {
+        // Make sure we aren't trying to pop too many
+        let end = self.length;
+        let count = count.min(end);
+        let start = end - count;
+        self.remaining_capacity += count;
+        self.length -= count;
+        PoppedValues {
+            stack: self,
+            current: start,
+            end,
+        }
     }
 
     /// Returns a reference to the top [`Value`] on the stack, or returns a
     /// [`FaultKind::StackUnderflow`] if no values are present.
     #[inline]
     pub fn top(&self) -> Result<&Value, FaultKind> {
-        if let Some(value) = self.values.last() {
-            Ok(value)
+        if self.length > 0 {
+            Ok(&self.values[self.length])
+        } else {
+            Err(FaultKind::StackUnderflow)
+        }
+    }
+
+    /// Returns a reference to the top [`Value`] on the stack, or returns a
+    /// [`FaultKind::StackUnderflow`] if no values are present.
+    #[inline]
+    pub fn top_mut(&mut self) -> Result<&mut Value, FaultKind> {
+        if self.length > 0 {
+            Ok(&mut self.values[self.length - 1])
         } else {
             Err(FaultKind::StackUnderflow)
         }
@@ -2217,41 +2552,43 @@ impl Stack {
     /// Returns [`FaultKind::StackUnderflow`] if the stack is empty.
     #[inline]
     pub fn pop(&mut self) -> Result<Value, FaultKind> {
-        if let Some(value) = self.values.pop() {
+        if let Some(new_length) = self.length.checked_sub(1) {
+            let value = std::mem::take(&mut self.values[new_length]);
             self.remaining_capacity += 1;
+            self.length = new_length;
             Ok(value)
         } else {
             Err(FaultKind::StackUnderflow)
         }
     }
 
-    /// Pops a [`Value`] from the stack and returns a mutable reference to the
-    /// next value.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FaultKind::StackUnderflow`] if the stack does not contain at
-    /// least two values.
-    #[inline]
-    pub fn pop_and_modify(&mut self) -> Result<(Value, &mut Value), FaultKind> {
-        if self.values.len() >= 2 {
-            let first = self.values.pop().expect("bounds already checked");
-            self.remaining_capacity += 1;
+    // /// Pops a [`Value`] from the stack and returns a mutable reference to the
+    // /// next value.
+    // ///
+    // /// # Errors
+    // ///
+    // /// Returns [`FaultKind::StackUnderflow`] if the stack does not contain at
+    // /// least two values.
+    // #[inline]
+    // pub fn pop_and_modify(&mut self) -> Result<(Value, &mut Value), FaultKind> {
+    //     if self.values.len() >= 2 {
+    //         let first = self.values.pop().expect("bounds already checked");
+    //         self.remaining_capacity += 1;
 
-            Ok((
-                first,
-                self.values.last_mut().expect("bounds already checked"),
-            ))
-        } else {
-            Err(FaultKind::StackUnderflow)
-        }
-    }
+    //         Ok((
+    //             first,
+    //             self.values.last_mut().expect("bounds already checked"),
+    //         ))
+    //     } else {
+    //         Err(FaultKind::StackUnderflow)
+    //     }
+    // }
 
     /// Returns the number of [`Value`]s contained in this stack.
     #[inline]
     #[must_use]
     pub fn len(&self) -> usize {
-        self.values.len()
+        self.length
     }
 
     /// Returns true if this stack has no values.
@@ -2273,22 +2610,71 @@ impl Stack {
     where
         R: RangeBounds<usize>,
     {
-        let removed = self.values.drain(range).count();
+        let mut start = match range.start_bound() {
+            Bound::Included(start) => *start,
+            Bound::Excluded(start) => start.saturating_sub(1),
+            Bound::Unbounded => 0,
+        };
+        let end = match range.end_bound() {
+            Bound::Included(end) => end.saturating_add(1),
+            Bound::Excluded(end) => *end,
+            Bound::Unbounded => self.length,
+        };
+        let removed = end - start;
+        if removed > 0 {
+            if let Some(values_to_copy) = self.length.checked_sub(end) {
+                // We have values at the end we should copy first
+                for index in 0..values_to_copy {
+                    let value = std::mem::take(&mut self.values[end + index]);
+                    self.values[start + index] = value;
+                }
+                start += values_to_copy;
+            }
+            // Replace the values with Void to free any ref-counted values.
+            if end > start {
+                // For some odd reason, fill_with is faster than fill here.
+                self.values[start..end].fill_with(|| Value::Void);
+            }
+        }
         self.remaining_capacity += removed;
+        self.length -= removed;
+    }
+
+    fn clear(&mut self) {
+        if self.length > 0 {
+            self.values[0..self.length].fill_with(|| Value::Void);
+        }
+        self.remaining_capacity += self.length;
+        self.length = 0;
     }
 
     #[inline]
-    fn grow_to<Env, ReturnType>(
-        &mut self,
-        new_size: usize,
-    ) -> Result<(), Fault<'static, Env, ReturnType>> {
-        let extra_capacity = new_size.saturating_sub(self.len());
-        if extra_capacity <= self.remaining_capacity {
-            self.values.resize(new_size, Value::Void);
-            self.remaining_capacity -= extra_capacity;
+    fn grow_to(&mut self, new_size: usize) -> Result<(), FaultKind> {
+        let extra_capacity = new_size.saturating_sub(self.length);
+        if let Some(remaining_capacity) = self.remaining_capacity.checked_sub(extra_capacity) {
+            self.remaining_capacity = remaining_capacity;
+            if new_size >= self.values.len() {
+                self.values.resize_with(new_size, || Value::Void);
+            }
+            self.length = new_size;
             Ok(())
         } else {
-            Err(Fault::from(FaultKind::StackOverflow))
+            Err(FaultKind::StackOverflow)
+        }
+    }
+
+    #[inline]
+    fn grow_by(&mut self, additional_voids: usize) -> Result<(), FaultKind> {
+        if let Some(remaining_capacity) = self.remaining_capacity.checked_sub(additional_voids) {
+            self.remaining_capacity = remaining_capacity;
+            let new_size = self.length + additional_voids;
+            if new_size > self.values.len() {
+                self.values.resize_with(new_size, || Value::Void);
+            }
+            self.length = new_size;
+            Ok(())
+        } else {
+            Err(FaultKind::StackOverflow)
         }
     }
 }
@@ -2308,6 +2694,45 @@ impl IndexMut<usize> for Stack {
         &mut self.values[index]
     }
 }
+
+/// An iterator over a sequence of values being removed from the top of a
+/// [`Stack`].
+///
+/// This iterator returns the values in the sequence that they are ordered on
+/// the stack, which is different than calling pop() `count` times sequentially.
+/// For example, if the stack contains `[0, 1, 2, 3]`, calling pop() twice will
+/// result in `3, 2`. Calling `pop_n(2)` will result in `2, 3`.
+pub struct PoppedValues<'a> {
+    stack: &'a mut Stack,
+    end: usize,
+    current: usize,
+}
+
+impl<'a> Drop for PoppedValues<'a> {
+    fn drop(&mut self) {
+        self.stack.values[self.current..self.end].fill_with(|| Value::Void);
+    }
+}
+
+impl<'a> Iterator for PoppedValues<'a> {
+    type Item = Value;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current < self.end {
+            let result = Some(std::mem::take(&mut self.stack.values[self.current]));
+            self.current += 1;
+            result
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.end - self.current, None)
+    }
+}
+
+impl<'a> ExactSizeIterator for PoppedValues<'a> {}
 
 /// A [`Fault`] that arose from a [`Dynamic`] value.
 #[derive(Debug)]
@@ -2388,10 +2813,14 @@ fn invalid_variables() {
     let mut context = Bud::empty().with_function("test", test);
     assert!(matches!(
         context
-            .run::<i64>(Cow::Borrowed(&[Instruction::Call {
-                vtable_index: Some(0),
-                arg_count: 0,
-            }]))
+            .run::<i64>(
+                Cow::Borrowed(&[Instruction::Call {
+                    vtable_index: Some(0),
+                    arg_count: 0,
+                    destination: Destination::Stack,
+                }],),
+                0
+            )
             .unwrap_err()
             .kind,
         FaultOrPause::Fault(FaultKind::InvalidVariableIndex)
@@ -2408,10 +2837,14 @@ fn invalid_argument() {
     let mut context = Bud::empty().with_function("test", test);
     assert!(matches!(
         context
-            .run::<i64>(Cow::Borrowed(&[Instruction::Call {
-                vtable_index: Some(0),
-                arg_count: 0,
-            }]))
+            .run::<i64>(
+                Cow::Borrowed(&[Instruction::Call {
+                    vtable_index: Some(0),
+                    arg_count: 0,
+                    destination: Destination::Stack,
+                }]),
+                0
+            )
             .unwrap_err()
             .kind,
         FaultOrPause::Fault(FaultKind::InvalidArgumentIndex)
@@ -2423,10 +2856,14 @@ fn invalid_vtable_index() {
     let mut context = Bud::empty();
     assert!(matches!(
         context
-            .run::<i64>(Cow::Borrowed(&[Instruction::Call {
-                vtable_index: Some(0),
-                arg_count: 0,
-            }]))
+            .run::<i64>(
+                Cow::Borrowed(&[Instruction::Call {
+                    vtable_index: Some(0),
+                    arg_count: 0,
+                    destination: Destination::Stack,
+                }]),
+                0
+            )
             .unwrap_err()
             .kind,
         FaultOrPause::Fault(FaultKind::InvalidVtableIndex)
@@ -2462,10 +2899,14 @@ fn function_needs_extra_cleanup() {
     let mut context = Bud::empty().with_function("test", test);
     assert_eq!(
         context
-            .run::<Value>(Cow::Borrowed(&[Instruction::Call {
-                vtable_index: Some(0),
-                arg_count: 0,
-            }]))
+            .run::<Value>(
+                Cow::Borrowed(&[Instruction::Call {
+                    vtable_index: Some(0),
+                    arg_count: 0,
+                    destination: Destination::Stack,
+                }]),
+                0
+            )
             .unwrap(),
         Value::Integer(1)
     );

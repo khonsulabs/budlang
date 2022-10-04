@@ -3,8 +3,8 @@ use std::{fmt::Display, vec};
 use crate::{
     symbol::Symbol,
     vm::{
-        self, Bud, DynamicFault, DynamicValue, Fault, FaultKind, FaultOrPause, Instruction, Value,
-        ValueSource,
+        self, Bud, DynamicFault, DynamicValue, Fault, FaultKind, FaultOrPause, Instruction,
+        PoppedValues, Value, ValueSource,
     },
     Error,
 };
@@ -65,8 +65,8 @@ fn math() {
     assert_run!("6 * (2 + 4) / 2", 18);
 
     // Floating points
-    assert_run!("1.1 + 2", Value::Real(3.1));
-    assert_run!("-1 - -10.0", Value::Real(9.));
+    assert_run!("1.1 + 2.0", Value::Real(3.1));
+    assert_run!("-1.0 - -10.0", Value::Real(9.));
     assert_run!("-0.0 * 0.0", Value::Real(0.));
 }
 
@@ -100,7 +100,7 @@ impl DynamicValue for TestDynamic {
         "TestDynamic"
     }
 
-    fn call(&mut self, name: &Symbol, _args: vec::Drain<'_, Value>) -> Result<Value, FaultKind> {
+    fn call(&mut self, name: &Symbol, _args: PoppedValues<'_>) -> Result<Value, FaultKind> {
         match name.as_ref() {
             "squared" => Ok(Value::dynamic(Self(self.0.pow(2)))),
             _ => Err(FaultKind::Dynamic(DynamicFault::new(format!(
@@ -120,6 +120,7 @@ fn dynamic_values() {
             target: Some(ValueSource::Argument(0)),
             name: Symbol::from("squared"),
             arg_count: 0,
+            destination: vm::Destination::Stack,
         }],
     };
 
