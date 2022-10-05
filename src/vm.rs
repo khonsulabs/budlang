@@ -3,7 +3,7 @@ use std::{
     borrow::Cow,
     cmp::Ordering,
     collections::{HashMap, VecDeque},
-    fmt::{Debug, Display},
+    fmt::{Debug, Display, Write},
     marker::PhantomData,
     ops::{Bound, Index, IndexMut, RangeBounds},
     sync::Arc,
@@ -24,7 +24,7 @@ pub enum Instruction {
     /// the destination instead.
     Add {
         /// The left hand side of the operation.
-        left: ValueSource,
+        left: ValueOrSource,
         /// The right hand side of the operation.
         right: ValueOrSource,
         /// The destination for the result to be stored in.
@@ -36,7 +36,7 @@ pub enum Instruction {
     /// the destination instead.
     Sub {
         /// The left hand side of the operation.
-        left: ValueSource,
+        left: ValueOrSource,
         /// The right hand side of the operation.
         right: ValueOrSource,
         /// The destination for the result to be stored in.
@@ -48,7 +48,7 @@ pub enum Instruction {
     /// the destination instead.
     Multiply {
         /// The left hand side of the operation.
-        left: ValueSource,
+        left: ValueOrSource,
         /// The right hand side of the operation.
         right: ValueOrSource,
         /// The destination for the result to be stored in.
@@ -60,7 +60,7 @@ pub enum Instruction {
     /// the destination instead.
     Divide {
         /// The left hand side of the operation.
-        left: ValueSource,
+        left: ValueOrSource,
         /// The right hand side of the operation.
         right: ValueOrSource,
         /// The destination for the result to be stored in.
@@ -80,7 +80,7 @@ pub enum Instruction {
     /// instead cause the current function to return.
     If {
         /// The source of the condition.
-        condition: ValueSource,
+        condition: ValueOrSource,
         /// The 0-based index of the instruction to jump to. This index is
         /// relative to the begining of the set of instructions being executed.
         false_jump_to: usize,
@@ -107,17 +107,14 @@ pub enum Instruction {
         /// The comparison to perform.
         comparison: Comparison,
         /// The left hand side of the operation.
-        left: ValueSource,
+        left: ValueOrSource,
         /// The right hand side of the operation.
         right: ValueOrSource,
         /// The action to take with the result of the comparison.
         action: CompareAction,
     },
-    /// Pushes a [`Value`] to the stack.
-    Push(Value),
-    /// Pushes a copy of a value to the stack. The value could be from either an
-    /// argument or a variable.
-    PushCopy(ValueSource),
+    /// Pushes a value to the stack.
+    Push(ValueOrSource),
     /// Pops a value from the stack and drops the value.
     ///
     /// Attempting to pop beyond the baseline of the currently executing set of
@@ -173,7 +170,7 @@ pub enum Instruction {
     CallInstance {
         /// The target of the function call. If None, the value on the stack
         /// prior to the arguments is the target of the call.
-        target: Option<ValueSource>,
+        target: Option<ValueOrSource>,
 
         /// The name of the function to call.
         name: Symbol,
@@ -187,6 +184,80 @@ pub enum Instruction {
     },
 }
 
+impl Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Instruction::Add {
+                left,
+                right,
+                destination,
+            } => write!(f, "add {left} {right} {destination}"),
+            Instruction::Sub {
+                left,
+                right,
+                destination,
+            } => write!(f, "sub {left} {right} {destination}"),
+            Instruction::Multiply {
+                left,
+                right,
+                destination,
+            } => write!(f, "mul {left} {right} {destination}"),
+            Instruction::Divide {
+                left,
+                right,
+                destination,
+            } => write!(f, "div {left} {right} {destination}"),
+            Instruction::If {
+                condition,
+                false_jump_to,
+            } => write!(f, "if !{condition} jump {false_jump_to}"),
+            Instruction::JumpTo(instruction) => write!(f, "jump {instruction}"),
+            Instruction::Compare {
+                comparison,
+                left,
+                right,
+                action,
+            } => write!(f, "{comparison} {left} {right} {action}"),
+            Instruction::Push(value) => write!(f, "push {value}"),
+            Instruction::PopAndDrop => write!(f, "pop-and-drop"),
+            Instruction::Load {
+                value,
+                variable_index,
+            } => write!(f, "load {value} ${variable_index}"),
+            Instruction::Return(opt_value) => {
+                if let Some(value) = opt_value {
+                    write!(f, "return {value}")
+                } else {
+                    f.write_str("return")
+                }
+            }
+            Instruction::Call {
+                vtable_index,
+                arg_count,
+                destination,
+            } => {
+                if let Some(vtable_index) = vtable_index {
+                    write!(f, "call #{vtable_index} {arg_count} {destination}")
+                } else {
+                    write!(f, "recurse-call {arg_count} {destination}")
+                }
+            }
+            Instruction::CallInstance {
+                target,
+                name,
+                arg_count,
+                destination,
+            } => {
+                if let Some(target) = target {
+                    write!(f, "invoke {target} {name} {arg_count} {destination}")
+                } else {
+                    write!(f, "invoke stack {name} {arg_count} {destination}")
+                }
+            }
+        }
+    }
+}
+
 /// An action to take during an [`Instruction::Compare`].
 #[derive(Debug, Clone, Copy)]
 pub enum CompareAction {
@@ -195,6 +266,15 @@ pub enum CompareAction {
     /// If the comparison is false, jump to the 0-based instruction index
     /// indicated.
     JumpIfFalse(usize),
+}
+
+impl Display for CompareAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompareAction::Store(destination) => Display::fmt(destination, f),
+            CompareAction::JumpIfFalse(label) => write!(f, "jump {label}"),
+        }
+    }
 }
 
 /// A destination for a value.
@@ -208,6 +288,16 @@ pub enum Destination {
     Return,
 }
 
+impl Display for Destination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Destination::Variable(variable) => write!(f, "${variable}"),
+            Destination::Stack => f.write_str("stack"),
+            Destination::Return => f.write_str("$$"),
+        }
+    }
+}
+
 /// The source of a value.
 #[derive(Debug, Copy, Clone)]
 pub enum ValueSource {
@@ -215,6 +305,15 @@ pub enum ValueSource {
     Argument(usize),
     /// The value is in a variable at the provided 0-based index.
     Variable(usize),
+}
+
+impl Display for ValueSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueSource::Argument(index) => write!(f, "@{index}"),
+            ValueSource::Variable(variable) => write!(f, "${variable}"),
+        }
+    }
 }
 
 /// A value or a location of a value
@@ -226,6 +325,16 @@ pub enum ValueOrSource {
     Argument(usize),
     /// The value is in a variable at the provided 0-based index.
     Variable(usize),
+}
+
+impl Display for ValueOrSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueOrSource::Value(value) => Display::fmt(value, f),
+            ValueOrSource::Argument(index) => write!(f, "@{index}"),
+            ValueOrSource::Variable(variable) => write!(f, "${variable}"),
+        }
+    }
 }
 
 /// A method for comparing [`Value`]s.
@@ -243,6 +352,19 @@ pub enum Comparison {
     GreaterThan,
     /// Pushes true if left is greater than or equal to right. Otherwise, pushes false.
     GreaterThanOrEqual,
+}
+
+impl Display for Comparison {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Comparison::Equal => f.write_str("eq"),
+            Comparison::NotEqual => f.write_str("neq"),
+            Comparison::LessThan => f.write_str("lt"),
+            Comparison::LessThanOrEqual => f.write_str("lte"),
+            Comparison::GreaterThan => f.write_str("gt"),
+            Comparison::GreaterThanOrEqual => f.write_str("gte"),
+        }
+    }
 }
 
 /// A virtual machine function.
@@ -939,7 +1061,7 @@ where
             destination: first_frame.destination,
             variables_offset: first_frame.variables_offset,
             arg_offset: first_frame.arg_offset,
-            return_value: None,
+            return_value: first_frame.return_value,
             vtable_index: first_frame.vtable_index,
             operation_index: first_frame.operation_index,
             _output: PhantomData,
@@ -1036,7 +1158,7 @@ where
                 destination: call_to_resume.destination,
                 variables_offset: call_to_resume.variables_offset,
                 arg_offset: call_to_resume.arg_offset,
-                return_value: None,
+                return_value: call_to_resume.return_value,
                 vtable_index: call_to_resume.vtable_index,
                 operation_index: call_to_resume.operation_index,
                 _output: PhantomData,
@@ -1051,11 +1173,12 @@ where
                 }) => {
                     paused.stack.push_front(PausedFrame {
                         return_offset: self.return_offset,
-                        destination: self.destination,
                         arg_offset: self.arg_offset,
                         variables_offset: self.variables_offset,
+                        return_value: self.return_value.take(),
                         vtable_index: self.vtable_index,
                         operation_index: self.operation_index,
+                        destination: self.destination,
                     });
                     return Err(Fault {
                         kind: FaultOrPause::Pause(paused),
@@ -1086,11 +1209,12 @@ where
                 let mut stack = VecDeque::new();
                 stack.push_front(PausedFrame {
                     return_offset: self.return_offset,
-                    destination: self.destination,
                     arg_offset: self.arg_offset,
                     variables_offset: self.variables_offset,
+                    return_value: self.return_value.take(),
                     vtable_index: self.vtable_index,
                     operation_index: self.operation_index,
+                    destination: self.destination,
                 });
                 return Err(Fault {
                     kind: FaultOrPause::Pause(PausedExecution {
@@ -1134,11 +1258,12 @@ where
                     if let FaultOrPause::Pause(paused_frame) = &mut fault.kind {
                         paused_frame.stack.push_front(PausedFrame {
                             return_offset: self.return_offset,
-                            destination: self.destination,
                             arg_offset: self.arg_offset,
                             variables_offset: self.variables_offset,
+                            return_value: self.return_value.take(),
                             vtable_index: self.vtable_index,
                             operation_index: self.operation_index,
+                            destination: self.destination,
                         });
                     }
                     fault.stack.insert(
@@ -1166,38 +1291,41 @@ where
                 left,
                 right,
                 destination,
-            } => self.add(*left, right, *destination),
+            } => self.add(left, right, *destination),
             Instruction::Sub {
                 left,
                 right,
                 destination,
-            } => self.sub(*left, right, *destination),
+            } => self.sub(left, right, *destination),
             Instruction::Multiply {
                 left,
                 right,
                 destination,
-            } => self.multiply(*left, right, *destination),
+            } => self.multiply(left, right, *destination),
             Instruction::Divide {
                 left,
                 right,
                 destination,
-            } => self.divide(*left, right, *destination),
+            } => self.divide(left, right, *destination),
             Instruction::If {
                 condition: value,
                 false_jump_to,
-            } => self.r#if(*value, *false_jump_to),
+            } => self.r#if(value, *false_jump_to),
             Instruction::Compare {
                 comparison,
                 left,
                 right,
                 action,
-            } => self.compare(*comparison, *left, right, *action),
+            } => self.compare(*comparison, left, right, *action),
             Instruction::Push(value) => {
-                self.stack.push(value.clone())?;
+                match value {
+                    ValueOrSource::Value(value) => self.stack.push(value.clone())?,
+                    ValueOrSource::Argument(arg) => self.push_arg(*arg)?,
+                    ValueOrSource::Variable(variable) => self.push_var(*variable)?,
+                }
+
                 Ok(None)
             }
-            Instruction::PushCopy(ValueSource::Variable(variable)) => self.push_var(*variable),
-            Instruction::PushCopy(ValueSource::Argument(arg_index)) => self.push_arg(*arg_index),
             Instruction::PopAndDrop => {
                 self.pop()?;
                 Ok(None)
@@ -1230,7 +1358,7 @@ where
                 name,
                 arg_count,
                 destination,
-            } => self.call_instance(*target, name, *arg_count, *destination),
+            } => self.call_instance(target.as_ref(), name, *arg_count, *destination),
         }
     }
 
@@ -1301,13 +1429,6 @@ where
         Err(FaultKind::InvalidVariableIndex)
     }
 
-    fn resolve_value_source(&self, value: ValueSource) -> Result<&Value, FaultKind> {
-        match value {
-            ValueSource::Argument(index) => self.resolve_argument(index),
-            ValueSource::Variable(index) => self.resolve_variable(index),
-        }
-    }
-
     fn resolve_value_source_mut(&mut self, value: Destination) -> Result<&mut Value, FaultKind> {
         match value {
             Destination::Variable(index) => self.resolve_variable_mut(index),
@@ -1338,11 +1459,11 @@ where
     // floating point casts are intentional in this code.
     fn add(
         &mut self,
-        left: ValueSource,
+        left: &ValueOrSource,
         right: &ValueOrSource,
         result: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_source(left)?;
+        let left = self.resolve_value_or_source(left)?;
         let right = self.resolve_value_or_source(right)?;
 
         let produced_value = match (left, right) {
@@ -1378,11 +1499,11 @@ where
     // floating point casts are intentional in this code.
     fn sub(
         &mut self,
-        left: ValueSource,
+        left: &ValueOrSource,
         right: &ValueOrSource,
         result: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_source(left)?;
+        let left = self.resolve_value_or_source(left)?;
         let right = self.resolve_value_or_source(right)?;
 
         let produced_value = match (left, right) {
@@ -1418,11 +1539,11 @@ where
     // floating point casts are intentional in this code.
     fn multiply(
         &mut self,
-        left: ValueSource,
+        left: &ValueOrSource,
         right: &ValueOrSource,
         result: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_source(left)?;
+        let left = self.resolve_value_or_source(left)?;
         let right = self.resolve_value_or_source(right)?;
 
         let produced_value = match (left, right) {
@@ -1458,11 +1579,11 @@ where
     // floating point casts are intentional in this code.
     fn divide(
         &mut self,
-        left: ValueSource,
+        left: &ValueOrSource,
         right: &ValueOrSource,
         result: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_source(left)?;
+        let left = self.resolve_value_or_source(left)?;
         let right = self.resolve_value_or_source(right)?;
 
         let produced_value = match (left, right) {
@@ -1497,10 +1618,10 @@ where
 
     fn r#if(
         &mut self,
-        value: ValueSource,
+        value: &ValueOrSource,
         false_jump_to: usize,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        if self.resolve_value_source(value)?.is_truthy() {
+        if self.resolve_value_or_source(value)?.is_truthy() {
             Ok(None)
         } else {
             Ok(Some(FlowControl::JumpTo(false_jump_to)))
@@ -1535,11 +1656,11 @@ where
     fn compare(
         &mut self,
         comparison: Comparison,
-        left: ValueSource,
+        left: &ValueOrSource,
         right: &ValueOrSource,
         result: CompareAction,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_source(left)?;
+        let left = self.resolve_value_or_source(left)?;
         let right = self.resolve_value_or_source(right)?;
 
         let comparison_result = match comparison {
@@ -1575,26 +1696,23 @@ where
         }
     }
 
-    fn push_var(
-        &mut self,
-        variable: usize,
-    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+    fn push_var(&mut self, variable: usize) -> Result<(), Fault<'static, Env, Output>> {
         if let Some(stack_offset) = self.variables_offset.checked_add(variable) {
             if stack_offset < self.return_offset {
                 let value = self.stack[stack_offset].clone();
                 self.stack.push(value)?;
-                return Ok(None);
+                return Ok(());
             }
         }
         Err(Fault::from(FaultKind::InvalidVariableIndex))
     }
 
-    fn push_arg(&mut self, arg: usize) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+    fn push_arg(&mut self, arg: usize) -> Result<(), Fault<'static, Env, Output>> {
         if let Some(stack_offset) = self.arg_offset.checked_add(arg) {
             if stack_offset < self.variables_offset {
                 let value = self.stack[stack_offset].clone();
                 self.stack.push(value)?;
-                return Ok(None);
+                return Ok(());
             }
         }
         Err(Fault::from(FaultKind::InvalidArgumentIndex))
@@ -1657,7 +1775,7 @@ where
 
     fn call_instance(
         &mut self,
-        target: Option<ValueSource>,
+        target: Option<&ValueOrSource>,
         name: &Symbol,
         arg_count: usize,
         destination: Destination,
@@ -1666,8 +1784,8 @@ where
         // borrows of the stack, we temporarily take the value from where it
         // lives.
         let stack_index = match target {
-            Some(ValueSource::Argument(index)) => {
-                if let Some(stack_index) = self.arg_offset.checked_add(index) {
+            Some(ValueOrSource::Argument(index)) => {
+                if let Some(stack_index) = self.arg_offset.checked_add(*index) {
                     if stack_index < self.variables_offset {
                         stack_index
                     } else {
@@ -1677,8 +1795,8 @@ where
                     return Err(Fault::from(FaultKind::InvalidArgumentIndex));
                 }
             }
-            Some(ValueSource::Variable(index)) => {
-                if let Some(stack_index) = self.variables_offset.checked_add(index) {
+            Some(ValueOrSource::Variable(index)) => {
+                if let Some(stack_index) = self.variables_offset.checked_add(*index) {
                     if stack_index < self.return_offset {
                         stack_index
                     } else {
@@ -1687,6 +1805,14 @@ where
                 } else {
                     return Err(Fault::from(FaultKind::InvalidVariableIndex));
                 }
+            }
+            Some(ValueOrSource::Value(value)) => {
+                // We don't have any intrinsic functions yet, and this Value can
+                // only be a literal.
+                return Err(Fault::from(FaultKind::UnknownFunction {
+                    kind: value.kind(),
+                    name: name.clone(),
+                }));
             }
             None => {
                 // If None, the target is the value prior to the arguments.
@@ -1987,6 +2113,7 @@ struct PausedFrame {
     arg_offset: usize,
     variables_offset: usize,
 
+    return_value: Option<Value>,
     vtable_index: Option<usize>,
     operation_index: usize,
     destination: Destination,
@@ -2332,65 +2459,65 @@ fn budget_with_frames() {
         variable_count: 2,
         code: vec![
             Instruction::If {
-                condition: ValueSource::Argument(0),
+                condition: ValueOrSource::Argument(0),
                 false_jump_to: 12,
             },
             Instruction::Load {
                 variable_index: 0,
                 value: ValueOrSource::Value(Value::Integer(1)),
             },
-            Instruction::Push(Value::Integer(1)),
-            Instruction::Push(Value::Integer(2)),
+            Instruction::Push(ValueOrSource::Value(Value::Integer(1))),
+            Instruction::Push(ValueOrSource::Value(Value::Integer(2))),
             Instruction::Add {
-                left: ValueSource::Variable(0),
+                left: ValueOrSource::Variable(0),
                 right: ValueOrSource::Value(Value::Integer(2)),
                 destination: Destination::Variable(0),
             },
-            Instruction::Push(Value::Integer(3)),
+            Instruction::Push(ValueOrSource::Value(Value::Integer(3))),
             Instruction::Add {
-                left: ValueSource::Variable(0),
+                left: ValueOrSource::Variable(0),
                 right: ValueOrSource::Value(Value::Integer(3)),
                 destination: Destination::Variable(0),
             },
-            Instruction::Push(Value::Integer(4)),
+            Instruction::Push(ValueOrSource::Value(Value::Integer(4))),
             Instruction::Add {
-                left: ValueSource::Variable(0),
+                left: ValueOrSource::Variable(0),
                 right: ValueOrSource::Value(Value::Integer(4)),
                 destination: Destination::Variable(0),
             },
-            Instruction::Push(Value::Integer(5)),
+            Instruction::Push(ValueOrSource::Value(Value::Integer(5))),
             Instruction::Add {
-                left: ValueSource::Variable(0),
+                left: ValueOrSource::Variable(0),
                 right: ValueOrSource::Value(Value::Integer(5)),
                 destination: Destination::Variable(0),
             },
             Instruction::Return(Some(ValueOrSource::Variable(0))),
             // If we were passed false, call ourself twice.
-            Instruction::Push(Value::Boolean(true)),
+            Instruction::Push(ValueOrSource::Value(Value::Boolean(true))),
             Instruction::Call {
                 vtable_index: None,
                 arg_count: 1,
                 destination: Destination::Variable(0),
             },
-            Instruction::Push(Value::Boolean(true)),
+            Instruction::Push(ValueOrSource::Value(Value::Boolean(true))),
             Instruction::Call {
                 vtable_index: None,
                 arg_count: 1,
                 destination: Destination::Variable(1),
             },
             Instruction::Add {
-                left: ValueSource::Variable(0),
+                left: ValueOrSource::Variable(0),
                 right: ValueOrSource::Variable(1),
                 destination: Destination::Variable(0),
             }, // should produce 30
-            Instruction::PushCopy(ValueSource::Variable(0)),
+            Instruction::Push(ValueOrSource::Variable(0)),
         ],
     };
     let mut context = Bud::default_for(Budgeted::new(0)).with_function("test", test);
     let mut fault = context
         .run::<i64>(
             Cow::Borrowed(&[
-                Instruction::Push(Value::Boolean(false)),
+                Instruction::Push(ValueOrSource::Value(Value::Boolean(false))),
                 Instruction::Call {
                     vtable_index: Some(0),
                     arg_count: 1,
@@ -2415,6 +2542,28 @@ fn budget_with_frames() {
     };
 
     assert_eq!(output, 30);
+}
+
+/// A block of code that can be executed on the virtual machine.
+#[derive(Debug)]
+pub struct CodeBlock {
+    pub(crate) variables: usize,
+    pub(crate) code: Vec<Instruction>,
+}
+
+impl Display for CodeBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut is_first = true;
+        for i in &self.code {
+            if is_first {
+                is_first = false;
+            } else {
+                f.write_char('\n')?;
+            }
+            Display::fmt(i, f)?;
+        }
+        Ok(())
+    }
 }
 
 /// A stack of [`Value`]s.
@@ -2808,7 +2957,7 @@ fn invalid_variables() {
     let test = Function {
         arg_count: 0,
         variable_count: 0,
-        code: vec![Instruction::PushCopy(ValueSource::Variable(0))],
+        code: vec![Instruction::Push(ValueOrSource::Variable(0))],
     };
     let mut context = Bud::empty().with_function("test", test);
     assert!(matches!(
@@ -2832,7 +2981,7 @@ fn invalid_argument() {
     let test = Function {
         arg_count: 0,
         variable_count: 0,
-        code: vec![Instruction::PushCopy(ValueSource::Argument(0))],
+        code: vec![Instruction::Push(ValueOrSource::Argument(0))],
     };
     let mut context = Bud::empty().with_function("test", test);
     assert!(matches!(
@@ -2892,8 +3041,8 @@ fn function_needs_extra_cleanup() {
         arg_count: 0,
         variable_count: 0,
         code: vec![
-            Instruction::Push(Value::Integer(1)),
-            Instruction::Push(Value::Integer(2)),
+            Instruction::Push(ValueOrSource::Value(Value::Integer(1))),
+            Instruction::Push(ValueOrSource::Value(Value::Integer(2))),
         ],
     };
     let mut context = Bud::empty().with_function("test", test);

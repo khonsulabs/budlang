@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use budlang::vm::{
     Bud, CompareAction, Comparison, Destination, Function, Instruction, Value, ValueOrSource,
-    ValueSource,
 };
 
 fn main() {
@@ -14,14 +13,14 @@ fn main() {
             // if v0 <= 2
             Instruction::Compare {
                 comparison: Comparison::LessThanOrEqual,
-                left: ValueSource::Argument(ARG_N),
+                left: ValueOrSource::Argument(ARG_N),
                 right: ValueOrSource::Value(Value::Integer(2)),
                 action: CompareAction::JumpIfFalse(2),
             },
             Instruction::Return(Some(ValueOrSource::Value(Value::Integer(1)))),
             // self(n - 1) (result left on stack)
             Instruction::Sub {
-                left: ValueSource::Argument(ARG_N),
+                left: ValueOrSource::Argument(ARG_N),
                 right: ValueOrSource::Value(Value::Integer(1)),
                 destination: Destination::Stack,
             },
@@ -32,7 +31,7 @@ fn main() {
             },
             // self(n - 2) (result left on stack)
             Instruction::Sub {
-                left: ValueSource::Argument(ARG_N),
+                left: ValueOrSource::Argument(ARG_N),
                 right: ValueOrSource::Value(Value::Integer(2)),
                 destination: Destination::Stack,
             },
@@ -43,7 +42,7 @@ fn main() {
             },
             // add the two values together
             Instruction::Add {
-                left: ValueSource::Variable(0),
+                left: ValueOrSource::Variable(0),
                 right: ValueOrSource::Variable(1),
                 destination: Destination::Return,
             },
@@ -53,7 +52,7 @@ fn main() {
     let result: i64 = context
         .run(
             Cow::Borrowed(&[
-                Instruction::Push(Value::Integer(35)),
+                Instruction::Push(ValueOrSource::Value(Value::Integer(35))),
                 Instruction::Call {
                     vtable_index: Some(0),
                     arg_count: 1,
@@ -63,7 +62,6 @@ fn main() {
             0,
         )
         .unwrap();
-    // assert_eq!(context.stack.len(), 1);
     assert_eq!(result, 9227465);
 }
 

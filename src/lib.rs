@@ -17,6 +17,8 @@ use std::fmt::Display;
 
 /// The abstract syntax tree Bud uses.
 pub mod ast;
+pub mod ir;
+// mod optimizer;
 /// The interface for parsing Bud code.
 pub mod parser;
 /// An "interned" string-like type used for identifiers in Bud.

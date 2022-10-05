@@ -44,6 +44,14 @@ struct Symbols {
 #[derive(Debug, Clone)]
 pub struct Symbol(SharedData);
 
+impl Symbol {
+    /// Returns this symbol's underlying representation.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0 .0.value
+    }
+}
+
 impl Hash for Symbol {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0 .0.index.hash(state);
@@ -165,9 +173,15 @@ impl Drop for SharedData {
                 .is_ok()
         {
             with_active_symbols(|symbols| {
-                symbols.active.remove(self);
-                symbols.slots[self.0.index] = None;
-                symbols.free_slots.push(self.0.index);
+                // Check that the strong count hasn't changed. If it has, we
+                // need to allow the symbol to stay alive.
+                if Arc::strong_count(&self.0) > 3 {
+                    self.0.freeing.store(false, atomic::Ordering::Relaxed);
+                } else {
+                    symbols.active.remove(self);
+                    symbols.slots[self.0.index] = None;
+                    symbols.free_slots.push(self.0.index);
+                }
             });
         }
     }
@@ -203,4 +217,28 @@ fn basics() {
             }
         }
     });
+}
+
+/// A type that can be converted into `Option<Symbol>`.
+pub trait OptionalSymbol {
+    /// Returns the value as a symbol, if possible.
+    fn into_symbol(self) -> Option<Symbol>;
+}
+
+impl OptionalSymbol for Symbol {
+    fn into_symbol(self) -> Option<Symbol> {
+        Some(self)
+    }
+}
+
+impl OptionalSymbol for Option<Symbol> {
+    fn into_symbol(self) -> Option<Symbol> {
+        self
+    }
+}
+
+impl<'a> OptionalSymbol for &'a str {
+    fn into_symbol(self) -> Option<Symbol> {
+        Some(Symbol::from(self))
+    }
 }

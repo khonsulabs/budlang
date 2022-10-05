@@ -1,19 +1,18 @@
 #![allow(missing_docs, clippy::missing_panics_doc)] // TODO docs and panics for ast
 
 use std::{
-    borrow::Cow,
     cell::RefCell,
     collections::HashMap,
     fmt::{Debug, Display},
 };
 
 use crate::{
-    symbol::Symbol,
-    vm::{
-        self, Bud, CompareAction, Comparison, Destination, Environment, FromStack, Instruction,
-        Value, ValueOrSource, ValueSource,
+    ir::{
+        self, CodeBlockBuilder, CompareAction, Destination, Instruction, ScopeSymbol,
+        UnlinkedCodeUnit, ValueOrSource,
     },
-    Error,
+    symbol::{OptionalSymbol, Symbol},
+    vm::{Comparison, Value},
 };
 
 pub struct ExpressionTree {
@@ -37,9 +36,7 @@ impl ExpressionTree {
     }
 
     pub fn generate_code(&self, block: &mut CodeBlockBuilder) {
-        let result = block.new_temporary_variable();
-        self.root().generate_code(result, block, self);
-        block.push(IntermediateOp::PushCopy(ValueSource::Variable(result.0)));
+        self.root().generate_code(Destination::Return, block, self);
     }
 }
 
@@ -148,7 +145,7 @@ enum Node {
 impl Node {
     pub fn generate_code(
         &self,
-        result: Variable,
+        result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
     ) {
@@ -156,17 +153,20 @@ impl Node {
             Node::If(if_expr) => if_expr.generate_code(result, operations, tree),
             Node::BinOp(bin_op) => bin_op.generate_code(result, operations, tree),
             Node::Block(statements) => {
+                let mut last_result_var = None;
                 for statement in &statements.0 {
                     let statement = tree.node(*statement);
-                    statement.generate_code(result, operations, tree);
+                    let result = operations.new_temporary_variable();
+                    statement.generate_code(Destination::Variable(result), operations, tree);
+                    last_result_var = Some(result);
+                }
+                if let Some(last_result) = last_result_var {
+                    operations.store_into_destination(ValueOrSource::Variable(last_result), result);
                 }
             }
             Node::Assign(assign) => assign.generate_code(result, operations, tree),
             Node::Literal(literal) => {
-                operations.push(IntermediateOp::Load {
-                    variable: result,
-                    value: ValueOrSource::Value(literal.clone()),
-                });
+                operations.store_into_destination(ValueOrSource::Value(literal.clone()), result);
             }
             Node::Identifier(identifier) => {
                 operations.load_from_symbol(identifier, result);
@@ -179,17 +179,38 @@ impl Node {
         }
     }
 
+    pub fn to_value_or_source(
+        &self,
+        operations: &mut CodeBlockBuilder,
+        tree: &ExpressionTree,
+    ) -> ValueOrSource {
+        match self {
+            Node::Literal(literal) => ValueOrSource::Value(literal.clone()),
+            Node::Identifier(identifier) => match operations.symbol(identifier) {
+                Some(ScopeSymbol::Argument(arg)) => ValueOrSource::Argument(*arg),
+                Some(ScopeSymbol::Variable(var)) => ValueOrSource::Variable(*var),
+                _ => todo!("error: unexpected/unknown symbol"),
+            },
+            // Node::Lookup(lookup) => lookup.generate_code(operations, tree),
+            // Node::Call(call) => call.generate_code(result, operations, tree),
+            // Node::Return(value) => {
+            //     Self::generate_return(*value, operations, tree);
+            // }
+            _ => {
+                let variable = operations.new_temporary_variable();
+                self.generate_code(Destination::Variable(variable), operations, tree);
+                ValueOrSource::Variable(variable)
+            }
+        }
+    }
+
     fn generate_return(
         value_to_return: NodeId,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
     ) {
         let value_to_return = tree.node(value_to_return);
-        let result = operations.new_temporary_variable();
-        value_to_return.generate_code(result, operations, tree);
-        operations.push(IntermediateOp::Return(Some(ValueOrSource::Variable(
-            result.0,
-        ))));
+        value_to_return.generate_code(Destination::Return, operations, tree);
     }
 }
 
@@ -218,23 +239,44 @@ impl If {
 
     fn generate_code(
         &self,
-        result: Variable,
+        result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
     ) {
         let condition = tree.node(self.condition);
-        let condition_result = operations.new_temporary_variable();
-        condition.generate_code(condition_result, operations, tree);
-        let if_false_label = self.else_block.map(|_| operations.new_label());
         let after_false_label = operations.new_label();
-        operations.push(IntermediateOp::If {
-            condition: ValueSource::Variable(condition_result.0),
-            false_jump_to: if_false_label.unwrap_or(after_false_label),
-        });
+        let if_false_label = self.else_block.map(|_| operations.new_label());
+        let false_jump_to = if_false_label.unwrap_or(after_false_label);
+        if let Node::BinOp(BinOp {
+            kind: BinOpKind::Compare(comparison),
+            left,
+            right,
+        }) = condition
+        {
+            // The if statement is a result of the comparison. Use the special
+            // form of the comparison operator to branch instead of using an if
+            // operation
+            let left = tree.node(*left).to_value_or_source(operations, tree);
+            let right = tree.node(*right).to_value_or_source(operations, tree);
+            operations.push(Instruction::Compare {
+                comparison: *comparison,
+                left,
+                right,
+                action: CompareAction::JumpIfFalse(false_jump_to),
+            });
+        } else {
+            // The if statement is a result of something more complex
+            let condition_result = operations.new_temporary_variable();
+            condition.generate_code(Destination::Variable(condition_result), operations, tree);
+            operations.push(Instruction::If {
+                condition: ValueOrSource::Variable(condition_result),
+                false_jump_to,
+            });
+        }
         let true_block = tree.node(self.true_block);
         true_block.generate_code(result, operations, tree);
         if let (Some(else_block), Some(if_false_label)) = (self.else_block, if_false_label) {
-            operations.push(IntermediateOp::JumpTo(after_false_label));
+            operations.push(Instruction::JumpTo(after_false_label));
             operations.label(if_false_label);
             let else_block = tree.node(else_block);
             else_block.generate_code(result, operations, tree);
@@ -256,7 +298,7 @@ pub struct BinOp {
 impl BinOp {
     fn generate_code(
         &self,
-        result: Variable,
+        result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
     ) {
@@ -279,43 +321,41 @@ impl BinOpKind {
         &self,
         left: NodeId,
         right: NodeId,
-        result: Variable,
+        destination: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
     ) {
         let left = tree.node(left);
         let right = tree.node(right);
-        let left_result = operations.new_temporary_variable();
-        left.generate_code(left_result, operations, tree);
-        let right_result = operations.new_temporary_variable();
-        right.generate_code(right_result, operations, tree);
+        let left = left.to_value_or_source(operations, tree);
+        let right = right.to_value_or_source(operations, tree);
 
         match self {
-            BinOpKind::Add => operations.push(IntermediateOp::Add {
-                left: ValueSource::Variable(left_result.0),
-                right: ValueOrSource::Variable(right_result.0),
-                destination: Destination::Variable(result.0),
+            BinOpKind::Add => operations.push(Instruction::Add {
+                left,
+                right,
+                destination,
             }),
-            BinOpKind::Sub => operations.push(IntermediateOp::Sub {
-                left: ValueSource::Variable(left_result.0),
-                right: ValueOrSource::Variable(right_result.0),
-                destination: Destination::Variable(result.0),
+            BinOpKind::Sub => operations.push(Instruction::Sub {
+                left,
+                right,
+                destination,
             }),
-            BinOpKind::Multiply => operations.push(IntermediateOp::Multiply {
-                left: ValueSource::Variable(left_result.0),
-                right: ValueOrSource::Variable(right_result.0),
-                destination: Destination::Variable(result.0),
+            BinOpKind::Multiply => operations.push(Instruction::Multiply {
+                left,
+                right,
+                destination,
             }),
-            BinOpKind::Divide => operations.push(IntermediateOp::Divide {
-                left: ValueSource::Variable(left_result.0),
-                right: ValueOrSource::Variable(right_result.0),
-                destination: Destination::Variable(result.0),
+            BinOpKind::Divide => operations.push(Instruction::Divide {
+                left,
+                right,
+                destination,
             }),
-            BinOpKind::Compare(comparison) => operations.push(IntermediateOp::Compare {
+            BinOpKind::Compare(comparison) => operations.push(Instruction::Compare {
                 comparison: *comparison,
-                left: ValueSource::Variable(left_result.0),
-                right: ValueOrSource::Variable(right_result.0),
-                action: CompareAction::Store(Destination::Variable(result.0)),
+                left,
+                right,
+                action: CompareAction::Store(destination),
             }),
         }
     }
@@ -359,7 +399,7 @@ impl Call {
 
     fn generate_code(
         &self,
-        result: Variable,
+        destination: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
     ) {
@@ -368,45 +408,37 @@ impl Call {
                 // Recursive call
                 for &arg in &self.args {
                     let arg = tree.node(arg);
-                    let arg_result = operations.new_temporary_variable();
-                    arg.generate_code(arg_result, operations, tree);
-                    operations.push(IntermediateOp::PushCopy(ValueSource::Variable(
-                        arg_result.0,
-                    )));
+                    arg.generate_code(Destination::Stack, operations, tree);
                 }
 
-                operations.push(IntermediateOp::Call {
+                operations.push(Instruction::Call {
                     function: None,
                     arg_count: self.args.len(),
-                    destination: Destination::Variable(result.0),
+                    destination,
                 });
             }
             (None, Some(symbol)) => {
                 // Global call
                 for &arg in &self.args {
                     let arg = tree.node(arg);
-                    let arg_result = operations.new_temporary_variable();
-                    arg.generate_code(arg_result, operations, tree);
-                    operations.push(IntermediateOp::PushCopy(ValueSource::Variable(
-                        arg_result.0,
-                    )));
+                    arg.generate_code(Destination::Stack, operations, tree);
                 }
 
-                match operations.scope.get(symbol) {
+                match operations.lookup(symbol) {
                     Some(ScopeSymbol::Argument(_) | ScopeSymbol::Variable(_)) => {
                         todo!("calling a lambda function in an argument")
                     }
                     Some(ScopeSymbol::Function { function }) => {
-                        operations.push(IntermediateOp::Call {
-                            function: Some(function.clone()), // Switch to a Module/Index vtable lookup? We can't compile the code because of recursion.
+                        operations.push(Instruction::Call {
+                            function: Some(function.clone()),
                             arg_count: self.args.len(),
-                            destination: Destination::Variable(result.0),
+                            destination,
                         });
                     }
-                    None => operations.push(IntermediateOp::Call {
-                        function: Some(symbol.clone()), // Switch to a Module/Index vtable lookup? We can't compile the code because of recursion.
+                    None => operations.push(Instruction::Call {
+                        function: Some(symbol.clone()),
                         arg_count: self.args.len(),
-                        destination: Destination::Variable(result.0),
+                        destination,
                     }),
                 }
             }
@@ -414,24 +446,20 @@ impl Call {
                 // Evaluate the target expression
                 let target = tree.node(target);
                 let target_result = operations.new_temporary_variable();
-                target.generate_code(target_result, operations, tree);
+                target.generate_code(Destination::Variable(target_result), operations, tree);
 
                 // Push the arguments
                 for &arg in &self.args {
                     let arg = tree.node(arg);
-                    let arg_result = operations.new_temporary_variable();
-                    arg.generate_code(arg_result, operations, tree);
-                    operations.push(IntermediateOp::PushCopy(ValueSource::Variable(
-                        arg_result.0,
-                    )));
+                    arg.generate_code(Destination::Stack, operations, tree);
                 }
 
                 // Invoke the call
-                operations.push(IntermediateOp::CallInstance {
-                    target: Some(ValueSource::Variable(target_result.0)),
+                operations.push(Instruction::CallInstance {
+                    target: Some(ValueOrSource::Variable(target_result)),
                     name: name.clone(),
                     arg_count: self.args.len(),
-                    destination: Destination::Variable(result.0),
+                    destination,
                 });
             }
             (Some(_), None) => todo!("invalid instruction"),
@@ -448,20 +476,16 @@ pub struct Assign {
 impl Assign {
     fn generate_code(
         &self,
-        result: Variable,
+        result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
     ) {
-        let value = tree.node(self.value);
-        value.generate_code(result, operations, tree);
-
         match tree.node(self.target) {
             Node::Identifier(name) => {
                 let variable = operations.variable_index_from_name(name);
-                operations.push(IntermediateOp::Load {
-                    variable,
-                    value: ValueOrSource::Variable(result.0),
-                });
+                let value = tree.node(self.value);
+                value.generate_code(Destination::Variable(variable), operations, tree);
+                operations.store_into_destination(ValueOrSource::Variable(variable), result);
             }
             _ => todo!("not a variable name"),
         }
@@ -548,210 +572,6 @@ impl SyntaxTreeBuilder {
     }
 }
 
-#[derive(Default)]
-pub struct CodeBlockBuilder {
-    labels: Vec<Option<usize>>,
-    ops: Vec<IntermediateOp>,
-    args: usize,
-    temporary_variables: usize,
-    scope: HashMap<Symbol, ScopeSymbol>,
-    variables: HashMap<Symbol, Variable>,
-}
-
-impl CodeBlockBuilder {
-    pub fn add_symbol(&mut self, symbol: impl Into<Symbol>, value: ScopeSymbol) {
-        if matches!(&value, ScopeSymbol::Argument(_)) {
-            self.args += 1;
-        }
-
-        self.scope.insert(symbol.into(), value);
-    }
-
-    pub fn new_label(&mut self) -> Label {
-        let label_id = self.labels.len();
-        self.labels.push(None);
-        Label(label_id)
-    }
-
-    pub fn push(&mut self, operation: IntermediateOp) {
-        self.ops.push(operation);
-    }
-
-    pub fn label(&mut self, label: Label) {
-        self.labels[label.0] = Some(self.ops.len());
-    }
-
-    pub fn push_from_symbol(&mut self, symbol: &Symbol) {
-        match self.scope.get(symbol).unwrap() {
-            ScopeSymbol::Argument(index) => {
-                self.ops
-                    .push(IntermediateOp::PushCopy(ValueSource::Argument(*index)));
-            }
-            ScopeSymbol::Variable(variable) => {
-                self.ops
-                    .push(IntermediateOp::PushCopy(ValueSource::Variable(variable.0)));
-            }
-            ScopeSymbol::Function { .. } => todo!("pushing a vtable entry?"),
-        }
-    }
-
-    pub fn load_from_symbol(&mut self, symbol: &Symbol, variable: Variable) {
-        match self.scope.get(symbol).unwrap() {
-            ScopeSymbol::Argument(index) => {
-                self.ops.push(IntermediateOp::Load {
-                    value: ValueOrSource::Argument(*index),
-                    variable,
-                });
-            }
-            ScopeSymbol::Variable(variable_index) => {
-                self.ops.push(IntermediateOp::Load {
-                    value: ValueOrSource::Variable(variable_index.0),
-                    variable,
-                });
-            }
-            ScopeSymbol::Function { .. } => todo!("pushing a vtable entry?"),
-        }
-    }
-
-    pub fn variable_index_from_name(&mut self, name: &Symbol) -> Variable {
-        let new_index = self.variables.len();
-        let variable = *self
-            .variables
-            .entry(name.clone())
-            .or_insert_with(|| Variable(new_index));
-
-        if variable.0 == new_index {
-            self.add_symbol(name.clone(), ScopeSymbol::Variable(variable));
-        }
-
-        variable
-    }
-
-    pub fn new_temporary_variable(&mut self) -> Variable {
-        self.temporary_variables += 1;
-        self.variable_index_from_name(&Symbol::from(self.temporary_variables.to_string().as_str()))
-    }
-
-    #[allow(clippy::too_many_lines)]
-    pub fn finish<Env>(
-        self,
-        scope: &Bud<Env>,
-    ) -> Result<(usize, Vec<Instruction>), CompilationError>
-    where
-        Env: Environment,
-    {
-        self.ops
-            .into_iter()
-            .map(|op| {
-                Ok(match op {
-                    IntermediateOp::Add {
-                        left,
-                        right,
-                        destination,
-                    } => Instruction::Add {
-                        left,
-                        right,
-                        destination,
-                    },
-                    IntermediateOp::Sub {
-                        left,
-                        right,
-                        destination,
-                    } => Instruction::Sub {
-                        left,
-                        right,
-                        destination,
-                    },
-                    IntermediateOp::Multiply {
-                        left,
-                        right,
-                        destination,
-                    } => Instruction::Multiply {
-                        left,
-                        right,
-                        destination,
-                    },
-                    IntermediateOp::Divide {
-                        left,
-                        right,
-                        destination,
-                    } => Instruction::Divide {
-                        left,
-                        right,
-                        destination,
-                    },
-                    IntermediateOp::If {
-                        condition,
-                        false_jump_to,
-                    } => Instruction::If {
-                        condition,
-                        false_jump_to: self.labels[false_jump_to.0].expect("label not inserted"),
-                    },
-                    IntermediateOp::JumpTo(label) => {
-                        Instruction::JumpTo(self.labels[label.0].expect("label not inserted"))
-                    }
-                    IntermediateOp::Compare {
-                        comparison,
-                        left,
-                        right,
-                        action,
-                    } => Instruction::Compare {
-                        comparison,
-                        left,
-                        right,
-                        action,
-                    },
-                    IntermediateOp::Push(value) => Instruction::Push(value),
-                    IntermediateOp::PushCopy(source) => Instruction::PushCopy(source),
-                    IntermediateOp::PopAndDrop => Instruction::PopAndDrop,
-                    IntermediateOp::Return(value) => Instruction::Return(value),
-                    IntermediateOp::Load { value, variable } => Instruction::Load {
-                        variable_index: variable.0,
-                        value,
-                    },
-                    IntermediateOp::Call {
-                        function,
-                        arg_count,
-                        destination,
-                    } => {
-                        let vtable_index = function
-                            .map(|symbol| {
-                                scope
-                                    .resolve_function_vtable_index(&symbol)
-                                    .ok_or(CompilationError::UndefinedFunction(symbol))
-                            })
-                            .transpose()?;
-                        Instruction::Call {
-                            vtable_index,
-                            arg_count,
-                            destination,
-                        }
-                    }
-                    IntermediateOp::CallInstance {
-                        target,
-                        name,
-                        arg_count,
-                        destination,
-                    } => Instruction::CallInstance {
-                        target,
-                        name,
-                        arg_count,
-                        destination,
-                    },
-                })
-            })
-            .collect::<Result<_, CompilationError>>()
-            .map(|instructions| (self.variables.len(), instructions))
-    }
-}
-
-#[derive(Debug)]
-pub enum ScopeSymbol {
-    Argument(usize),
-    Variable(Variable),
-    Function { function: Symbol },
-}
-
 #[derive(Default, Debug)]
 #[must_use]
 pub struct CodeUnit {
@@ -809,58 +629,29 @@ impl CodeUnit {
             1 => Some(self.init_statements[0]),
             _ => Some(self.init_tree.statements(self.init_statements)),
         };
-        let init =
-            init.map(|body| Function::new("__init", Vec::new(), self.init_tree.finish(body)));
-        UnlinkedCodeUnit {
-            vtable: self.vtable,
-            modules: self.modules.into_iter().map(CodeUnit::compile).collect(),
+        let vtable = self
+            .vtable
+            .into_iter()
+            .map(|f| {
+                let mut block = CodeBlockBuilder::default();
+                for (index, arg) in f.args.iter().enumerate() {
+                    block.add_symbol(arg.clone(), ScopeSymbol::Argument(index));
+                }
+                f.body.generate_code(&mut block);
+                ir::Function::new(f.name, f.args, block.finish())
+            })
+            .collect();
+
+        let init = init.map(|body| {
+            let mut block = CodeBlockBuilder::default();
+            self.init_tree.finish(body).generate_code(&mut block);
+            ir::Function::new("__init", Vec::new(), block.finish())
+        });
+        UnlinkedCodeUnit::new(
+            vtable,
+            self.modules.into_iter().map(CodeUnit::compile).collect(),
             init,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct UnlinkedCodeUnit {
-    vtable: Vec<Function>,
-    modules: Vec<UnlinkedCodeUnit>,
-    init: Option<Function>,
-}
-
-impl UnlinkedCodeUnit {
-    /// Runs all code in this unit in the passed context.
-    pub fn execute_in<'a, Output: FromStack, Env>(
-        &self,
-        context: &'a mut Bud<Env>,
-    ) -> Result<Output, Error<'a, Env, Output>>
-    where
-        Env: Environment,
-    {
-        // Process all modules first
-        for _module in &self.modules {
-            todo!()
-        }
-
-        // Compile each function
-        for function in &self.vtable {
-            function.compile_into(context)?;
-        }
-
-        // Execute the module initializer if it exists
-        if let Some(init) = &self.init {
-            let vtable_index = init.compile_into(context)?;
-            context
-                .run(
-                    Cow::Owned(vec![Instruction::Call {
-                        vtable_index: Some(vtable_index),
-                        arg_count: 0,
-                        destination: Destination::Stack,
-                    }]),
-                    0,
-                )
-                .map_err(Error::from)
-        } else {
-            Output::from_value(Value::Void).map_err(Error::from)
-        }
+        )
     }
 }
 
@@ -904,93 +695,10 @@ impl Function {
         }
     }
 
-    pub fn compile_into<Env>(&self, context: &mut Bud<Env>) -> Result<usize, CompilationError>
-    where
-        Env: Environment,
-    {
-        let name = self
-            .name
-            .clone()
-            .expect("compiling an unnamed function into a context isn't allowed");
-        let mut block = CodeBlockBuilder::default();
-        for (index, arg) in self.args.iter().enumerate() {
-            block.add_symbol(arg.clone(), ScopeSymbol::Argument(index));
-        }
-        self.body.generate_code(&mut block);
-        let (variable_count, code) = block.finish(context)?;
-        let function = vm::Function {
-            arg_count: self.args.len(),
-            code,
-            variable_count,
-        };
-        let vtable_index = context.define_function(name, function);
-        Ok(vtable_index)
-    }
-
     #[must_use]
     pub fn name(&self) -> Option<&Symbol> {
         self.name.as_ref()
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Label(usize);
-
-#[derive(Debug, Clone, Copy)]
-pub struct Variable(usize);
-
-#[derive(Debug, Clone)]
-pub enum IntermediateOp {
-    Add {
-        left: ValueSource,
-        right: ValueOrSource,
-        destination: Destination,
-    },
-    Sub {
-        left: ValueSource,
-        right: ValueOrSource,
-        destination: Destination,
-    },
-    Multiply {
-        left: ValueSource,
-        right: ValueOrSource,
-        destination: Destination,
-    },
-    Divide {
-        left: ValueSource,
-        right: ValueOrSource,
-        destination: Destination,
-    },
-    If {
-        condition: ValueSource,
-        false_jump_to: Label,
-    },
-    JumpTo(Label),
-    Compare {
-        comparison: Comparison,
-        left: ValueSource,
-        right: ValueOrSource,
-        action: CompareAction,
-    },
-    Push(Value),
-    PushCopy(ValueSource),
-    PopAndDrop,
-    Load {
-        value: ValueOrSource,
-        variable: Variable,
-    },
-    Return(Option<ValueOrSource>),
-    Call {
-        function: Option<Symbol>,
-        arg_count: usize,
-        destination: Destination,
-    },
-    CallInstance {
-        target: Option<ValueSource>,
-        name: Symbol,
-        arg_count: usize,
-        destination: Destination,
-    },
 }
 
 #[derive(Debug)]
@@ -1007,27 +715,5 @@ impl Display for CompilationError {
                 write!(f, "undefined function: {symbol}")
             }
         }
-    }
-}
-
-pub trait OptionalSymbol {
-    fn into_symbol(self) -> Option<Symbol>;
-}
-
-impl OptionalSymbol for Symbol {
-    fn into_symbol(self) -> Option<Symbol> {
-        Some(self)
-    }
-}
-
-impl OptionalSymbol for Option<Symbol> {
-    fn into_symbol(self) -> Option<Symbol> {
-        self
-    }
-}
-
-impl<'a> OptionalSymbol for &'a str {
-    fn into_symbol(self) -> Option<Symbol> {
-        Some(Symbol::from(self))
     }
 }

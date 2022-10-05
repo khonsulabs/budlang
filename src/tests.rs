@@ -4,7 +4,7 @@ use crate::{
     symbol::Symbol,
     vm::{
         self, Bud, DynamicFault, DynamicValue, Fault, FaultKind, FaultOrPause, Instruction,
-        PoppedValues, Value, ValueSource,
+        PoppedValues, Value, ValueOrSource,
     },
     Error,
 };
@@ -117,7 +117,7 @@ fn dynamic_values() {
         arg_count: 1,
         variable_count: 0,
         code: vec![Instruction::CallInstance {
-            target: Some(ValueSource::Argument(0)),
+            target: Some(ValueOrSource::Argument(0)),
             name: Symbol::from("squared"),
             arg_count: 0,
             destination: vm::Destination::Stack,

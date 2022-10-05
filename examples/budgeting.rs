@@ -15,7 +15,7 @@ fn main() {
                 if n <= 2
                     1
                 else
-                    this(n - 1) + this(n - 2)
+                    fibonacci(n - 1) + fibonacci(n - 2)
                 end
            end
 

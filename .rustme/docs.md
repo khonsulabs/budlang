@@ -56,23 +56,16 @@ virtual machine instructions. Despite not having an optimizer, the compiled
 `fibonacci()` function's code is the same number of instructions (with one small
 difference):
 
-|  # | compiled              | hand-written         |
-|----|-----------------------|----------------------|
-|  0 | `push 2`              | `push 2`             |
-|  1 | `push-arg 0`          | `push-arg 0`         |
-|  2 | `compare <=`          | `compare <=`         |
-|  3 | `if-false-jump-to 6`  | `if-false-jump-to 6` |
-|  4 | `push 1`              | `push 1`             |
-| *5 | `if-false-jump-to 15` | `return`             |
-|  6 | `push 1`              | `push 1`             |
-|  7 | `push-arg 0`          | `push-arg 0`         |
-|  8 | `sub`                 | `sub`                |
-|  9 | `recurse-call 1`      | `recurse-call 1`     |
-| 10 | `push 2`              | `push 2`             |
-| 11 | `push-arg 0`          | `push-arg 0`         |
-| 12 | `sub`                 | `sub`                |
-| 13 | `recurse-call 1`      | `recurse-call 1`     |
-| 14 | `add`                 | `add`                |
+|  # | compiled              | # | hand-written         |
+|----|-----------------------|---|----------------------|
+|  0 | `lte @0 2 jump 2`     | 0 | `lte @0 2 jump 3`    |
+|  1 | `return 1`            | 1 | `return 1`           |
+|    |                       | 2 | `jump 9`             |
+|  2 | `sub @0 1 stack`      | 3 | `sub @0 1 stack`     |
+|  3 | `recurse-call 1 $$0`  | 4 | `recurse-call 1 $$0` |
+|  4 | `sub @0 2 stack`      | 5 | `sub @0 2 stack`     |
+|  5 | `recurse-call 1 $$1`  | 6 | `recurse-call 1 $$1` |
+|  6 | `add $$0 $$1 $$$$`    | 7 | `add $$0 $$1 $$$$`   |
 
 ## Why not Bud?
 
@@ -80,7 +73,7 @@ It probably doesn't do what you need (yet):
 
 - [x] Don't panic in vm
 - [ ] Don't panic in compiler
-- [ ] Don't panic ih parser
+- [ ] Don't panic in parser
 - [x] Support parenthesized expressions as terms
 - [x] Add variables
 - [ ] Add loops
