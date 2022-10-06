@@ -403,12 +403,14 @@ impl CodeBlock {
         Env: Environment,
     {
         let mut labels = Vec::new();
+        let mut labels_encountered = 0;
         for (index, op) in self.code.iter().enumerate() {
             if let Instruction::Label(label) = op {
                 if labels.len() <= label.0 {
                     labels.resize(label.0 + 1, None);
                 }
-                labels[label.0] = Some(index);
+                labels[label.0] = Some(index - labels_encountered);
+                labels_encountered += 1;
             }
         }
         self.code
