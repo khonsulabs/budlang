@@ -702,6 +702,8 @@
 <span id="702">702</span>
 <span id="703">703</span>
 <span id="704">704</span>
+<span id="705">705</span>
+<span id="706">706</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">allow</span>(<span class="ident">missing_docs</span>, <span class="ident">clippy::missing_panics_doc</span>)]</span> <span class="comment">// TODO docs and panics for ir</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::{
@@ -1107,12 +1109,14 @@
         <span class="ident">Env</span>: <span class="ident">Environment</span>,
     {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">labels</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">labels_encountered</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">for</span> (<span class="ident">index</span>, <span class="ident">op</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">code</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
             <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Instruction::Label</span>(<span class="ident">label</span>) <span class="op">=</span> <span class="ident">op</span> {
                 <span class="kw">if</span> <span class="ident">labels</span>.<span class="ident">len</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">label</span>.<span class="number">0</span> {
                     <span class="ident">labels</span>.<span class="ident">resize</span>(<span class="ident">label</span>.<span class="number">0</span> <span class="op">+</span> <span class="number">1</span>, <span class="prelude-val">None</span>);
                 }
-                <span class="ident">labels</span>[<span class="ident">label</span>.<span class="number">0</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">index</span>);
+                <span class="ident">labels</span>[<span class="ident">label</span>.<span class="number">0</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">index</span> <span class="op">-</span> <span class="ident">labels_encountered</span>);
+                <span class="ident">labels_encountered</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
             }
         }
         <span class="self">self</span>.<span class="ident">code</span>

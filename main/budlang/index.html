@@ -36,12 +36,12 @@ version</a> looks like this:</p>
 end</code></pre></div>
 <p>Another example <a href="https://github.com/khonsulabs/budlang/blob/main/examples/fib-vm.rs">shows an identical implementation</a> using hand-written
 virtual machine instructions. Despite not having an optimizer, the compiled
-<code>fibonacci()</code> function’s code is the same number of instructions (with one small
-difference):</p>
-<div><table><thead><tr><th>#</th><th>compiled</th><th>#</th><th>hand-written</th></tr></thead><tbody>
+<code>fibonacci()</code> function’s code is nearly identical, having one extra (unreachable)
+instruction:</p>
+<div><table><thead><tr><th>#</th><th>hand-written</th><th>#</th><th>compiled</th></tr></thead><tbody>
 <tr><td>0</td><td><code>lte @0 2 jump 2</code></td><td>0</td><td><code>lte @0 2 jump 3</code></td></tr>
 <tr><td>1</td><td><code>return 1</code></td><td>1</td><td><code>return 1</code></td></tr>
-<tr><td></td><td></td><td>2</td><td><code>jump 9</code></td></tr>
+<tr><td></td><td></td><td>2</td><td><code>jump 8</code></td></tr>
 <tr><td>2</td><td><code>sub @0 1 stack</code></td><td>3</td><td><code>sub @0 1 stack</code></td></tr>
 <tr><td>3</td><td><code>recurse-call 1 $0</code></td><td>4</td><td><code>recurse-call 1 $0</code></td></tr>
 <tr><td>4</td><td><code>sub @0 2 stack</code></td><td>5</td><td><code>sub @0 2 stack</code></td></tr>
