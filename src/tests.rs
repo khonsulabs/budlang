@@ -190,3 +190,12 @@ fn dynamic_error() {
         err => unreachable!("unexpected error: {err}"),
     }
 }
+
+#[test]
+fn strings() {
+    // Strings don't do much beyond exist right now
+    let string = Bud::empty()
+        .run_source::<String>(r#""hello, world!""#)
+        .unwrap();
+    assert_eq!(string, "hello, world!");
+}

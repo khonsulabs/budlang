@@ -9,7 +9,7 @@ use std::{
 use crate::{
     ast::CompilationError,
     symbol::{OptionalSymbol, Symbol},
-    vm::{self, Bud, Comparison, Environment, FromStack, Value},
+    vm::{self, Bud, Comparison, Environment, FromStack, Value, ValueOrSource},
     Error,
 };
 
@@ -38,51 +38,51 @@ pub enum DagNode {
 #[derive(Debug, Clone)]
 pub enum Instruction {
     Add {
-        left: ValueOrSource,
-        right: ValueOrSource,
+        left: LiteralOrSource,
+        right: LiteralOrSource,
         destination: Destination,
     },
     Sub {
-        left: ValueOrSource,
-        right: ValueOrSource,
+        left: LiteralOrSource,
+        right: LiteralOrSource,
         destination: Destination,
     },
     Multiply {
-        left: ValueOrSource,
-        right: ValueOrSource,
+        left: LiteralOrSource,
+        right: LiteralOrSource,
         destination: Destination,
     },
     Divide {
-        left: ValueOrSource,
-        right: ValueOrSource,
+        left: LiteralOrSource,
+        right: LiteralOrSource,
         destination: Destination,
     },
     If {
-        condition: ValueOrSource,
+        condition: LiteralOrSource,
         false_jump_to: Label,
     },
     JumpTo(Label),
     Label(Label),
     Compare {
         comparison: Comparison,
-        left: ValueOrSource,
-        right: ValueOrSource,
+        left: LiteralOrSource,
+        right: LiteralOrSource,
         action: CompareAction,
     },
-    Push(ValueOrSource),
+    Push(LiteralOrSource),
     PopAndDrop,
     Load {
-        value: ValueOrSource,
+        value: LiteralOrSource,
         variable: Variable,
     },
-    Return(Option<ValueOrSource>),
+    Return(Option<LiteralOrSource>),
     Call {
         function: Option<Symbol>,
         arg_count: usize,
         destination: Destination,
     },
     CallInstance {
-        target: Option<ValueOrSource>,
+        target: Option<LiteralOrSource>,
         name: Symbol,
         arg_count: usize,
         destination: Destination,
@@ -161,6 +161,85 @@ impl Display for Instruction {
     }
 }
 
+/// A literal value.
+#[derive(Debug, Clone)]
+pub enum Literal {
+    /// A literal that represents [`Value::Void`].
+    Void,
+    /// A signed 64-bit integer literal value.
+    Integer(i64),
+    /// A real number literal value (64-bit floating point).
+    Real(f64),
+    /// A boolean literal.
+    Boolean(bool),
+    /// A string literal.
+    String(String),
+}
+
+impl Literal {
+    #[must_use]
+    pub fn instantiate<Env>(&self) -> Value
+    where
+        Env: Environment,
+    {
+        match self {
+            Literal::Void => Value::Void,
+            Literal::Integer(value) => Value::Integer(*value),
+            Literal::Real(value) => Value::Real(*value),
+            Literal::Boolean(value) => Value::Boolean(*value),
+            Literal::String(value) => Value::dynamic(<Env::String as From<&str>>::from(value)),
+        }
+    }
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Integer(value) => Display::fmt(value, f),
+            Self::Real(value) => Display::fmt(value, f),
+            Self::Boolean(value) => Display::fmt(value, f),
+            Self::String(string) => Display::fmt(&DisplayString::new(string), f),
+            Self::Void => f.write_str("Void"),
+        }
+    }
+}
+
+#[must_use]
+pub struct DisplayString<'a>(&'a str);
+
+impl<'a> DisplayString<'a> {
+    pub fn new(value: &'a str) -> Self {
+        Self(value)
+    }
+}
+
+impl<'a> Display for DisplayString<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_char('"')?;
+        for ch in self.0.chars() {
+            match ch {
+                ch if ch.is_alphanumeric() || ch == ' ' || ch.is_ascii_punctuation() => {
+                    f.write_char(ch)?;
+                }
+                '\t' => {
+                    f.write_str("\\t")?;
+                }
+                '\r' => {
+                    f.write_str("\\r")?;
+                }
+                '\n' => {
+                    f.write_str("\\n")?;
+                }
+                other => {
+                    let codepoint = u32::from(other);
+                    write!(f, "\\u{{{codepoint:x}}}").expect("error writing codepoint");
+                }
+            }
+        }
+        f.write_char('"')
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ValueSource {
     /// The value is in an argument at the provided 0-based index.
@@ -188,30 +267,34 @@ impl<'a> From<&'a ValueSource> for vm::ValueSource {
 }
 
 #[derive(Debug, Clone)]
-pub enum ValueOrSource {
-    Value(Value),
+pub enum LiteralOrSource {
+    Literal(Literal),
     /// The value is in an argument at the provided 0-based index.
     Argument(usize),
     /// The value is in a variable specified.
     Variable(Variable),
 }
 
-impl Display for ValueOrSource {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl LiteralOrSource {
+    #[must_use]
+    pub fn instantiate<Env>(&self) -> ValueOrSource
+    where
+        Env: Environment,
+    {
         match self {
-            ValueOrSource::Value(value) => Display::fmt(value, f),
-            ValueOrSource::Argument(index) => write!(f, "@{index}"),
-            ValueOrSource::Variable(variable) => Display::fmt(variable, f),
+            LiteralOrSource::Literal(literal) => ValueOrSource::Value(literal.instantiate::<Env>()),
+            LiteralOrSource::Argument(index) => ValueOrSource::Argument(*index),
+            LiteralOrSource::Variable(index) => ValueOrSource::Variable(index.0),
         }
     }
 }
 
-impl<'a> From<&'a ValueOrSource> for vm::ValueOrSource {
-    fn from(source: &'a ValueOrSource) -> Self {
-        match source {
-            ValueOrSource::Value(value) => Self::Value(value.clone()),
-            ValueOrSource::Argument(arg) => Self::Argument(*arg),
-            ValueOrSource::Variable(var) => Self::Variable(var.0),
+impl Display for LiteralOrSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LiteralOrSource::Literal(value) => Display::fmt(value, f),
+            LiteralOrSource::Argument(index) => write!(f, "@{index}"),
+            LiteralOrSource::Variable(variable) => Display::fmt(variable, f),
         }
     }
 }
@@ -315,11 +398,11 @@ impl CodeBlockBuilder {
         match self.scope.get(symbol).unwrap() {
             ScopeSymbol::Argument(index) => {
                 self.ops
-                    .push(Instruction::Push(ValueOrSource::Argument(*index)));
+                    .push(Instruction::Push(LiteralOrSource::Argument(*index)));
             }
             ScopeSymbol::Variable(variable) => {
                 self.ops
-                    .push(Instruction::Push(ValueOrSource::Variable(*variable)));
+                    .push(Instruction::Push(LiteralOrSource::Variable(*variable)));
             }
             ScopeSymbol::Function { .. } => todo!("pushing a vtable entry?"),
         }
@@ -330,7 +413,7 @@ impl CodeBlockBuilder {
         self.scope.get(symbol)
     }
 
-    pub fn store_into_destination(&mut self, value: ValueOrSource, destination: Destination) {
+    pub fn store_into_destination(&mut self, value: LiteralOrSource, destination: Destination) {
         match destination {
             Destination::Variable(variable) => {
                 self.push(Instruction::Load { value, variable });
@@ -352,10 +435,10 @@ impl CodeBlockBuilder {
     pub fn load_from_symbol(&mut self, symbol: &Symbol, destination: Destination) {
         match self.scope.get(symbol).unwrap() {
             ScopeSymbol::Argument(index) => {
-                self.store_into_destination(ValueOrSource::Argument(*index), destination);
+                self.store_into_destination(LiteralOrSource::Argument(*index), destination);
             }
             ScopeSymbol::Variable(variable) => {
-                self.store_into_destination(ValueOrSource::Variable(*variable), destination);
+                self.store_into_destination(LiteralOrSource::Variable(*variable), destination);
             }
             ScopeSymbol::Function { .. } => todo!("pushing a vtable entry?"),
         }
@@ -453,8 +536,8 @@ where
             right,
             destination,
         } => vm::Instruction::Add {
-            left: left.into(),
-            right: right.into(),
+            left: left.instantiate::<Env>(),
+            right: right.instantiate::<Env>(),
             destination: destination.into(),
         },
         Instruction::Sub {
@@ -462,8 +545,8 @@ where
             right,
             destination,
         } => vm::Instruction::Sub {
-            left: left.into(),
-            right: right.into(),
+            left: left.instantiate::<Env>(),
+            right: right.instantiate::<Env>(),
             destination: destination.into(),
         },
         Instruction::Multiply {
@@ -471,8 +554,8 @@ where
             right,
             destination,
         } => vm::Instruction::Multiply {
-            left: left.into(),
-            right: right.into(),
+            left: left.instantiate::<Env>(),
+            right: right.instantiate::<Env>(),
             destination: destination.into(),
         },
         Instruction::Divide {
@@ -480,15 +563,15 @@ where
             right,
             destination,
         } => vm::Instruction::Divide {
-            left: left.into(),
-            right: right.into(),
+            left: left.instantiate::<Env>(),
+            right: right.instantiate::<Env>(),
             destination: destination.into(),
         },
         Instruction::If {
             condition,
             false_jump_to,
         } => vm::Instruction::If {
-            condition: condition.into(),
+            condition: condition.instantiate::<Env>(),
             false_jump_to: labels[false_jump_to.0].expect("label not inserted"),
         },
         Instruction::JumpTo(label) => {
@@ -502,18 +585,18 @@ where
             action,
         } => vm::Instruction::Compare {
             comparison: *comparison,
-            left: left.into(),
-            right: right.into(),
+            left: left.instantiate::<Env>(),
+            right: right.instantiate::<Env>(),
             action: action.link(labels),
         },
-        Instruction::Push(value) => vm::Instruction::Push(value.into()),
+        Instruction::Push(value) => vm::Instruction::Push(value.instantiate::<Env>()),
         Instruction::PopAndDrop => vm::Instruction::PopAndDrop,
         Instruction::Return(value) => {
-            vm::Instruction::Return(value.as_ref().map(vm::ValueOrSource::from))
+            vm::Instruction::Return(value.as_ref().map(LiteralOrSource::instantiate::<Env>))
         }
         Instruction::Load { value, variable } => vm::Instruction::Load {
             variable_index: variable.0,
-            value: value.into(),
+            value: value.instantiate::<Env>(),
         },
         Instruction::Call {
             function,
@@ -540,7 +623,7 @@ where
             arg_count,
             destination,
         } => vm::Instruction::CallInstance {
-            target: target.as_ref().map(vm::ValueOrSource::from),
+            target: target.as_ref().map(LiteralOrSource::instantiate::<Env>),
             name: name.clone(),
             arg_count: *arg_count,
             destination: destination.into(),

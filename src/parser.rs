@@ -12,7 +12,7 @@ use crate::{
     vm::Comparison,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Token {
     kind: TokenKind,
     _range: Range<usize>,
@@ -31,11 +31,12 @@ impl Token {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum TokenKind {
     Identifier(Symbol),
     Integer(i64),
     Real(f64),
+    String(String),
     Assign,
     Comparison(Comparison),
     Not,
@@ -50,7 +51,7 @@ enum TokenKind {
     Period,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum BracketType {
     Paren,
     Square,
@@ -375,6 +376,7 @@ impl<'a> Lexer<'a> {
                     TokenKind::Close(BracketType::Curly),
                     offset,
                 ))),
+                Some((offset, char)) if char == '"' => Some(self.read_string(offset)),
                 Some((offset, char)) if char == '\r' || char == '\n' => {
                     if char == '\r' && matches!(self.chars.peek().map(|(_, ch)| *ch), Some('\n')) {
                         Some(Ok(Token::new(TokenKind::EndOfLine, offset..offset + 2)))
@@ -401,6 +403,92 @@ impl<'a> Lexer<'a> {
         };
         assert!(matches!(end_of_line.kind, TokenKind::EndOfLine)); // TODO error trailing stuff
         Ok(())
+    }
+
+    fn read_string(&mut self, start_offset: usize) -> Result<Token, ParseError> {
+        let mut string = String::new();
+        let mut end_offset = start_offset + 1;
+        loop {
+            let ch = self.chars.next().map(|r| r.1);
+            if ch.is_some() {
+                end_offset += 1;
+            }
+
+            match ch {
+                Some('"') => {
+                    // Final quote
+                    break;
+                }
+                Some('\\') => {
+                    end_offset += 1;
+                    // Escaped character
+                    let unescaped = match self.chars.next() {
+                        Some((_, 't')) => '\t',
+                        Some((_, 'r')) => '\r',
+                        Some((_, 'n')) => '\n',
+                        Some((_, 'u')) => {
+                            end_offset += 1;
+                            match self.chars.next().map(|r| r.1) {
+                                Some('{') => {}
+                                _ => {
+                                    todo!("add error")
+                                }
+                            }
+
+                            let mut codepoint = 0_u32;
+                            for (offset, char) in &mut self.chars {
+                                end_offset = offset + 1;
+                                let nibble_value = match char {
+                                    '}' => {
+                                        break;
+                                    }
+                                    ch if ch.is_numeric() => u32::from(ch) - u32::from(b'0'),
+                                    ch if ('a'..='f').contains(&ch) => {
+                                        u32::from(ch) - u32::from(b'a')
+                                    }
+                                    ch if ('A'..='F').contains(&ch) => {
+                                        u32::from(ch) - u32::from(b'A')
+                                    }
+                                    _ => return Err(ParseError::Unexpected { offset, char }),
+                                };
+
+                                codepoint <<= 4;
+                                codepoint |= nibble_value;
+                            }
+
+                            if let Some(ch) = char::from_u32(codepoint) {
+                                ch
+                            } else {
+                                todo!("handle invalid unicode")
+                            }
+                        }
+                        Some((_, other)) => other,
+                        None => {
+                            return Err(ParseError::UnexpectedEof(String::from(
+                                "expected escape character",
+                            )))
+                        }
+                    };
+
+                    string.push(unescaped);
+                }
+                Some(ch) => {
+                    string.push(ch);
+                }
+                None => {
+                    return Err(ParseError::MissingEnd {
+                        kind: '"',
+                        open_offset: start_offset,
+                        error_location: end_offset,
+                    })
+                }
+            }
+        }
+
+        Ok(Token::new(
+            TokenKind::String(string),
+            start_offset..end_offset,
+        ))
     }
 }
 
@@ -678,6 +766,7 @@ fn parse_term(
         }
         TokenKind::Integer(integer) => Ok(tree.integer(integer)),
         TokenKind::Real(integer) => Ok(tree.real(integer)),
+        TokenKind::String(string) => Ok(tree.string(string)),
         TokenKind::Open(BracketType::Paren) => {
             let first_token = tokens.next().unwrap()?;
             let expression = parse_expression(first_token, tree, tokens, owning_function_name)?;
@@ -760,7 +849,16 @@ fn parse_lookup(
 
 #[derive(Debug)]
 pub enum ParseError {
-    Unexpected { offset: usize, char: char },
+    Unexpected {
+        offset: usize,
+        char: char,
+    },
+    UnexpectedEof(String),
+    MissingEnd {
+        kind: char,
+        open_offset: usize,
+        error_location: usize,
+    },
 }
 
 impl std::error::Error for ParseError {}
@@ -771,6 +869,52 @@ impl Display for ParseError {
             Self::Unexpected { offset, char } => {
                 write!(f, "unexpected character at offset {offset}: '{char}'")
             }
+            Self::UnexpectedEof(message) => {
+                write!(f, "unexpected end of file: {message}")
+            }
+            Self::MissingEnd {
+                kind,
+                open_offset,
+                error_location,
+            } => {
+                write!(f, "missing '{kind}' at {open_offset}..{error_location}")
+            }
         }
     }
+}
+
+#[test]
+fn string_parsing() {
+    use crate::vm::DynamicValue;
+    assert_eq!(
+        Lexer::new(r#""hello""#)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap(),
+        vec![Token::new(TokenKind::String(String::from("hello")), 0..7)]
+    );
+    let string = String::from("\t\r\n\u{2764}test");
+    let source = string.to_source().unwrap();
+    assert_eq!(source, r#""\t\r\n\u{2764}test""#);
+    assert_eq!(
+        Lexer::new(source.as_str())
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap(),
+        vec![Token::new(TokenKind::String(string), 0..source.len())]
+    );
+    assert!(matches!(
+        Lexer::new(r#"""#)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_err(),
+        ParseError::MissingEnd {
+            kind: '"',
+            open_offset: 0,
+            error_location: 1,
+        }
+    ));
+    assert!(matches!(
+        Lexer::new(r#""\"#)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_err(),
+        ParseError::UnexpectedEof(_)
+    ));
 }

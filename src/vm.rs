@@ -10,7 +10,7 @@ use std::{
     vec,
 };
 
-use crate::{ast::CompilationError, parser::parse, symbol::Symbol, Error};
+use crate::{ast::CompilationError, ir::DisplayString, parser::parse, symbol::Symbol, Error};
 
 /// A virtual machine instruction.
 ///
@@ -338,7 +338,7 @@ impl Display for ValueOrSource {
 }
 
 /// A method for comparing [`Value`]s.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Comparison {
     /// Pushes true if left and right are equal. Otherwise, pushes false.
     Equal,
@@ -822,7 +822,7 @@ impl ValueKind {
 }
 
 /// A type that can be used in the virtual machine using [`Value::dynamic`].
-pub trait DynamicValue: Clone + Debug + Display + 'static {
+pub trait DynamicValue: Clone + Debug + 'static {
     /// Returns true if the value contained is truthy. See
     /// [`Value::is_truthy()`] for examples of what this means for primitive
     /// types.
@@ -868,6 +868,11 @@ pub trait DynamicValue: Clone + Debug + Display + 'static {
             kind: ValueKind::Dynamic(self.kind()),
             name: name.clone(),
         })
+    }
+
+    /// Returns this value as represented in source, if possible.
+    fn to_source(&self) -> Option<String> {
+        None
     }
 }
 
@@ -2239,11 +2244,14 @@ impl Dynamic {
 
 impl Display for Dynamic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.0, f)
+        match self.0.to_source() {
+            Some(value) => f.write_str(&value),
+            None => Ok(()),
+        }
     }
 }
 
-trait UnboxableDynamicValue: Debug + Display {
+trait UnboxableDynamicValue: Debug {
     fn cloned(&self) -> Box<dyn UnboxableDynamicValue>;
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
@@ -2254,6 +2262,7 @@ trait UnboxableDynamicValue: Debug + Display {
     fn partial_eq(&self, other: &Value) -> Option<bool>;
     fn partial_cmp(&self, other: &Value) -> Option<Ordering>;
     fn call(&mut self, name: &Symbol, arguments: PoppedValues<'_>) -> Result<Value, FaultKind>;
+    fn to_source(&self) -> Option<String>;
 }
 
 #[derive(Clone)]
@@ -2309,6 +2318,10 @@ where
     fn call(&mut self, name: &Symbol, arguments: PoppedValues<'_>) -> Result<Value, FaultKind> {
         self.value_mut().call(name, arguments)
     }
+
+    fn to_source(&self) -> Option<String> {
+        self.value().to_source()
+    }
 }
 
 impl<T> DynamicValue for DynamicValueData<T>
@@ -2329,6 +2342,14 @@ where
 
     fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
         self.value().partial_cmp(other)
+    }
+
+    fn to_source(&self) -> Option<String> {
+        self.value().to_source()
+    }
+
+    fn call(&mut self, name: &Symbol, args: PoppedValues<'_>) -> Result<Value, FaultKind> {
+        self.value_mut().call(name, args)
     }
 }
 
@@ -2358,8 +2379,40 @@ where
     }
 }
 
+impl DynamicValue for String {
+    fn is_truthy(&self) -> bool {
+        !self.is_empty()
+    }
+
+    fn kind(&self) -> &'static str {
+        "String"
+    }
+
+    fn partial_eq(&self, other: &Value) -> Option<bool> {
+        other.as_dynamic::<Self>().map(|other| self == other)
+    }
+
+    fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
+        other.as_dynamic::<Self>().map(|other| self.cmp(other))
+    }
+
+    fn call(&mut self, name: &Symbol, _args: PoppedValues<'_>) -> Result<Value, FaultKind> {
+        Err(FaultKind::UnknownFunction {
+            kind: ValueKind::Dynamic(self.kind()),
+            name: name.clone(),
+        })
+    }
+
+    fn to_source(&self) -> Option<String> {
+        Some(DisplayString::new(self).to_string())
+    }
+}
+
 /// Customizes the behavior of a virtual machine instance.
 pub trait Environment: 'static {
+    /// The string type for this environment.
+    type String: DynamicValue + for<'a> From<&'a str>;
+
     /// Called once before each instruction is executed.
     ///
     /// If [`ExecutionBehavior::Continue`] is returned, the next instruction
@@ -2373,6 +2426,7 @@ pub trait Environment: 'static {
 }
 
 impl Environment for () {
+    type String = String;
     #[inline]
     fn step(&mut self) -> ExecutionBehavior {
         ExecutionBehavior::Continue
@@ -2405,6 +2459,8 @@ impl Budgeted {
 }
 
 impl Environment for Budgeted {
+    type String = String;
+
     #[inline]
     fn step(&mut self) -> ExecutionBehavior {
         if self.0 > 0 {
@@ -2425,32 +2481,50 @@ pub enum ExecutionBehavior {
     Pause,
 }
 
-// #[test]
-// fn budget() {
-//     let mut context = Bud::default_for(Budgeted::new(0));
-//     let mut fault = context
-//         .run::<i64>(Cow::Borrowed(&[
-//             Instruction::Push(Value::Integer(1)),
-//             Instruction::Push(Value::Integer(2)),
-//             Instruction::Add,
-//         ]))
-//         .unwrap_err();
-//     let output = loop {
-//         println!("Paused");
-//         let mut pending = match fault.kind {
-//             FaultOrPause::Pause(pending) => pending,
-//             FaultOrPause::Fault(error) => unreachable!("unexpected error: {error}"),
-//         };
-//         pending.environment_mut().add_budget(1);
+#[test]
+fn budget() {
+    let mut context = Bud::default_for(Budgeted::new(0));
+    let mut pause_count = 0;
+    let mut fault = context
+        .run::<i64>(
+            Cow::Borrowed(&[
+                Instruction::Add {
+                    left: ValueOrSource::Value(Value::Integer(1)),
+                    right: ValueOrSource::Value(Value::Integer(2)),
+                    destination: Destination::Variable(0),
+                },
+                Instruction::Add {
+                    left: ValueOrSource::Variable(0),
+                    right: ValueOrSource::Value(Value::Integer(3)),
+                    destination: Destination::Variable(0),
+                },
+                Instruction::Add {
+                    left: ValueOrSource::Variable(0),
+                    right: ValueOrSource::Value(Value::Integer(4)),
+                    destination: Destination::Return,
+                },
+            ]),
+            1,
+        )
+        .unwrap_err();
+    let output = loop {
+        pause_count += 1;
+        println!("Paused {pause_count}");
+        let mut pending = match fault.kind {
+            FaultOrPause::Pause(pending) => pending,
+            FaultOrPause::Fault(error) => unreachable!("unexpected error: {error}"),
+        };
+        pending.environment_mut().add_budget(1);
 
-//         fault = match pending.resume() {
-//             Ok(result) => break result,
-//             Err(err) => err,
-//         };
-//     };
+        fault = match pending.resume() {
+            Ok(result) => break result,
+            Err(err) => err,
+        };
+    };
 
-//     assert_eq!(output, 3);
-// }
+    assert_eq!(output, 10);
+    assert_eq!(pause_count, 4); // Paused once at the start, then once per instruction.
+}
 
 #[test]
 fn budget_with_frames() {

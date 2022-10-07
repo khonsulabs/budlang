@@ -8,11 +8,11 @@ use std::{
 
 use crate::{
     ir::{
-        self, CodeBlockBuilder, CompareAction, Destination, Instruction, ScopeSymbol,
-        UnlinkedCodeUnit, ValueOrSource,
+        self, CodeBlockBuilder, CompareAction, Destination, Instruction, Literal, LiteralOrSource,
+        ScopeSymbol, UnlinkedCodeUnit,
     },
     symbol::{OptionalSymbol, Symbol},
-    vm::{Comparison, Value},
+    vm::Comparison,
 };
 
 pub struct ExpressionTree {
@@ -135,7 +135,7 @@ enum Node {
     Assign(Assign),
     // UnaryOp(UnaryOp),
     Block(Block),
-    Literal(Value),
+    Literal(Literal),
     Identifier(Symbol),
     // Lookup(Lookup),
     Call(Call),
@@ -161,12 +161,14 @@ impl Node {
                     last_result_var = Some(result);
                 }
                 if let Some(last_result) = last_result_var {
-                    operations.store_into_destination(ValueOrSource::Variable(last_result), result);
+                    operations
+                        .store_into_destination(LiteralOrSource::Variable(last_result), result);
                 }
             }
             Node::Assign(assign) => assign.generate_code(result, operations, tree),
             Node::Literal(literal) => {
-                operations.store_into_destination(ValueOrSource::Value(literal.clone()), result);
+                operations
+                    .store_into_destination(LiteralOrSource::Literal(literal.clone()), result);
             }
             Node::Identifier(identifier) => {
                 operations.load_from_symbol(identifier, result);
@@ -183,12 +185,12 @@ impl Node {
         &self,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) -> ValueOrSource {
+    ) -> LiteralOrSource {
         match self {
-            Node::Literal(literal) => ValueOrSource::Value(literal.clone()),
+            Node::Literal(literal) => LiteralOrSource::Literal(literal.clone()),
             Node::Identifier(identifier) => match operations.symbol(identifier) {
-                Some(ScopeSymbol::Argument(arg)) => ValueOrSource::Argument(*arg),
-                Some(ScopeSymbol::Variable(var)) => ValueOrSource::Variable(*var),
+                Some(ScopeSymbol::Argument(arg)) => LiteralOrSource::Argument(*arg),
+                Some(ScopeSymbol::Variable(var)) => LiteralOrSource::Variable(*var),
                 _ => todo!("error: unexpected/unknown symbol"),
             },
             // Node::Lookup(lookup) => lookup.generate_code(operations, tree),
@@ -199,7 +201,7 @@ impl Node {
             _ => {
                 let variable = operations.new_temporary_variable();
                 self.generate_code(Destination::Variable(variable), operations, tree);
-                ValueOrSource::Variable(variable)
+                LiteralOrSource::Variable(variable)
             }
         }
     }
@@ -269,7 +271,7 @@ impl If {
             let condition_result = operations.new_temporary_variable();
             condition.generate_code(Destination::Variable(condition_result), operations, tree);
             operations.push(Instruction::If {
-                condition: ValueOrSource::Variable(condition_result),
+                condition: LiteralOrSource::Variable(condition_result),
                 false_jump_to,
             });
         }
@@ -456,7 +458,7 @@ impl Call {
 
                 // Invoke the call
                 operations.push(Instruction::CallInstance {
-                    target: Some(ValueOrSource::Variable(target_result)),
+                    target: Some(LiteralOrSource::Variable(target_result)),
                     name: name.clone(),
                     arg_count: self.args.len(),
                     destination,
@@ -485,7 +487,7 @@ impl Assign {
                 let variable = operations.variable_index_from_name(name);
                 let value = tree.node(self.value);
                 value.generate_code(Destination::Variable(variable), operations, tree);
-                operations.store_into_destination(ValueOrSource::Variable(variable), result);
+                operations.store_into_destination(LiteralOrSource::Variable(variable), result);
             }
             _ => todo!("not a variable name"),
         }
@@ -549,11 +551,15 @@ impl SyntaxTreeBuilder {
     }
 
     pub fn integer(&self, integer: i64) -> NodeId {
-        self.push(Node::Literal(Value::Integer(integer)))
+        self.push(Node::Literal(Literal::Integer(integer)))
+    }
+
+    pub fn string(&self, string: String) -> NodeId {
+        self.push(Node::Literal(Literal::String(string)))
     }
 
     pub fn real(&self, real: f64) -> NodeId {
-        self.push(Node::Literal(Value::Real(real)))
+        self.push(Node::Literal(Literal::Real(real)))
     }
 
     pub fn call(&self, call: Call) -> NodeId {
