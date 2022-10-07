@@ -717,6 +717,12 @@
 <span id="717">717</span>
 <span id="718">718</span>
 <span id="719">719</span>
+<span id="720">720</span>
+<span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
+<span id="725">725</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">allow</span>(<span class="ident">missing_docs</span>, <span class="ident">clippy::missing_panics_doc</span>)]</span> <span class="comment">// TODO docs and panics for ast</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::{
@@ -727,11 +733,11 @@
 
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">ir</span>::{
-        <span class="self">self</span>, <span class="ident">CodeBlockBuilder</span>, <span class="ident">CompareAction</span>, <span class="ident">Destination</span>, <span class="ident">Instruction</span>, <span class="ident">ScopeSymbol</span>,
-        <span class="ident">UnlinkedCodeUnit</span>, <span class="ident">ValueOrSource</span>,
+        <span class="self">self</span>, <span class="ident">CodeBlockBuilder</span>, <span class="ident">CompareAction</span>, <span class="ident">Destination</span>, <span class="ident">Instruction</span>, <span class="ident">Literal</span>, <span class="ident">LiteralOrSource</span>,
+        <span class="ident">ScopeSymbol</span>, <span class="ident">UnlinkedCodeUnit</span>,
     },
     <span class="ident">symbol</span>::{<span class="ident">OptionalSymbol</span>, <span class="ident">Symbol</span>},
-    <span class="ident">vm</span>::{<span class="ident">Comparison</span>, <span class="ident">Value</span>},
+    <span class="ident">vm::Comparison</span>,
 };
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ExpressionTree</span> {
@@ -854,7 +860,7 @@
     <span class="ident">Assign</span>(<span class="ident">Assign</span>),
     <span class="comment">// UnaryOp(UnaryOp),</span>
     <span class="ident">Block</span>(<span class="ident">Block</span>),
-    <span class="ident">Literal</span>(<span class="ident">Value</span>),
+    <span class="ident">Literal</span>(<span class="ident">Literal</span>),
     <span class="ident">Identifier</span>(<span class="ident">Symbol</span>),
     <span class="comment">// Lookup(Lookup),</span>
     <span class="ident">Call</span>(<span class="ident">Call</span>),
@@ -880,12 +886,14 @@
                     <span class="ident">last_result_var</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">result</span>);
                 }
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">last_result</span>) <span class="op">=</span> <span class="ident">last_result_var</span> {
-                    <span class="ident">operations</span>.<span class="ident">store_into_destination</span>(<span class="ident">ValueOrSource::Variable</span>(<span class="ident">last_result</span>), <span class="ident">result</span>);
+                    <span class="ident">operations</span>
+                        .<span class="ident">store_into_destination</span>(<span class="ident">LiteralOrSource::Variable</span>(<span class="ident">last_result</span>), <span class="ident">result</span>);
                 }
             }
             <span class="ident">Node::Assign</span>(<span class="ident">assign</span>) =&gt; <span class="ident">assign</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
             <span class="ident">Node::Literal</span>(<span class="ident">literal</span>) =&gt; {
-                <span class="ident">operations</span>.<span class="ident">store_into_destination</span>(<span class="ident">ValueOrSource::Value</span>(<span class="ident">literal</span>.<span class="ident">clone</span>()), <span class="ident">result</span>);
+                <span class="ident">operations</span>
+                    .<span class="ident">store_into_destination</span>(<span class="ident">LiteralOrSource::Literal</span>(<span class="ident">literal</span>.<span class="ident">clone</span>()), <span class="ident">result</span>);
             }
             <span class="ident">Node::Identifier</span>(<span class="ident">identifier</span>) =&gt; {
                 <span class="ident">operations</span>.<span class="ident">load_from_symbol</span>(<span class="ident">identifier</span>, <span class="ident">result</span>);
@@ -902,12 +910,12 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) -&gt; <span class="ident">ValueOrSource</span> {
+    ) -&gt; <span class="ident">LiteralOrSource</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Node::Literal</span>(<span class="ident">literal</span>) =&gt; <span class="ident">ValueOrSource::Value</span>(<span class="ident">literal</span>.<span class="ident">clone</span>()),
+            <span class="ident">Node::Literal</span>(<span class="ident">literal</span>) =&gt; <span class="ident">LiteralOrSource::Literal</span>(<span class="ident">literal</span>.<span class="ident">clone</span>()),
             <span class="ident">Node::Identifier</span>(<span class="ident">identifier</span>) =&gt; <span class="kw">match</span> <span class="ident">operations</span>.<span class="ident">symbol</span>(<span class="ident">identifier</span>) {
-                <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Argument</span>(<span class="ident">arg</span>)) =&gt; <span class="ident">ValueOrSource::Argument</span>(<span class="kw-2">*</span><span class="ident">arg</span>),
-                <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Variable</span>(<span class="ident">var</span>)) =&gt; <span class="ident">ValueOrSource::Variable</span>(<span class="kw-2">*</span><span class="ident">var</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Argument</span>(<span class="ident">arg</span>)) =&gt; <span class="ident">LiteralOrSource::Argument</span>(<span class="kw-2">*</span><span class="ident">arg</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Variable</span>(<span class="ident">var</span>)) =&gt; <span class="ident">LiteralOrSource::Variable</span>(<span class="kw-2">*</span><span class="ident">var</span>),
                 <span class="kw">_</span> =&gt; <span class="macro">todo!</span>(<span class="string">&quot;error: unexpected/unknown symbol&quot;</span>),
             },
             <span class="comment">// Node::Lookup(lookup) =&gt; lookup.generate_code(operations, tree),</span>
@@ -918,7 +926,7 @@
             <span class="kw">_</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">variable</span> <span class="op">=</span> <span class="ident">operations</span>.<span class="ident">new_temporary_variable</span>();
                 <span class="self">self</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">variable</span>), <span class="ident">operations</span>, <span class="ident">tree</span>);
-                <span class="ident">ValueOrSource::Variable</span>(<span class="ident">variable</span>)
+                <span class="ident">LiteralOrSource::Variable</span>(<span class="ident">variable</span>)
             }
         }
     }
@@ -988,7 +996,7 @@
             <span class="kw">let</span> <span class="ident">condition_result</span> <span class="op">=</span> <span class="ident">operations</span>.<span class="ident">new_temporary_variable</span>();
             <span class="ident">condition</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">condition_result</span>), <span class="ident">operations</span>, <span class="ident">tree</span>);
             <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">Instruction::If</span> {
-                <span class="ident">condition</span>: <span class="ident">ValueOrSource::Variable</span>(<span class="ident">condition_result</span>),
+                <span class="ident">condition</span>: <span class="ident">LiteralOrSource::Variable</span>(<span class="ident">condition_result</span>),
                 <span class="ident">false_jump_to</span>,
             });
         }
@@ -1175,7 +1183,7 @@
 
                 <span class="comment">// Invoke the call</span>
                 <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">Instruction::CallInstance</span> {
-                    <span class="ident">target</span>: <span class="prelude-val">Some</span>(<span class="ident">ValueOrSource::Variable</span>(<span class="ident">target_result</span>)),
+                    <span class="ident">target</span>: <span class="prelude-val">Some</span>(<span class="ident">LiteralOrSource::Variable</span>(<span class="ident">target_result</span>)),
                     <span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">clone</span>(),
                     <span class="ident">arg_count</span>: <span class="self">self</span>.<span class="ident">args</span>.<span class="ident">len</span>(),
                     <span class="ident">destination</span>,
@@ -1204,7 +1212,7 @@
                 <span class="kw">let</span> <span class="ident">variable</span> <span class="op">=</span> <span class="ident">operations</span>.<span class="ident">variable_index_from_name</span>(<span class="ident">name</span>);
                 <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="self">self</span>.<span class="ident">value</span>);
                 <span class="ident">value</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">variable</span>), <span class="ident">operations</span>, <span class="ident">tree</span>);
-                <span class="ident">operations</span>.<span class="ident">store_into_destination</span>(<span class="ident">ValueOrSource::Variable</span>(<span class="ident">variable</span>), <span class="ident">result</span>);
+                <span class="ident">operations</span>.<span class="ident">store_into_destination</span>(<span class="ident">LiteralOrSource::Variable</span>(<span class="ident">variable</span>), <span class="ident">result</span>);
             }
             <span class="kw">_</span> =&gt; <span class="macro">todo!</span>(<span class="string">&quot;not a variable name&quot;</span>),
         }
@@ -1268,11 +1276,15 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">integer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">integer</span>: <span class="ident">i64</span>) -&gt; <span class="ident">NodeId</span> {
-        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Node::Literal</span>(<span class="ident">Value::Integer</span>(<span class="ident">integer</span>)))
+        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Node::Literal</span>(<span class="ident">Literal::Integer</span>(<span class="ident">integer</span>)))
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">string</span>: <span class="ident">String</span>) -&gt; <span class="ident">NodeId</span> {
+        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Node::Literal</span>(<span class="ident">Literal::String</span>(<span class="ident">string</span>)))
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">real</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">real</span>: <span class="ident">f64</span>) -&gt; <span class="ident">NodeId</span> {
-        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Node::Literal</span>(<span class="ident">Value::Real</span>(<span class="ident">real</span>)))
+        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Node::Literal</span>(<span class="ident">Literal::Real</span>(<span class="ident">real</span>)))
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">call</span>: <span class="ident">Call</span>) -&gt; <span class="ident">NodeId</span> {
