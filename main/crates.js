@@ -1,1 +1,1 @@
-window.ALL_CRATES = ["budlang"];
+window.ALL_CRATES = ["budlang","budlang_cli","xtask"];

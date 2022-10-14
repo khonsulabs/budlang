@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/ir.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ir.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../budlang/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/ir.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ir.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../budlang/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -787,6 +787,59 @@
 <span id="787">787</span>
 <span id="788">788</span>
 <span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+<span id="799">799</span>
+<span id="800">800</span>
+<span id="801">801</span>
+<span id="802">802</span>
+<span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
+<span id="842">842</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">allow</span>(<span class="ident">missing_docs</span>, <span class="ident">clippy::missing_panics_doc</span>)]</span> <span class="comment">// TODO docs and panics for ir</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::{
@@ -796,9 +849,12 @@
 };
 
 <span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">ast::CompilationError</span>,
+    <span class="ident">ast</span>::{<span class="ident">CompilationError</span>, <span class="ident">NodeId</span>},
     <span class="ident">symbol</span>::{<span class="ident">OptionalSymbol</span>, <span class="ident">Symbol</span>},
-    <span class="ident">vm</span>::{<span class="self">self</span>, <span class="ident">Bud</span>, <span class="ident">Comparison</span>, <span class="ident">Environment</span>, <span class="ident">FromStack</span>, <span class="ident">Value</span>, <span class="ident">ValueOrSource</span>},
+    <span class="ident">vm</span>::{
+        <span class="self">self</span>, <span class="ident">Bud</span>, <span class="ident">Comparison</span>, <span class="ident">Environment</span>, <span class="ident">FromStack</span>, <span class="ident">Intrinsic</span>, <span class="ident">StringLiteralDisplay</span>, <span class="ident">Value</span>,
+        <span class="ident">ValueOrSource</span>,
+    },
     <span class="ident">Error</span>,
 };
 
@@ -813,6 +869,13 @@
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Variable</span>(<span class="ident">usize</span>);
+
+<span class="kw">impl</span> <span class="ident">Variable</span> {
+    <span class="attribute">#[<span class="ident">must_use</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">index</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="number">0</span>
+    }
+}
 
 <span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Variable</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
@@ -867,6 +930,11 @@
     <span class="ident">Return</span>(<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">LiteralOrSource</span><span class="op">&gt;</span>),
     <span class="ident">Call</span> {
         <span class="ident">function</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>,
+        <span class="ident">arg_count</span>: <span class="ident">usize</span>,
+        <span class="ident">destination</span>: <span class="ident">Destination</span>,
+    },
+    <span class="ident">CallIntrinsic</span> {
+        <span class="ident">intrinsic</span>: <span class="ident">Intrinsic</span>,
         <span class="ident">arg_count</span>: <span class="ident">usize</span>,
         <span class="ident">destination</span>: <span class="ident">Destination</span>,
     },
@@ -934,6 +1002,13 @@
                     <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;recurse-call {arg_count} {destination}&quot;</span>)
                 }
             }
+            <span class="ident">Instruction::CallIntrinsic</span> {
+                <span class="ident">intrinsic</span>,
+                <span class="ident">arg_count</span>,
+                <span class="ident">destination</span>,
+            } =&gt; {
+                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;intrinsic {intrinsic} {arg_count} {destination}&quot;</span>)
+            }
             <span class="ident">Instruction::CallInstance</span> {
                 <span class="ident">target</span>,
                 <span class="ident">name</span>,
@@ -965,6 +1040,12 @@
     <span class="ident">String</span>(<span class="ident">String</span>),
 }
 
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Mapping</span> {
+    <span class="kw">pub</span> <span class="ident">key</span>: <span class="ident">NodeId</span>,
+    <span class="kw">pub</span> <span class="ident">value</span>: <span class="ident">NodeId</span>,
+}
+
 <span class="kw">impl</span> <span class="ident">Literal</span> {
     <span class="attribute">#[<span class="ident">must_use</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">instantiate</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Value</span>
@@ -987,45 +1068,9 @@
             <span class="ident"><span class="self">Self</span>::Integer</span>(<span class="ident">value</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">value</span>, <span class="ident">f</span>),
             <span class="ident"><span class="self">Self</span>::Real</span>(<span class="ident">value</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">value</span>, <span class="ident">f</span>),
             <span class="ident"><span class="self">Self</span>::Boolean</span>(<span class="ident">value</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">value</span>, <span class="ident">f</span>),
-            <span class="ident"><span class="self">Self</span>::String</span>(<span class="ident">string</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="kw-2">&amp;</span><span class="ident">DisplayString::new</span>(<span class="ident">string</span>), <span class="ident">f</span>),
+            <span class="ident"><span class="self">Self</span>::String</span>(<span class="ident">string</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="kw-2">&amp;</span><span class="ident">StringLiteralDisplay::new</span>(<span class="ident">string</span>), <span class="ident">f</span>),
             <span class="ident"><span class="self">Self</span>::Void</span> =&gt; <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;Void&quot;</span>),
         }
-    }
-}
-
-<span class="attribute">#[<span class="ident">must_use</span>]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DisplayString</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>);
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">DisplayString</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">value</span>)
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">DisplayString</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">write_char</span>(<span class="string">&#39;&quot;&#39;</span>)<span class="question-mark">?</span>;
-        <span class="kw">for</span> <span class="ident">ch</span> <span class="kw">in</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">chars</span>() {
-            <span class="kw">match</span> <span class="ident">ch</span> {
-                <span class="ident">ch</span> <span class="kw">if</span> <span class="ident">ch</span>.<span class="ident">is_alphanumeric</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">ch</span> <span class="op">==</span> <span class="string">&#39; &#39;</span> <span class="op">|</span><span class="op">|</span> <span class="ident">ch</span>.<span class="ident">is_ascii_punctuation</span>() =&gt; {
-                    <span class="ident">f</span>.<span class="ident">write_char</span>(<span class="ident">ch</span>)<span class="question-mark">?</span>;
-                }
-                <span class="string">&#39;\t&#39;</span> =&gt; {
-                    <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;\\t&quot;</span>)<span class="question-mark">?</span>;
-                }
-                <span class="string">&#39;\r&#39;</span> =&gt; {
-                    <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;\\r&quot;</span>)<span class="question-mark">?</span>;
-                }
-                <span class="string">&#39;\n&#39;</span> =&gt; {
-                    <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;\\n&quot;</span>)<span class="question-mark">?</span>;
-                }
-                <span class="ident">other</span> =&gt; {
-                    <span class="kw">let</span> <span class="ident">codepoint</span> <span class="op">=</span> <span class="ident">u32::from</span>(<span class="ident">other</span>);
-                    <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;\\u{{{codepoint:x}}}&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;error writing codepoint&quot;</span>);
-                }
-            }
-        }
-        <span class="ident">f</span>.<span class="ident">write_char</span>(<span class="string">&#39;&quot;&#39;</span>)
     }
 }
 
@@ -1157,11 +1202,11 @@
     <span class="ident">args</span>: <span class="ident">usize</span>,
     <span class="ident">temporary_variables</span>: <span class="ident">usize</span>,
     <span class="ident">scope</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Symbol</span>, <span class="ident">ScopeSymbol</span><span class="op">&gt;</span>,
-    <span class="ident">variables</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Symbol</span>, <span class="ident">Variable</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">variables</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Symbol</span>, <span class="ident">Variable</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">CodeBlockBuilder</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_symbol</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">symbol</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>, <span class="ident">value</span>: <span class="ident">ScopeSymbol</span>) {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">add_symbol</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">symbol</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>, <span class="ident">value</span>: <span class="ident">ScopeSymbol</span>) {
         <span class="kw">if</span> <span class="macro">matches!</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>, <span class="ident">ScopeSymbol::Argument</span>(<span class="kw">_</span>)) {
             <span class="self">self</span>.<span class="ident">args</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         }
@@ -1270,9 +1315,9 @@
 
 <span class="kw">impl</span> <span class="ident">CodeBlock</span> {
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_lines</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">link</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">scope</span>: <span class="kw-2">&amp;</span><span class="ident">Bud</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">vm::CodeBlock</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">link</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">scope</span>: <span class="kw-2">&amp;</span><span class="ident">S</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">vm::CodeBlock</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
     <span class="kw">where</span>
-        <span class="ident">Env</span>: <span class="ident">Environment</span>,
+        <span class="ident">S</span>: <span class="ident">Scope</span>,
     {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">labels</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">labels_encountered</span> <span class="op">=</span> <span class="number">0</span>;
@@ -1311,13 +1356,14 @@
     }
 }
 
-<span class="kw">fn</span> <span class="ident">compile_instruction</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_lines</span>)]</span> <span class="comment">// Most are straight mappings...</span>
+<span class="kw">fn</span> <span class="ident">compile_instruction</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(
     <span class="ident">op</span>: <span class="kw-2">&amp;</span><span class="ident">Instruction</span>,
     <span class="ident">labels</span>: <span class="kw-2">&amp;</span>[<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>],
-    <span class="ident">scope</span>: <span class="kw-2">&amp;</span><span class="ident">Bud</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>,
+    <span class="ident">scope</span>: <span class="kw-2">&amp;</span><span class="ident">S</span>,
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">vm::Instruction</span><span class="op">&gt;</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
 <span class="kw">where</span>
-    <span class="ident">Env</span>: <span class="ident">Environment</span>,
+    <span class="ident">S</span>: <span class="ident">Scope</span>,
 {
     <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="kw">match</span> <span class="ident">op</span> {
         <span class="ident">Instruction::Add</span> {
@@ -1325,8 +1371,8 @@
             <span class="ident">right</span>,
             <span class="ident">destination</span>,
         } =&gt; <span class="ident">vm::Instruction::Add</span> {
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
+            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
+            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
             <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
         },
         <span class="ident">Instruction::Sub</span> {
@@ -1334,8 +1380,8 @@
             <span class="ident">right</span>,
             <span class="ident">destination</span>,
         } =&gt; <span class="ident">vm::Instruction::Sub</span> {
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
+            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
+            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
             <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
         },
         <span class="ident">Instruction::Multiply</span> {
@@ -1343,8 +1389,8 @@
             <span class="ident">right</span>,
             <span class="ident">destination</span>,
         } =&gt; <span class="ident">vm::Instruction::Multiply</span> {
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
+            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
+            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
             <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
         },
         <span class="ident">Instruction::Divide</span> {
@@ -1352,15 +1398,15 @@
             <span class="ident">right</span>,
             <span class="ident">destination</span>,
         } =&gt; <span class="ident">vm::Instruction::Divide</span> {
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
+            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
+            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
             <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
         },
         <span class="ident">Instruction::If</span> {
             <span class="ident">condition</span>,
             <span class="ident">false_jump_to</span>,
         } =&gt; <span class="ident">vm::Instruction::If</span> {
-            <span class="ident">condition</span>: <span class="ident">condition</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
+            <span class="ident">condition</span>: <span class="ident">condition</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
             <span class="ident">false_jump_to</span>: <span class="ident">labels</span>[<span class="ident">false_jump_to</span>.<span class="number">0</span>].<span class="ident">expect</span>(<span class="string">&quot;label not inserted&quot;</span>),
         },
         <span class="ident">Instruction::JumpTo</span>(<span class="ident">label</span>) =&gt; {
@@ -1374,18 +1420,20 @@
             <span class="ident">action</span>,
         } =&gt; <span class="ident">vm::Instruction::Compare</span> {
             <span class="ident">comparison</span>: <span class="kw-2">*</span><span class="ident">comparison</span>,
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
+            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
+            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
             <span class="ident">action</span>: <span class="ident">action</span>.<span class="ident">link</span>(<span class="ident">labels</span>),
         },
-        <span class="ident">Instruction::Push</span>(<span class="ident">value</span>) =&gt; <span class="ident">vm::Instruction::Push</span>(<span class="ident">value</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>()),
+        <span class="ident">Instruction::Push</span>(<span class="ident">value</span>) =&gt; <span class="ident">vm::Instruction::Push</span>(<span class="ident">value</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>()),
         <span class="ident">Instruction::PopAndDrop</span> =&gt; <span class="ident">vm::Instruction::PopAndDrop</span>,
-        <span class="ident">Instruction::Return</span>(<span class="ident">value</span>) =&gt; {
-            <span class="ident">vm::Instruction::Return</span>(<span class="ident">value</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="ident">LiteralOrSource::instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>))
-        }
+        <span class="ident">Instruction::Return</span>(<span class="ident">value</span>) =&gt; <span class="ident">vm::Instruction::Return</span>(
+            <span class="ident">value</span>
+                .<span class="ident">as_ref</span>()
+                .<span class="ident">map</span>(<span class="ident">LiteralOrSource::instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>),
+        ),
         <span class="ident">Instruction::Load</span> { <span class="ident">value</span>, <span class="ident">variable</span> } =&gt; <span class="ident">vm::Instruction::Load</span> {
             <span class="ident">variable_index</span>: <span class="ident">variable</span>.<span class="number">0</span>,
-            <span class="ident">value</span>: <span class="ident">value</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(),
+            <span class="ident">value</span>: <span class="ident">value</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
         },
         <span class="ident">Instruction::Call</span> {
             <span class="ident">function</span>,
@@ -1412,12 +1460,30 @@
             <span class="ident">arg_count</span>,
             <span class="ident">destination</span>,
         } =&gt; <span class="ident">vm::Instruction::CallInstance</span> {
-            <span class="ident">target</span>: <span class="ident">target</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="ident">LiteralOrSource::instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>),
+            <span class="ident">target</span>: <span class="ident">target</span>
+                .<span class="ident">as_ref</span>()
+                .<span class="ident">map</span>(<span class="ident">LiteralOrSource::instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>),
             <span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">clone</span>(),
             <span class="ident">arg_count</span>: <span class="kw-2">*</span><span class="ident">arg_count</span>,
             <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
         },
+        <span class="ident">Instruction::CallIntrinsic</span> {
+            <span class="ident">intrinsic</span>,
+            <span class="ident">arg_count</span>,
+            <span class="ident">destination</span>,
+        } =&gt; <span class="ident">vm::Instruction::CallIntrinsic</span> {
+            <span class="ident">intrinsic</span>: <span class="kw-2">*</span><span class="ident">intrinsic</span>,
+            <span class="ident">arg_count</span>: <span class="kw-2">*</span><span class="ident">arg_count</span>,
+            <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
+        },
     }))
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ScopeSymbolKind</span> {
+    <span class="ident">Argument</span>,
+    <span class="ident">Variable</span>,
+    <span class="ident">Function</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
@@ -1429,9 +1495,9 @@
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Function</span> {
-    <span class="ident">name</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>,
-    <span class="ident">args</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>,
-    <span class="ident">body</span>: <span class="ident">CodeBlock</span>,
+    <span class="kw">pub</span> <span class="ident">name</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">args</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">body</span>: <span class="ident">CodeBlock</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Function</span> {
@@ -1443,9 +1509,9 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compile_into</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Bud</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compile</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">S</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">vm::Function</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
     <span class="kw">where</span>
-        <span class="ident">Env</span>: <span class="ident">Environment</span>,
+        <span class="ident">S</span>: <span class="ident">Scope</span>,
     {
         <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">name</span>
@@ -1456,11 +1522,23 @@
             <span class="macro">println!</span>(<span class="string">&quot;{block}&quot;</span>);
         }
         <span class="kw">let</span> <span class="ident">function</span> <span class="op">=</span> <span class="ident">vm::Function</span> {
+            <span class="ident">name</span>,
             <span class="ident">arg_count</span>: <span class="self">self</span>.<span class="ident">args</span>.<span class="ident">len</span>(),
             <span class="ident">code</span>: <span class="ident">block</span>.<span class="ident">code</span>,
             <span class="ident">variable_count</span>: <span class="ident">block</span>.<span class="ident">variables</span>,
         };
-        <span class="kw">let</span> <span class="ident">vtable_index</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">define_function</span>(<span class="ident">name</span>, <span class="ident">function</span>);
+        <span class="prelude-val">Ok</span>(<span class="ident">function</span>)
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compile_into</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">S</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
+    <span class="kw">where</span>
+        <span class="ident">S</span>: <span class="ident">Scope</span>,
+    {
+        <span class="kw">let</span> <span class="ident">function</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">compile</span>(<span class="ident">context</span>)<span class="question-mark">?</span>;
+
+        <span class="kw">let</span> <span class="ident">vtable_index</span> <span class="op">=</span> <span class="ident">context</span>
+            .<span class="ident">define_function</span>(<span class="ident">function</span>)
+            .<span class="ident">ok_or</span>(<span class="ident">CompilationError::InvalidScope</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="ident">vtable_index</span>)
     }
 
@@ -1472,9 +1550,9 @@
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnlinkedCodeUnit</span> {
-    <span class="ident">vtable</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Function</span><span class="op">&gt;</span>,
-    <span class="ident">modules</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">UnlinkedCodeUnit</span><span class="op">&gt;</span>,
-    <span class="ident">init</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Function</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">vtable</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Function</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">modules</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">UnlinkedCodeUnit</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">init</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Function</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">UnlinkedCodeUnit</span> {
@@ -1552,6 +1630,34 @@
             <span class="ident">Output::from_value</span>(<span class="ident">Value::Void</span>).<span class="ident">map_err</span>(<span class="ident">Error::from</span>)
         }
     }
+}
+
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Scope</span> {
+    <span class="kw">type</span> <span class="ident">Environment</span>: <span class="ident">Environment</span>;
+
+    <span class="doccomment">/// Returns the vtable index of a function with the provided name.</span>
+    <span class="kw">fn</span> <span class="ident">resolve_function_vtable_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">map_each_symbol</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">callback</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="ident">Symbol</span>, <span class="ident">ScopeSymbolKind</span>));
+
+    <span class="doccomment">/// Defines a function with the provided name.</span>
+    <span class="kw">fn</span> <span class="ident">define_function</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">function</span>: <span class="ident">vm::Function</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">define_variable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="ident">Symbol</span>, <span class="ident">variable</span>: <span class="ident">Variable</span>);
+}
+
+<span class="kw">impl</span> <span class="ident">Scope</span> <span class="kw">for</span> () {
+    <span class="kw">type</span> <span class="ident">Environment</span> <span class="op">=</span> ();
+
+    <span class="kw">fn</span> <span class="ident">resolve_function_vtable_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+        <span class="prelude-val">None</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">map_each_symbol</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_callback</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="ident">Symbol</span>, <span class="ident">ScopeSymbolKind</span>)) {}
+
+    <span class="kw">fn</span> <span class="ident">define_function</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_function</span>: <span class="ident">vm::Function</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+        <span class="prelude-val">None</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">define_variable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_name</span>: <span class="ident">Symbol</span>, <span class="ident">_variable</span>: <span class="ident">Variable</span>) {}
 }
 
 <span class="comment">// #[test]</span>

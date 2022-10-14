@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["ParseError",""]],"fn":[["parse",""]]};
+window.SIDEBAR_ITEMS = {"enum":[["ParseError",""]],"fn":[["parse",""]],"struct":[["Token",""]]};

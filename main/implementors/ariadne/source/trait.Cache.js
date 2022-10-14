@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["budlang_cli"] = [{"text":"impl Cache&lt;<a class=\"enum\" href=\"budlang_cli/enum.SourceId.html\" title=\"enum budlang_cli::SourceId\">SourceId</a>&gt; for <a class=\"struct\" href=\"budlang_cli/struct.SourceCache.html\" title=\"struct budlang_cli::SourceCache\">SourceCache</a>","synthetic":false,"types":["budlang_cli::SourceCache"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["BinOpKind",""],["CompilationError",""],["Declaration",""]],"struct":[["Assign",""],["BinOp",""],["Block",""],["Call",""],["CodeUnit",""],["ExpressionTree",""],["Function",""],["If",""],["NodeId",""],["SyntaxTreeBuilder",""]]};
+window.SIDEBAR_ITEMS = {"enum":[["BinOpKind",""],["CompilationError",""],["Declaration",""]],"struct":[["Assign",""],["BinOp",""],["Block",""],["Call",""],["CodeUnit",""],["ExpressionTree",""],["Function",""],["If",""],["List",""],["Map",""],["Mapping",""],["NodeId",""],["SyntaxTreeBuilder",""]]};
