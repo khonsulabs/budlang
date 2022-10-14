@@ -5,7 +5,7 @@ Configuration(
             "docs.md",
             "https://github.com/khonsulabs/.github/raw/main/snippets/readme-footer.md",
         ],
-        "../src/.crate-docs.md":  (
+        "../budlang/src/.crate-docs.md":  (
             for_docs: true,
             sections: [
                 "docs.md",

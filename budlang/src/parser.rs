@@ -4,7 +4,11 @@
 // helper function to appease clippy.
 #![allow(clippy::range_plus_one)]
 
-use std::{fmt::Display, ops::Range, str::CharIndices};
+use std::{
+    fmt::{Display, Write},
+    ops::Range,
+    str::CharIndices,
+};
 
 use crate::{
     ast::{BinOpKind, Call, CodeUnit, Function, If, Mapping, NodeId, SyntaxTreeBuilder},
@@ -12,10 +16,10 @@ use crate::{
     vm::Comparison,
 };
 
-#[derive(Debug, PartialEq)]
-struct Token {
+#[derive(Clone, Debug, PartialEq)]
+pub struct Token {
     kind: TokenKind,
-    _range: Range<usize>,
+    range: Range<usize>,
 }
 
 impl Token {
@@ -24,14 +28,17 @@ impl Token {
     }
 
     fn new(kind: TokenKind, range: Range<usize>) -> Self {
-        Self {
-            kind,
-            _range: range,
-        }
+        Self { kind, range }
     }
 }
 
-#[derive(Debug, PartialEq)]
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.kind, f)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 enum TokenKind {
     Identifier(Symbol),
     Integer(i64),
@@ -50,9 +57,42 @@ enum TokenKind {
     Comma,
     Period,
     Colon,
+    Unknown(char),
+}
+impl Display for TokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenKind::Identifier(value) => Display::fmt(value, f),
+            TokenKind::Integer(value) => Display::fmt(value, f),
+            TokenKind::Real(value) => Display::fmt(value, f),
+            TokenKind::String(value) => Display::fmt(value, f),
+            TokenKind::Assign => f.write_str(":="),
+            TokenKind::Comparison(value) => Display::fmt(value, f),
+            TokenKind::Not => f.write_char('!'),
+            TokenKind::Add => f.write_char('+'),
+            TokenKind::Sub => f.write_char('-'),
+            TokenKind::Multiply => f.write_char('*'),
+            TokenKind::Divide => f.write_char('/'),
+            TokenKind::Open(value) => match value {
+                BracketType::Paren => f.write_char('('),
+                BracketType::Square => f.write_char('['),
+                BracketType::Curly => f.write_char('{'),
+            },
+            TokenKind::Close(value) => match value {
+                BracketType::Paren => f.write_char(')'),
+                BracketType::Square => f.write_char(']'),
+                BracketType::Curly => f.write_char('}'),
+            },
+            TokenKind::EndOfLine => f.write_str("\\n"),
+            TokenKind::Comma => f.write_char(','),
+            TokenKind::Period => f.write_char('.'),
+            TokenKind::Colon => f.write_char(':'),
+            TokenKind::Unknown(token) => Display::fmt(token, f),
+        }
+    }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum BracketType {
     Paren,
     Square,
@@ -231,7 +271,7 @@ impl<'a> Lexer<'a> {
 
                     Some(Ok(Token {
                         kind: TokenKind::Identifier(Symbol::from(&self.source[offset..=end])),
-                        _range: offset..end + 1,
+                        range: offset..end + 1,
                     }))
                 }
                 Some((offset, char))
@@ -269,7 +309,7 @@ impl<'a> Lexer<'a> {
 
                         return Some(Ok(Token {
                             kind: TokenKind::Real(value),
-                            _range: offset..end + 1,
+                            range: offset..end + 1,
                         }));
                     }
 
@@ -277,7 +317,7 @@ impl<'a> Lexer<'a> {
 
                     Some(Ok(Token {
                         kind: TokenKind::Integer(value),
-                        _range: offset..end + 1,
+                        range: offset..end + 1,
                     }))
                 }
                 Some((offset, char)) if char == '+' => {
@@ -385,14 +425,20 @@ impl<'a> Lexer<'a> {
                         Some(Ok(Token::at_offset(TokenKind::EndOfLine, offset)))
                     }
                 }
-                Some((offset, char)) => Some(Err(ParseError::Unexpected { offset, char })),
+                Some((offset, char)) => Some(Err(ParseError::Unexpected(Token {
+                    kind: TokenKind::Unknown(char),
+                    range: offset..offset + 1,
+                }))),
                 None => None,
             };
         }
     }
 
     fn expect_end_of_line(&mut self) -> Result<(), ParseError> {
-        let end_of_line = self.next().unwrap()?;
+        let end_of_line = self.next().ok_or(ParseError::ExpectedEndOfLine {
+            offset: self.source.len(),
+            found: None,
+        })??;
         assert!(matches!(end_of_line.kind, TokenKind::EndOfLine)); // TODO error trailing stuff
         Ok(())
     }
@@ -450,7 +496,12 @@ impl<'a> Lexer<'a> {
                                     ch if ('A'..='F').contains(&ch) => {
                                         u32::from(ch) - u32::from(b'A')
                                     }
-                                    _ => return Err(ParseError::Unexpected { offset, char }),
+                                    _ => {
+                                        return Err(ParseError::Unexpected(Token {
+                                            kind: TokenKind::Unknown(char),
+                                            range: offset..offset + 1,
+                                        }))
+                                    }
                                 };
 
                                 codepoint <<= 4;
@@ -490,6 +541,11 @@ impl<'a> Lexer<'a> {
             TokenKind::String(string),
             start_offset..end_offset,
         ))
+    }
+
+    fn expect_next(&mut self, expected: &str) -> Result<Token, ParseError> {
+        self.next()
+            .ok_or_else(|| ParseError::UnexpectedEof(expected.to_string()))?
     }
 }
 
@@ -537,14 +593,14 @@ pub fn parse(source: &str) -> Result<CodeUnit, ParseError> {
 }
 
 fn parse_function(tokens: &mut Lexer<'_>) -> Result<Function, ParseError> {
-    let name = tokens.next().unwrap()?;
+    let name = tokens.expect_next("function name")?;
     let name = match name.kind {
         TokenKind::Identifier(name) => name,
         _ => todo!("error non-identifier for function name"),
     };
 
     // Parameter list
-    let open_paren = tokens.next().unwrap()?;
+    let open_paren = tokens.expect_next("(")?;
     let mut args = Vec::new();
     if let TokenKind::Open(BracketType::Paren) = open_paren.kind {
         loop {
@@ -570,7 +626,7 @@ fn parse_function(tokens: &mut Lexer<'_>) -> Result<Function, ParseError> {
     let body_tree = SyntaxTreeBuilder::new();
     let body_node = parse_statements(&body_tree, tokens, Some(&name))?;
 
-    match tokens.next().unwrap()?.kind {
+    match tokens.expect_next("end")?.kind {
         TokenKind::Identifier(end) if end == "end" => {}
         other => todo!("unexpected {other:?}"),
     }
@@ -604,7 +660,6 @@ fn parse_statements(
     }
 
     let body_node = match body.len() {
-        0 => todo!("empty function"),
         1 => body[0],
         _ => tree.statements(body),
     };
@@ -619,7 +674,7 @@ fn parse_expression(
 ) -> Result<NodeId, ParseError> {
     match &first_token.kind {
         TokenKind::Identifier(symbol) if symbol == "if" => {
-            let first_token = tokens.next().unwrap()?;
+            let first_token = tokens.expect_next("if condition")?;
             let condition = parse_expression(first_token, tree, tokens, owning_function_name)?;
             tokens.expect_end_of_line()?;
             let if_true = parse_statements(tree, tokens, owning_function_name)?;
@@ -635,11 +690,11 @@ fn parse_expression(
                 }
                 _ => {}
             }
-            match tokens.next().unwrap()?.kind {
+            match tokens.expect_next("end")?.kind {
                 TokenKind::Identifier(end) if end == "end" => {}
                 other => todo!("unexpected {other:?}"),
             }
-            tokens.expect_end_of_line()?;
+            tokens.expect_end_of_line_or_eof()?;
 
             Ok(tree.if_node(if_op))
         }
@@ -661,7 +716,7 @@ fn parse_assign_expression(
     while let Some(TokenKind::Assign) = tokens.peek_token_kind() {
         tokens.next();
         stack.push(left);
-        let first_token = tokens.next().unwrap()?;
+        let first_token = tokens.expect_next("value to assign")?;
         left = parse_comparison_expression(first_token, tree, tokens, owning_function_name)?;
     }
 
@@ -685,7 +740,7 @@ fn parse_comparison_expression(
     while let Some(TokenKind::Comparison(comparison)) = tokens.peek_token_kind() {
         let comparison = *comparison;
         let _op_token = tokens.next();
-        let next_token = tokens.next().unwrap()?;
+        let next_token = tokens.expect_next("value to compare against")?;
         let right = parse_add_sub(next_token, tree, tokens, owning_function_name)?;
         left = tree.compare_node(comparison, left, right);
     }
@@ -713,7 +768,7 @@ fn parse_add_sub(
             _ => break,
         };
         let _op_token = tokens.next();
-        let next_token = tokens.next().unwrap()?;
+        let next_token = tokens.expect_next("value to operate against")?;
         let right = parse_mul_div(next_token, tree, tokens, owning_function_name)?;
         left = match kind {
             Kind::Add => tree.binop_node(BinOpKind::Add, left, right),
@@ -744,7 +799,7 @@ fn parse_mul_div(
             _ => break,
         };
         let _op_token = tokens.next();
-        let next_token = tokens.next().unwrap()?;
+        let next_token = tokens.expect_next("value to operate against")?;
         let right = parse_term(next_token, tree, tokens, owning_function_name)?;
         left = match kind {
             Kind::Multiply => tree.binop_node(BinOpKind::Multiply, left, right),
@@ -771,9 +826,9 @@ fn parse_term(
         TokenKind::Real(integer) => Ok(tree.real(integer)),
         TokenKind::String(string) => Ok(tree.string(string)),
         TokenKind::Open(BracketType::Paren) => {
-            let first_token = tokens.next().unwrap()?;
+            let first_token = tokens.expect_next("expression")?;
             let expression = parse_expression(first_token, tree, tokens, owning_function_name)?;
-            let close_paren = tokens.next().unwrap()?;
+            let close_paren = tokens.expect_next(")")?;
             if !matches!(close_paren.kind, TokenKind::Close(BracketType::Paren)) {
                 todo!("error expected close paren")
             }
@@ -782,7 +837,10 @@ fn parse_term(
         }
         TokenKind::Open(BracketType::Curly) => parse_map(tree, tokens, owning_function_name),
         TokenKind::Open(BracketType::Square) => parse_list(tree, tokens, owning_function_name),
-        _ => todo!("parse_term: {first_token:?}"),
+        other => Err(ParseError::Unexpected(Token {
+            kind: other,
+            range: first_token.range,
+        })),
     }
 }
 
@@ -799,7 +857,7 @@ fn parse_lookup(
                 // Call
                 let _open_paren = tokens.next();
                 let mut args = Vec::new();
-                let mut next_token = tokens.next().unwrap()?;
+                let mut next_token = tokens.expect_next("argument or )")?;
                 if !matches!(next_token.kind, TokenKind::Close(BracketType::Paren)) {
                     loop {
                         args.push(parse_expression(
@@ -810,13 +868,13 @@ fn parse_lookup(
                         )?);
 
                         // Expect either end bracket or comma,
-                        let comma_or_end = tokens.next().unwrap()?;
+                        let comma_or_end = tokens.expect_next(", or )")?;
                         match comma_or_end.kind {
                             TokenKind::Close(BracketType::Paren) => break,
                             TokenKind::Comma => {}
                             other => todo!("error: {other:?}"),
                         }
-                        next_token = tokens.next().unwrap()?;
+                        next_token = tokens.expect_next("argument or )")?;
                     }
                 }
                 if let Some(base) = base {
@@ -840,7 +898,7 @@ fn parse_lookup(
 
         if let Some(TokenKind::Period) = tokens.peek_token_kind() {
             let _period = tokens.next();
-            match tokens.next().unwrap()?.kind {
+            match tokens.expect_next("identifier")?.kind {
                 TokenKind::Identifier(sym) => symbol = sym,
                 _ => todo!("error: invalid lookup"),
             }
@@ -859,15 +917,15 @@ fn parse_map(
 ) -> Result<NodeId, ParseError> {
     let mut mappings = Vec::new();
     loop {
-        let first_token = tokens.next().unwrap()?;
+        let first_token = tokens.expect_next("key")?;
         if matches!(first_token.kind, TokenKind::Close(BracketType::Curly)) {
             break;
         }
 
         let key = parse_expression(first_token, tree, tokens, owning_function_name)?;
-        let colon = tokens.next().unwrap()?;
+        let colon = tokens.expect_next(":")?;
         assert!(matches!(colon.kind, TokenKind::Colon));
-        let first_token = tokens.next().unwrap()?;
+        let first_token = tokens.expect_next("value")?;
         let value = parse_expression(first_token, tree, tokens, owning_function_name)?;
         mappings.push(Mapping { key, value });
 
@@ -892,7 +950,7 @@ fn parse_list(
 ) -> Result<NodeId, ParseError> {
     let mut values = Vec::new();
     loop {
-        let first_token = tokens.next().unwrap()?;
+        let first_token = tokens.expect_next("list element or ]")?;
         if matches!(first_token.kind, TokenKind::Close(BracketType::Square)) {
             break;
         }
@@ -918,18 +976,35 @@ fn parse_list(
     Ok(tree.list_node(values))
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ParseError {
-    Unexpected {
-        offset: usize,
-        char: char,
-    },
+    Unexpected(Token),
     UnexpectedEof(String),
     MissingEnd {
         kind: char,
         open_offset: usize,
         error_location: usize,
     },
+    ExpectedEndOfLine {
+        offset: usize,
+        found: Option<Token>,
+    },
+}
+
+impl ParseError {
+    #[must_use]
+    pub fn location(&self) -> Option<Range<usize>> {
+        match self {
+            ParseError::Unexpected(token) => Some(token.range.clone()),
+            ParseError::UnexpectedEof(_) => None,
+            ParseError::MissingEnd {
+                open_offset,
+                error_location,
+                ..
+            } => Some(*open_offset..error_location + 1),
+            ParseError::ExpectedEndOfLine { offset, .. } => Some(*offset..*offset),
+        }
+    }
 }
 
 impl std::error::Error for ParseError {}
@@ -937,8 +1012,8 @@ impl std::error::Error for ParseError {}
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Unexpected { offset, char } => {
-                write!(f, "unexpected character at offset {offset}: '{char}'")
+            Self::Unexpected(token) => {
+                write!(f, "unexpected '{token}' at offset {}", token.range.start)
             }
             Self::UnexpectedEof(message) => {
                 write!(f, "unexpected end of file: {message}")
@@ -949,6 +1024,13 @@ impl Display for ParseError {
                 error_location,
             } => {
                 write!(f, "missing '{kind}' at {open_offset}..{error_location}")
+            }
+            Self::ExpectedEndOfLine { offset, found } => {
+                if let Some(found) = found {
+                    write!(f, "expected end of line at {offset}, but found {found}")
+                } else {
+                    write!(f, "expected end of line at {offset}")
+                }
             }
         }
     }

@@ -1,0 +1,17 @@
+[package]
+name = "budlang"
+version = "0.0.0"
+description = "A safe, fast, lightweight embeddable scripting language written in Rust."
+repository = "https://github.com/khonsulabs/budlang"
+
+# Important information for consumers of this crate.
+license = "MIT OR Apache-2.0"
+rust-version = "1.62.0"
+edition = "2021"
+
+# Additional metadata
+keywords = ["scripting", "language"]
+categories = ["compilers"]
+readme = "./README.md"
+
+[dependencies]

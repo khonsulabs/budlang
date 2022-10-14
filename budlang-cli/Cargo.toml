@@ -1,0 +1,24 @@
+[package]
+name = "budlang-cli"
+version = "0.0.1"
+description = "A command-line environment for BudLang."
+repository = "https://github.com/khonsulabs/budlang"
+
+# Important information for consumers of this crate.
+license = "MIT OR Apache-2.0"
+rust-version = "1.62.0"
+edition = "2021"
+
+# Additional metadata
+keywords = ["scripting", "language"]
+categories = ["command-line-utilities"]
+readme = "./README.md"
+
+[dependencies]
+budlang = { path = "../budlang" }
+crossterm = "0.25.0"
+reedline = "0.12.0"
+dirs = "4.0.0"
+ariadne = "0.1.5"
+clap = { version = "4.0.0", features = ["derive"] }
+anyhow = "1.0.65"

@@ -13,7 +13,7 @@
     clippy::missing_errors_doc
 )]
 
-use std::fmt::Display;
+use std::{fmt::Display, ops::Range};
 
 use crate::vm::{Fault, FaultOrPause};
 
@@ -71,6 +71,15 @@ impl<'a, Env, ReturnType> Error<'a, Env, ReturnType> {
                 stack,
             }),
             Error::Fault(_) => unreachable!("paused execution"),
+        }
+    }
+
+    /// Returns the source range for this error, if available.
+    #[must_use]
+    pub fn location(&self) -> Option<Range<usize>> {
+        match self {
+            Error::Parse(err) => err.location(),
+            Error::Compilation(_) | Error::Fault(_) => None,
         }
     }
 }

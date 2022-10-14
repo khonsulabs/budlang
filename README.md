@@ -4,6 +4,7 @@ A safe, fast, lightweight embeddable scripting language written in Rust.
 
 **WARNING: This crate is not anywhere near being ready to publish.**
 
+![budlang forbids unsafe code](https://img.shields.io/badge/unsafe-forbid-success)
 [![crate version](https://img.shields.io/crates/v/budlang.svg)](https://crates.io/crates/budlang)
 [![Live Build Status](https://img.shields.io/github/workflow/status/khonsulabs/budlang/Tests/main)](https://github.com/khonsulabs/budlang/actions?query=workflow:Tests)
 [![HTML Coverage Report for `main` branch](https://khonsulabs.github.io/budlang/coverage/badge.svg)](https://khonsulabs.github.io/budlang/coverage/)
@@ -13,8 +14,8 @@ A safe, fast, lightweight embeddable scripting language written in Rust.
 
 ### Memory-safe
 
-This crate forbids unsafe code (`#![forbid(unsafe_code)]`) and has no
-dependencies.
+This project forbids unsafe code (`#![forbid(unsafe_code)]`), and the `budlang`
+crate has no dependencies.
 
 ### Safe to run untrusted code
 
@@ -30,10 +31,10 @@ options including maximum stack size, maximum memory used, and more.
 development, so many instances of `todo!()` and `unwrap()` abound. These will
 all be replaced with descriptive errors instead of panics.
 
-**Work In Progress:** Bud will only support these primitive types: integers,
-real numbers (floating point), strings, lists, and maps. Bud will be able to be
-extended to support additional features via Rust, placing the developer
-embedding Bud in full control of what scripts can do.
+Bud will only support these primitive types: integers, real numbers (floating
+point), strings, lists, and maps. Bud will be able to be extended to support
+additional features via Rust, placing the developer embedding Bud in full
+control of what scripts can do.
 
 ### Efficient
 
@@ -84,7 +85,7 @@ It probably doesn't do what you need (yet):
 - [x] Add List type
 - [x] Add Map type
 - [x] Ability to write Rust functions
-- [ ] Implement a REPL
+- [x] Implement a REPL
 - [ ] Consider static variables for persistent module state.
 
 Bud is compiled to a virtual machine written using only memory-safe abstractions
