@@ -3,8 +3,8 @@ use std::{fmt::Display, vec};
 use crate::{
     symbol::Symbol,
     vm::{
-        self, Bud, DynamicFault, DynamicValue, Fault, FaultKind, FaultOrPause, Instruction,
-        PoppedValues, Value, ValueOrSource,
+        self, Bud, DynamicFault, DynamicValue, Fault, FaultKind, FaultOrPause, HashMap,
+        Instruction, List, PoppedValues, Value, ValueOrSource,
     },
     Error,
 };
@@ -100,7 +100,7 @@ impl DynamicValue for TestDynamic {
         "TestDynamic"
     }
 
-    fn call(&mut self, name: &Symbol, _args: PoppedValues<'_>) -> Result<Value, FaultKind> {
+    fn call(&self, name: &Symbol, _args: &mut PoppedValues<'_>) -> Result<Value, FaultKind> {
         match name.as_ref() {
             "squared" => Ok(Value::dynamic(Self(self.0.pow(2)))),
             _ => Err(FaultKind::Dynamic(DynamicFault::new(format!(
@@ -114,6 +114,7 @@ impl DynamicValue for TestDynamic {
 fn dynamic_values() {
     // Call the squared function on the passed TestDynamic
     let test = vm::Function {
+        name: Symbol::from("test"),
         arg_count: 1,
         variable_count: 0,
         code: vec![Instruction::CallInstance {
@@ -125,7 +126,7 @@ fn dynamic_values() {
     };
 
     // Invoke the function with a TestDynamic value 2, expect 4.
-    let mut context = Bud::empty().with_function("test", test);
+    let mut context = Bud::empty().with_function(test);
     let two_squared = context
         .call::<Value, _, _>(&Symbol::from("test"), [Value::dynamic(TestDynamic(2))])
         .unwrap();
@@ -133,17 +134,14 @@ fn dynamic_values() {
 
     // Test the various ways to access the embedded type
     let one = Value::dynamic(TestDynamic(1));
-    let mut cloned = one.clone();
-    cloned.as_dynamic_mut::<TestDynamic>().unwrap().0 = 2;
-
-    assert_eq!(one.as_dynamic::<TestDynamic>().unwrap().0, 1);
-    assert_eq!(cloned.as_dynamic::<TestDynamic>().unwrap().0, 2);
 
     let cloned = one.clone();
-    // First into_dynamic will use the clone path
+    // We cannot unwrap either value until one is dropped. This step drops
+    // `clone` because into_dynamic takes the value, then returns it into an
+    // error which is being dropped.
+    assert!(cloned.try_into_dynamic::<TestDynamic>().is_err());
+    // Now we can retrieve the inner value of one.
     assert_eq!(one.into_dynamic::<TestDynamic>().unwrap().0, 1);
-    // Second into_dynamic will use the Arc::try_unwrap
-    assert_eq!(cloned.into_dynamic::<TestDynamic>().unwrap().0, 1);
 }
 
 #[test]
@@ -193,9 +191,129 @@ fn dynamic_error() {
 
 #[test]
 fn strings() {
-    // Strings don't do much beyond exist right now
     let string = Bud::empty()
-        .run_source::<String>(r#""hello, world!""#)
+        .run_source::<String>(r#""hello" + ", world!""#)
         .unwrap();
     assert_eq!(string, "hello, world!");
+    let repeated = Bud::empty().run_source::<String>(r#""a" * 5"#).unwrap();
+    assert_eq!(repeated, "aaaaa");
+    // Test reverse ops, where DynamicValue::checked_mul is invoked with
+    // is_reverse = true.
+    let repeated = Bud::empty().run_source::<String>(r#"5 * "a""#).unwrap();
+    assert_eq!(repeated, "aaaaa");
+
+    // TODO this should be able to be "literal".replace(), but we currently
+    // don't support invoking on a literal.
+    let replaced = Bud::empty()
+        .run_source::<String>(
+            r#"
+                a := "abcda"
+                a.replace("a", "1")
+            "#,
+        )
+        .unwrap();
+    assert_eq!(replaced, "1bcd1");
+}
+
+#[test]
+fn maps() {
+    let map = Bud::empty()
+        .run_source::<HashMap>(r#"{"hello": "world", 2: 42}"#)
+        .unwrap();
+    assert_eq!(map.len(), 2);
+    assert_eq!(
+        map.get(&Value::dynamic(String::from("hello"))),
+        Some(Value::dynamic(String::from("world")))
+    );
+    assert_eq!(map.get(&Value::Integer(2)), Some(Value::Integer(42)));
+
+    // Floats aren't hashable
+    assert!(matches!(
+        Bud::empty()
+            .run_source::<HashMap>(r#"{3.2: 1, }"#)
+            .unwrap_err(),
+        Error::Fault(Fault {
+            kind: FaultOrPause::Fault(FaultKind::ValueCannotBeHashed(Value::Real(_))),
+            ..
+        })
+    ));
+    let map = Bud::empty()
+        .run_source::<HashMap>(
+            r#"
+                a := {1: true}
+                a.insert(2, false)
+                a.insert(3, a.get(1))
+                a.insert(4, a.remove(2))
+                a
+            "#,
+        )
+        .unwrap();
+    assert_eq!(map.get(&Value::Integer(1)), Some(Value::Boolean(true)));
+    assert_eq!(map.get(&Value::Integer(2)), None);
+    assert_eq!(map.get(&Value::Integer(3)), Some(Value::Boolean(true)));
+    assert_eq!(map.get(&Value::Integer(4)), Some(Value::Boolean(false)));
+}
+
+#[test]
+fn lists() {
+    let list = Bud::empty()
+        .run_source::<List>(r#"[1, 2, 3]"#)
+        .unwrap()
+        .into_inner();
+    assert_eq!(list.len(), 3);
+    assert_eq!(list[0], Value::Integer(1));
+    assert_eq!(list[1], Value::Integer(2));
+    assert_eq!(list[2], Value::Integer(3));
+    let list = Bud::empty()
+        .run_source::<List>(
+            r#"
+                a := []
+                a.push(2)
+                a.push(3)
+                a.push_front(1)
+
+                a.push_front(0)
+                a.push_front(-1)
+                a.push(5)
+                b := a.remove(1) + a.pop() + a.pop_front()
+                a.push(b)
+
+                a
+            "#,
+        )
+        .unwrap();
+    assert_eq!(list.len(), 4);
+    assert_eq!(list.get(0).unwrap(), Value::Integer(1));
+    assert_eq!(list.get(1).unwrap(), Value::Integer(2));
+    assert_eq!(list.get(2).unwrap(), Value::Integer(3));
+    assert_eq!(list.get(3).unwrap(), Value::Integer(4)); // adds -1, 5, and 0
+}
+
+#[test]
+fn interactive() {
+    // Test variable persistence
+    let mut session = Bud::empty();
+    session.evaluate::<()>("a := 42").unwrap();
+    assert_eq!(session.evaluate::<i64>("a").unwrap(), 42);
+
+    // Test a new function calling an existing function
+    session
+        .evaluate::<()>(
+            r#"
+                function foo()
+                    42
+                end
+            "#,
+        )
+        .unwrap();
+    session
+        .evaluate::<()>(
+            r#"
+                function bar()
+                    foo()
+                end
+            "#,
+        )
+        .unwrap();
+    assert_eq!(session.evaluate::<i64>("bar()").unwrap(), 42);
 }

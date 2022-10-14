@@ -9,10 +9,10 @@ use std::{
 use crate::{
     ir::{
         self, CodeBlockBuilder, CompareAction, Destination, Instruction, Literal, LiteralOrSource,
-        ScopeSymbol, UnlinkedCodeUnit,
+        Scope, ScopeSymbol, ScopeSymbolKind, UnlinkedCodeUnit,
     },
     symbol::{OptionalSymbol, Symbol},
-    vm::Comparison,
+    vm::{Comparison, Intrinsic},
 };
 
 pub struct ExpressionTree {
@@ -88,6 +88,20 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
                 .field("target", &self.node(assign.target))
                 .field("value", &self.node(assign.value))
                 .finish(),
+            Node::Map(map) => {
+                let mut dbg = f.debug_tuple("Map");
+                for mapping in &map.mappings {
+                    dbg.field(&(self.node(mapping.key), self.node(mapping.value)));
+                }
+                dbg.finish()
+            }
+            Node::List(list) => {
+                let mut dbg = f.debug_tuple("List");
+                for value in &list.values {
+                    dbg.field(&self.node(*value));
+                }
+                dbg.finish()
+            }
             // Node::Lookup(lookup) => f
             //     .debug_struct("Lookup")
             //     .field("base", &self.node(lookup.base))
@@ -137,6 +151,8 @@ enum Node {
     Block(Block),
     Literal(Literal),
     Identifier(Symbol),
+    Map(Map),
+    List(List),
     // Lookup(Lookup),
     Call(Call),
     Return(NodeId),
@@ -173,6 +189,8 @@ impl Node {
             Node::Identifier(identifier) => {
                 operations.load_from_symbol(identifier, result);
             }
+            Node::Map(map) => map.generate_code(result, operations, tree),
+            Node::List(list) => list.generate_code(result, operations, tree),
             // Node::Lookup(lookup) => lookup.generate_code(operations, tree),
             Node::Call(call) => call.generate_code(result, operations, tree),
             Node::Return(value) => {
@@ -447,8 +465,18 @@ impl Call {
             (Some(target), Some(name)) => {
                 // Evaluate the target expression
                 let target = tree.node(target);
-                let target_result = operations.new_temporary_variable();
-                target.generate_code(Destination::Variable(target_result), operations, tree);
+                let target = if let Node::Identifier(name) = target {
+                    match operations.lookup(name) {
+                        Some(ScopeSymbol::Argument(arg)) => LiteralOrSource::Argument(*arg),
+                        Some(ScopeSymbol::Variable(var)) => LiteralOrSource::Variable(*var),
+                        Some(ScopeSymbol::Function { .. }) => todo!("can't invoke on a function"),
+                        None => todo!("unknown identifier"),
+                    }
+                } else {
+                    let target_result = operations.new_temporary_variable();
+                    target.generate_code(Destination::Variable(target_result), operations, tree);
+                    LiteralOrSource::Variable(target_result)
+                };
 
                 // Push the arguments
                 for &arg in &self.args {
@@ -458,7 +486,7 @@ impl Call {
 
                 // Invoke the call
                 operations.push(Instruction::CallInstance {
-                    target: Some(LiteralOrSource::Variable(target_result)),
+                    target: Some(target),
                     name: name.clone(),
                     arg_count: self.args.len(),
                     destination,
@@ -491,6 +519,64 @@ impl Assign {
             }
             _ => todo!("not a variable name"),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Map {
+    pub mappings: Vec<Mapping>,
+}
+
+impl Map {
+    fn generate_code(
+        &self,
+        result: Destination,
+        operations: &mut CodeBlockBuilder,
+        tree: &ExpressionTree,
+    ) {
+        for mapping in &self.mappings {
+            tree.node(mapping.key)
+                .generate_code(Destination::Stack, operations, tree);
+            tree.node(mapping.value)
+                .generate_code(Destination::Stack, operations, tree);
+        }
+
+        operations.push(Instruction::CallIntrinsic {
+            intrinsic: Intrinsic::NewMap,
+            arg_count: self.mappings.len() * 2,
+            destination: result,
+        });
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Mapping {
+    pub key: NodeId,
+    pub value: NodeId,
+}
+
+#[derive(Debug, Clone)]
+pub struct List {
+    pub values: Vec<NodeId>,
+}
+
+impl List {
+    fn generate_code(
+        &self,
+        result: Destination,
+        operations: &mut CodeBlockBuilder,
+        tree: &ExpressionTree,
+    ) {
+        for value in &self.values {
+            tree.node(*value)
+                .generate_code(Destination::Stack, operations, tree);
+        }
+
+        operations.push(Instruction::CallIntrinsic {
+            intrinsic: Intrinsic::NewList,
+            arg_count: self.values.len(),
+            destination: result,
+        });
     }
 }
 
@@ -562,12 +648,24 @@ impl SyntaxTreeBuilder {
         self.push(Node::Literal(Literal::Real(real)))
     }
 
+    pub fn boolean(&self, boolean: bool) -> NodeId {
+        self.push(Node::Literal(Literal::Boolean(boolean)))
+    }
+
     pub fn call(&self, call: Call) -> NodeId {
         self.push(Node::Call(call))
     }
 
     pub fn return_node(&self, value: NodeId) -> NodeId {
         self.push(Node::Return(value))
+    }
+
+    pub fn map_node(&self, mappings: Vec<Mapping>) -> NodeId {
+        self.push(Node::Map(Map { mappings }))
+    }
+
+    pub fn list_node(&self, values: Vec<NodeId>) -> NodeId {
+        self.push(Node::List(List { values }))
     }
 
     pub fn finish(self, root: NodeId) -> ExpressionTree {
@@ -629,7 +727,7 @@ impl CodeUnit {
         self
     }
 
-    pub fn compile(self) -> UnlinkedCodeUnit {
+    pub fn compile<InitScope: Scope>(self, scope: &mut InitScope) -> UnlinkedCodeUnit {
         let init = match self.init_statements.len() {
             0 => None,
             1 => Some(self.init_statements[0]),
@@ -650,12 +748,26 @@ impl CodeUnit {
 
         let init = init.map(|body| {
             let mut block = CodeBlockBuilder::default();
+            // Define any existing variables
+            scope.map_each_symbol(&mut |symbol, kind| match kind {
+                ScopeSymbolKind::Variable => {
+                    block.variable_index_from_name(&symbol);
+                }
+                ScopeSymbolKind::Function | ScopeSymbolKind::Argument => {}
+            });
             self.init_tree.finish(body).generate_code(&mut block);
+            for (symbol, variable) in &block.variables {
+                scope.define_variable(symbol.clone(), *variable);
+            }
+
             ir::Function::new("__init", Vec::new(), block.finish())
         });
         UnlinkedCodeUnit::new(
             vtable,
-            self.modules.into_iter().map(CodeUnit::compile).collect(),
+            self.modules
+                .into_iter()
+                .map(|unit| unit.compile(scope))
+                .collect(),
             init,
         )
     }
@@ -707,9 +819,10 @@ impl Function {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CompilationError {
     UndefinedFunction(Symbol),
+    InvalidScope,
 }
 
 impl std::error::Error for CompilationError {}
@@ -719,6 +832,9 @@ impl Display for CompilationError {
         match self {
             CompilationError::UndefinedFunction(symbol) => {
                 write!(f, "undefined function: {symbol}")
+            }
+            CompilationError::InvalidScope => {
+                write!(f, "the scope used did not support a required operation")
             }
         }
     }

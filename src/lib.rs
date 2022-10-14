@@ -15,6 +15,8 @@
 
 use std::fmt::Display;
 
+use crate::vm::{Fault, FaultOrPause};
+
 /// The abstract syntax tree Bud uses.
 pub mod ast;
 pub mod ir;
@@ -27,7 +29,7 @@ pub mod symbol;
 pub mod vm;
 
 /// All errors that can be encountered executing Bud code.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error<'a, Env, ReturnType> {
     /// An error occurred while parsing the source code.
     Parse(parser::ParseError),
@@ -35,6 +37,42 @@ pub enum Error<'a, Env, ReturnType> {
     Compilation(ast::CompilationError),
     /// A fault occurred while running the virtual machine.
     Fault(vm::Fault<'a, Env, ReturnType>),
+}
+
+impl<Env, ReturnType> Clone for Error<'static, Env, ReturnType> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Parse(arg0) => Self::Parse(arg0.clone()),
+            Self::Compilation(arg0) => Self::Compilation(arg0.clone()),
+            Self::Fault(arg0) => Self::Fault(arg0.clone()),
+        }
+    }
+}
+
+impl<'a, Env, ReturnType> Error<'a, Env, ReturnType> {
+    /// Asserts that this error does not contain a paused execution. Returns an
+    /// [`Error`] instance with a `'static` lifetime.
+    ///
+    /// # Panics
+    ///
+    /// If this contains [`Error::Fault`] with a kind of
+    /// [`FaultOrPause::Pause`], this function will panic. Paused execution
+    /// mutably borrows the virtual machine's state.
+    #[must_use]
+    pub fn expect_no_pause(self) -> Error<'static, Env, ReturnType> {
+        match self {
+            Error::Parse(parse) => Error::Parse(parse),
+            Error::Compilation(compilation) => Error::Compilation(compilation),
+            Error::Fault(Fault {
+                kind: FaultOrPause::Fault(fault),
+                stack,
+            }) => Error::Fault(Fault {
+                kind: FaultOrPause::Fault(fault),
+                stack,
+            }),
+            Error::Fault(_) => unreachable!("paused execution"),
+        }
+    }
 }
 
 impl<'a, Env, ReturnType> std::error::Error for Error<'a, Env, ReturnType>

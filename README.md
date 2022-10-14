@@ -80,10 +80,10 @@ It probably doesn't do what you need (yet):
 - [x] Add variables
 - [ ] Add loops
 - [x] Add Real (Float) type
-- [ ] Add String type
-- [ ] Add List type
-- [ ] Add Map type
-- [ ] Ability to write Rust functions
+- [x] Add String type
+- [x] Add List type
+- [x] Add Map type
+- [x] Ability to write Rust functions
 - [ ] Implement a REPL
 - [ ] Consider static variables for persistent module state.
 

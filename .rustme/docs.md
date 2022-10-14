@@ -28,10 +28,10 @@ options including maximum stack size, maximum memory used, and more.
 development, so many instances of `todo!()` and `unwrap()` abound. These will
 all be replaced with descriptive errors instead of panics.
 
-**Work In Progress:** Bud will only support these primitive types: integers,
-real numbers (floating point), strings, lists, and maps. Bud will be able to be
-extended to support additional features via Rust, placing the developer
-embedding Bud in full control of what scripts can do.
+Bud will only support these primitive types: integers, real numbers (floating
+point), strings, lists, and maps. Bud will be able to be extended to support
+additional features via Rust, placing the developer embedding Bud in full
+control of what scripts can do.
 
 ### Efficient
 
@@ -78,10 +78,10 @@ It probably doesn't do what you need (yet):
 - [x] Add variables
 - [ ] Add loops
 - [x] Add Real (Float) type
-- [ ] Add String type
-- [ ] Add List type
-- [ ] Add Map type
-- [ ] Ability to write Rust functions
+- [x] Add String type
+- [x] Add List type
+- [x] Add Map type
+- [x] Ability to write Rust functions
 - [ ] Implement a REPL
 - [ ] Consider static variables for persistent module state.
 

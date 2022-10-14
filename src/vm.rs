@@ -2,21 +2,40 @@ use std::{
     any::{type_name, Any},
     borrow::Cow,
     cmp::Ordering,
-    collections::{HashMap, VecDeque},
+    collections::{HashMap as StdHashMap, VecDeque},
     fmt::{Debug, Display, Write},
+    hash::{Hash, Hasher},
     marker::PhantomData,
-    ops::{Bound, Index, IndexMut, RangeBounds},
+    ops::{Add, Bound, Div, Index, IndexMut, Mul, RangeBounds, Sub},
     sync::Arc,
     vec,
 };
 
-use crate::{ast::CompilationError, ir::DisplayString, parser::parse, symbol::Symbol, Error};
+use crate::{
+    ast::CompilationError,
+    ir::{Scope, ScopeSymbolKind},
+    parser::parse,
+    symbol::Symbol,
+    Error,
+};
+
+mod dynamic;
+mod list;
+mod map;
+mod string;
+
+pub use self::{
+    dynamic::{Dynamic, DynamicValue},
+    list::List,
+    map::HashMap,
+    string::StringLiteralDisplay,
+};
 
 /// A virtual machine instruction.
 ///
 /// This enum contains all instructions that the virtual machine is able to
 /// perform.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Instruction {
     /// Adds `left` and `right` and places the result in `destination`.
     ///
@@ -156,6 +175,27 @@ pub enum Instruction {
         /// The destination for the result of the call.
         destination: Destination,
     },
+    /// Calls an intrinsic runtime function.
+    ///
+    /// When calling a function, values on the stack are "passed" to the
+    /// function being pushed to the stack before calling the function. To
+    /// ensure the correct number of arguments are taken even when variable
+    /// argument lists are supported, the number of arguments is passed and
+    /// controls the baseline of the stack.
+    ///  
+    /// Upon returning from a function call, the arguments will no longer be on
+    /// the stack. The value returned from the function (or [`Value::Void`] if
+    /// no value was returned) will be placed in `destination`.
+    CallIntrinsic {
+        /// The runtime intrinsic to call.
+        intrinsic: Intrinsic,
+        /// The number of arguments on the stack that should be used as
+        /// arguments to this call.
+        arg_count: usize,
+
+        /// The destination for the result of the call.
+        destination: Destination,
+    },
     /// Calls a function by name on a value.
     ///
     /// When calling a function, values on the stack are "passed" to the
@@ -254,12 +294,34 @@ impl Display for Instruction {
                     write!(f, "invoke stack {name} {arg_count} {destination}")
                 }
             }
+            Instruction::CallIntrinsic {
+                intrinsic,
+                arg_count,
+                destination,
+            } => {
+                write!(f, "intrinsic {intrinsic} {arg_count} {destination}")
+            }
         }
     }
 }
 
+/// A runtime intrinsic function.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Intrinsic {
+    /// Creates a new Map with the given arguments.
+    NewMap,
+    /// Creates a new List with the given arguments.
+    NewList,
+}
+
+impl Display for Intrinsic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(self, f)
+    }
+}
+
 /// An action to take during an [`Instruction::Compare`].
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CompareAction {
     /// Store the boolean result in the destination indicated.
     Store(Destination),
@@ -278,7 +340,7 @@ impl Display for CompareAction {
 }
 
 /// A destination for a value.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Destination {
     /// Store the value in the 0-based variable index provided.
     Variable(usize),
@@ -299,7 +361,7 @@ impl Display for Destination {
 }
 
 /// The source of a value.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ValueSource {
     /// The value is in an argument at the provided 0-based index.
     Argument(usize),
@@ -317,7 +379,7 @@ impl Display for ValueSource {
 }
 
 /// A value or a location of a value
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ValueOrSource {
     /// A value.
     Value(Value),
@@ -368,8 +430,10 @@ impl Display for Comparison {
 }
 
 /// A virtual machine function.
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Function {
+    /// The name of the function.
+    pub name: Symbol,
     /// The number of arguments this function expects.
     pub arg_count: usize,
     /// The number of variables this function requests space for.
@@ -413,27 +477,28 @@ impl Value {
     #[must_use]
     pub fn as_dynamic<T: DynamicValue>(&self) -> Option<&T> {
         if let Self::Dynamic(value) = self {
-            value.0.as_any().downcast_ref::<T>()
+            value.inner()
         } else {
             None
         }
     }
 
-    /// Returns a mutable reference to the contained value, if it was one
-    /// originally created with [`Value::dynamic()`]. If the value isn't a
-    /// dynamic value or `T` is not the correct type, None will be returned.
-    ///
-    /// Because dynamic values are cheaply cloned by wrapping the value in an
-    /// [`Arc`], this method will create a copy of the contained value if there
-    /// are any other instances that point to the same contained value. If this
-    /// is the only instance of this value, a mutable reference to the contained
-    /// value will be returned without additional allocations.
-    #[must_use]
-    pub fn as_dynamic_mut<T: DynamicValue>(&mut self) -> Option<&mut T> {
-        if let Self::Dynamic(value) = self {
-            value.as_mut().as_any_mut().downcast_mut()
+    /// Returns the contained value if `T` matches the contained type and this
+    /// is the final reference to the value. If the value contains another type
+    /// or additional references exist, `Err(self)` will be returned. Otherwise,
+    /// the original value will be returned.
+    pub fn try_into_dynamic<T: DynamicValue>(self) -> Result<T, Self> {
+        // Before we consume the value, verify we have the correct type.
+        if self.as_dynamic::<T>().is_some() {
+            // We can now destruct self safely without worrying about needing to
+            // return an error.
+            if let Self::Dynamic(value) = self {
+                value.try_into_inner().map_err(Self::Dynamic)
+            } else {
+                unreachable!()
+            }
         } else {
-            None
+            Err(self)
         }
     }
 
@@ -443,38 +508,44 @@ impl Value {
     /// value will be returned.
     ///
     /// Because dynamic values are cheaply cloned by wrapping the value in an
-    /// [`Arc`], this method will return a clone if there are any other
-    /// instances that point to the same contained value. If this is the final
-    /// instance of this value, the contained value will be returned without
-    /// additional allocations.
-    pub fn into_dynamic<T: DynamicValue>(self) -> Result<T, Self> {
+    /// [`std::sync::Arc`], this method will return a clone if there are any
+    /// other instances that point to the same contained value. If this is the
+    /// final instance of this value, the contained value will be returned
+    /// without additional allocations.
+    pub fn into_dynamic<T: DynamicValue + Clone>(self) -> Result<T, Self> {
         // Before we consume the value, verify we have the correct type.
         if self.as_dynamic::<T>().is_some() {
             // We can now destruct self safely without worrying about needing to
             // return an error.
-            let value = if let Self::Dynamic(value) = self {
-                value
+            if let Self::Dynamic(value) = self {
+                value.into_inner().map_err(Self::Dynamic)
             } else {
                 unreachable!()
-            };
-            match Arc::try_unwrap(value.0) {
-                Ok(mut boxed_value) => {
-                    let opt_value = boxed_value
-                        .as_opt_any_mut()
-                        .downcast_mut::<Option<T>>()
-                        .expect("type already checked");
-                    let mut value = None;
-                    std::mem::swap(opt_value, &mut value);
-                    Ok(value.expect("value already taken"))
-                }
-                Err(arc_value) => Ok(arc_value
-                    .as_any()
-                    .downcast_ref::<T>()
-                    .expect("type already checked")
-                    .clone()),
             }
         } else {
             Err(self)
+        }
+    }
+
+    /// If this value is a [`Value::Integer`], this function returns the
+    /// contained value. Otherwise, `None` is returned.
+    #[must_use]
+    pub fn as_i64(&self) -> Option<i64> {
+        if let Value::Integer(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// If this value is a [`Value::Real`], this function returns the
+    /// contained value. Otherwise, `None` is returned.
+    #[must_use]
+    pub fn as_f64(&self) -> Option<f64> {
+        if let Value::Real(value) = self {
+            Some(*value)
+        } else {
+            None
         }
     }
 
@@ -491,7 +562,7 @@ impl Value {
             Value::Integer(value) => *value != 0,
             Value::Real(value) => value.abs() < f64::EPSILON,
             Value::Boolean(value) => *value,
-            Value::Dynamic(value) => value.0.is_truthy(),
+            Value::Dynamic(value) => value.is_truthy(),
             Value::Void => false,
         }
     }
@@ -510,17 +581,68 @@ impl Value {
             Value::Integer(_) => ValueKind::Integer,
             Value::Real(_) => ValueKind::Real,
             Value::Boolean(_) => ValueKind::Boolean,
-            Value::Dynamic(value) => ValueKind::Dynamic(value.0.kind()),
+            Value::Dynamic(value) => ValueKind::Dynamic(value.kind()),
             Value::Void => ValueKind::Void,
         }
+    }
+
+    /// Returns true if value contained supports hashing.
+    ///
+    /// Using [`Hash`] on a value that does not support hashing will not panic,
+    /// but unique hash values will not be generated.
+    #[must_use]
+    pub fn implements_hash(&self) -> bool {
+        struct NullHasher;
+        impl std::hash::Hasher for NullHasher {
+            fn finish(&self) -> u64 {
+                0
+            }
+
+            fn write(&mut self, _bytes: &[u8]) {}
+        }
+
+        self.try_hash(&mut NullHasher)
+    }
+
+    /// Attempts to compute a hash over this value. Returns true if the value
+    /// contained supports hashing.
+    ///
+    /// The `state` may be mutated even if the contained value does not contain
+    /// a hashable value.
+    pub fn try_hash<H: Hasher>(&self, state: &mut H) -> bool {
+        match self {
+            Value::Void => state.write_u8(0),
+            Value::Integer(value) => {
+                state.write_u8(1);
+                value.hash(state);
+            }
+            Value::Boolean(value) => {
+                state.write_u8(2);
+                value.hash(state);
+            }
+            Value::Dynamic(value) => {
+                state.write_u8(3);
+                value.type_id().hash(state);
+
+                if !value.hash(state) {
+                    return false;
+                }
+            }
+            Value::Real(_) => return false,
+        }
+        true
+    }
+}
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.try_hash(state);
     }
 }
 
 impl Eq for Value {}
 
 impl PartialEq for Value {
-    // floating point casts are intentional in this code.
-    #[allow(clippy::cast_precision_loss)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Integer(lhs), Self::Integer(rhs)) => lhs == rhs,
@@ -528,11 +650,10 @@ impl PartialEq for Value {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => lhs == rhs,
             (Self::Void, Self::Void) => true,
             (Self::Dynamic(lhs), Self::Dynamic(rhs)) => lhs
-                .0
                 .partial_eq(other)
-                .or_else(|| rhs.0.partial_eq(self))
+                .or_else(|| rhs.partial_eq(self))
                 .unwrap_or(false),
-            (Self::Dynamic(lhs), _) => lhs.0.partial_eq(other).unwrap_or(false),
+            (Self::Dynamic(lhs), _) => lhs.partial_eq(other).unwrap_or(false),
             _ => false,
         }
     }
@@ -576,132 +697,17 @@ fn real_total_eq(lhs: f64, rhs: f64) -> bool {
     }
 }
 
-/// This function produces an Ordering for floats as follows:
-///
-/// - -Infinity
-/// - negative real numbers
-/// - -0.0
-/// - +0.0
-/// - positive real numbers
-/// - Infinity
-/// - NaN
-fn real_total_cmp(lhs: f64, rhs: f64) -> Ordering {
-    match (lhs.is_nan(), rhs.is_nan()) {
-        // Neither are NaNs
-        (false, false) => {
-            let (lhs_is_infinite, rhs_is_infinite) = (lhs.is_infinite(), rhs.is_infinite());
-            let (lhs_is_positive, rhs_is_positive) =
-                (lhs.is_sign_positive(), rhs.is_sign_positive());
-
-            match (
-                lhs_is_infinite,
-                rhs_is_infinite,
-                lhs_is_positive,
-                rhs_is_positive,
-            ) {
-                (false, false, _, _) => {
-                    if real_eq(lhs, rhs) {
-                        Ordering::Equal
-                    } else if lhs < rhs {
-                        Ordering::Less
-                    } else {
-                        Ordering::Greater
-                    }
-                }
-                // Equal if both are infinite and signs are equal
-                (true, true, true, true) | (true, true, false, false) => Ordering::Equal,
-                // If only one is infinite, its sign controls the sort.
-                (false, _, _, true) | (true, _, false, _) => Ordering::Less,
-                (false, _, _, false) | (true, _, true, _) => Ordering::Greater,
-            }
-        }
-        // Both are NaN.
-        (true, true) => Ordering::Equal,
-        // One is NaN, the other isn't. Unlike infinity, there is no concept of negative nan.
-        (false, _) => Ordering::Less,
-        (true, _) => Ordering::Greater,
-    }
-}
-
 #[test]
-fn real_cmp_tests() {
-    const EXPECTED_ORDER: [f64; 10] = [
-        f64::NEG_INFINITY,
-        f64::NEG_INFINITY,
-        -1.0,
-        -0.0,
-        0.0,
-        1.0,
-        f64::INFINITY,
-        f64::INFINITY,
-        f64::NAN,
-        f64::NAN,
-    ];
-
-    // NaN comparisons
-    assert_eq!(real_total_cmp(f64::NAN, f64::NAN), Ordering::Equal);
-    assert_eq!(real_total_cmp(f64::NAN, -1.), Ordering::Greater);
-    assert_eq!(real_total_cmp(f64::NAN, 1.), Ordering::Greater);
-    assert_eq!(
-        real_total_cmp(f64::NAN, f64::NEG_INFINITY),
-        Ordering::Greater
-    );
-    assert_eq!(real_total_cmp(f64::NAN, f64::INFINITY), Ordering::Greater);
-
-    // NaN comparisons reversed
-    assert_eq!(real_total_cmp(-1., f64::NAN), Ordering::Less);
-    assert_eq!(real_total_cmp(1., f64::NAN,), Ordering::Less);
-    assert_eq!(real_total_cmp(f64::NEG_INFINITY, f64::NAN), Ordering::Less);
-    assert_eq!(real_total_cmp(f64::INFINITY, f64::NAN), Ordering::Less);
-
-    // Infinity comparisons
-    assert_eq!(
-        real_total_cmp(f64::INFINITY, f64::INFINITY),
-        Ordering::Equal
-    );
-    assert_eq!(
-        real_total_cmp(f64::INFINITY, f64::NEG_INFINITY),
-        Ordering::Greater
-    );
-    assert_eq!(real_total_cmp(f64::INFINITY, -1.), Ordering::Greater);
-    assert_eq!(real_total_cmp(f64::INFINITY, 1.), Ordering::Greater);
-
-    // Infinity comparisons reversed
-    assert_eq!(
-        real_total_cmp(f64::NEG_INFINITY, f64::INFINITY),
-        Ordering::Less
-    );
-    assert_eq!(real_total_cmp(-1., f64::INFINITY,), Ordering::Less);
-    assert_eq!(real_total_cmp(1., f64::INFINITY,), Ordering::Less);
-
-    // Negative-Infinity comparisons
-    assert_eq!(
-        real_total_cmp(f64::NEG_INFINITY, f64::NEG_INFINITY),
-        Ordering::Equal
-    );
-    assert_eq!(real_total_cmp(f64::NEG_INFINITY, -1.), Ordering::Less);
-    assert_eq!(real_total_cmp(f64::NEG_INFINITY, 1.), Ordering::Less);
-
-    // Negative-Infinity comparisons reversed
-    assert_eq!(real_total_cmp(f64::NEG_INFINITY, -1.), Ordering::Less);
-    assert_eq!(real_total_cmp(f64::NEG_INFINITY, 1.), Ordering::Less);
-    let mut values = vec![
-        1.0,
-        f64::INFINITY,
-        0.0,
-        f64::NEG_INFINITY,
-        -1.0,
-        -0.0,
-        f64::NAN,
-        f64::NAN,
-        f64::INFINITY,
-        f64::NEG_INFINITY,
-    ];
-    values.sort_by(|a, b| real_total_cmp(*a, *b));
-    println!("Sorted: {values:?}");
-    for (a, b) in values.iter().zip(EXPECTED_ORDER.iter()) {
-        assert!(real_total_eq(*a, *b), "{a} != {b}");
-    }
+fn real_eq_tests() {
+    assert!(real_total_eq(0.1, 0.1));
+    assert!(!real_total_eq(0.1 + f64::EPSILON, 0.1));
+    assert!(real_total_eq(f64::NAN, f64::NAN));
+    assert!(!real_total_eq(f64::NAN, -f64::NAN));
+    assert!(!real_total_eq(f64::NAN, 0.1));
+    assert!(!real_total_eq(f64::NAN, f64::INFINITY));
+    assert!(!real_total_eq(f64::NAN, f64::NEG_INFINITY));
+    assert!(real_total_eq(f64::INFINITY, f64::INFINITY));
+    assert!(!real_total_eq(f64::INFINITY, f64::NEG_INFINITY));
 }
 
 impl PartialEq<bool> for Value {
@@ -736,20 +742,6 @@ impl PartialEq<f64> for Value {
     }
 }
 
-fn dynamic_ord(
-    left: &Value,
-    left_dynamic: &dyn UnboxableDynamicValue,
-    right: &Value,
-) -> Option<Ordering> {
-    match left_dynamic.partial_cmp(right) {
-        Some(ordering) => Some(ordering),
-        None => match right {
-            Value::Dynamic(right) => right.0.partial_cmp(left).map(Ordering::reverse),
-            _ => None,
-        },
-    }
-}
-
 impl PartialOrd for Value {
     #[inline]
     fn partial_cmp(&self, right: &Self) -> Option<Ordering> {
@@ -757,30 +749,25 @@ impl PartialOrd for Value {
             Value::Integer(left) => match right {
                 Value::Integer(right) => Some(left.cmp(right)),
                 Value::Dynamic(right_dynamic) => {
-                    dynamic_ord(right, right_dynamic.0.as_ref().as_ref(), self)
-                        .map(Ordering::reverse)
+                    dynamic::cmp(right, right_dynamic, self).map(Ordering::reverse)
                 }
                 _ => None,
             },
             Value::Real(left) => match right {
-                Value::Real(right) => Some(real_total_cmp(*left, *right)),
+                Value::Real(right) => Some(left.total_cmp(right)),
                 Value::Dynamic(right_dynamic) => {
-                    dynamic_ord(right, right_dynamic.0.as_ref().as_ref(), self)
-                        .map(Ordering::reverse)
+                    dynamic::cmp(right, right_dynamic, self).map(Ordering::reverse)
                 }
                 _ => None,
             },
             Value::Boolean(left) => match right {
                 Value::Boolean(right) => Some(left.cmp(right)),
                 Value::Dynamic(right_dynamic) => {
-                    dynamic_ord(right, right_dynamic.0.as_ref().as_ref(), self)
-                        .map(Ordering::reverse)
+                    dynamic::cmp(right, right_dynamic, self).map(Ordering::reverse)
                 }
                 _ => None,
             },
-            Value::Dynamic(left_dynamic) => {
-                dynamic_ord(self, left_dynamic.0.as_ref().as_ref(), right)
-            }
+            Value::Dynamic(left_dynamic) => dynamic::cmp(self, left_dynamic, right),
             Value::Void => {
                 if let Value::Void = right {
                     Some(Ordering::Equal)
@@ -821,65 +808,16 @@ impl ValueKind {
     }
 }
 
-/// A type that can be used in the virtual machine using [`Value::dynamic`].
-pub trait DynamicValue: Clone + Debug + 'static {
-    /// Returns true if the value contained is truthy. See
-    /// [`Value::is_truthy()`] for examples of what this means for primitive
-    /// types.
-    fn is_truthy(&self) -> bool;
-
-    /// Returns a unique string identifying this type. This returned string will
-    /// be wrapped in [`ValueKind::Dynamic`] when [`Value::kind()`] is invoked
-    /// on a dynamic value.
-    ///
-    /// This value does not influence the virtual machine's behavior. The
-    /// virtual machine uses this string only when creating error messages.
-    fn kind(&self) -> &'static str;
-
-    /// Returns true if self and other are considered equal. Returns false if
-    /// self and other are able to be compared but are not equal. Returns None
-    /// if the values are unable to be compared.
-    ///
-    /// When evaluating `left = right` with dynamic values, if
-    /// `left.partial_eq(right)` returns None, `right.partial_eq(left)` will be
-    /// attempted before returning false.
-    #[allow(unused_variables)]
-    fn partial_eq(&self, other: &Value) -> Option<bool> {
-        None
-    }
-
-    /// Returns the relative ordering of `self` and `other`, if a comparison is
-    /// able to be made. If the types cannot be compared, this function should
-    /// return None.
-    ///
-    /// When evaluating a comparison such as `left < right` with dynamic values,
-    /// if `left.partial_cmp(right)` returns None,
-    /// `right.partial_cmp(left).map(Ordering::reverse)` will be attempted
-    /// before returning false.
-    #[allow(unused_variables)]
-    fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
-        None
-    }
-
-    /// Calls a function by `name` with `args`.
-    #[allow(unused_variables)]
-    fn call(&mut self, name: &Symbol, args: PoppedValues<'_>) -> Result<Value, FaultKind> {
-        Err(FaultKind::UnknownFunction {
-            kind: ValueKind::Dynamic(self.kind()),
-            name: name.clone(),
-        })
-    }
-
-    /// Returns this value as represented in source, if possible.
-    fn to_source(&self) -> Option<String> {
-        None
+impl Display for ValueKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 struct Module {
-    contents: HashMap<Symbol, ModuleItem>,
-    vtable: Vec<Function>,
+    contents: StdHashMap<Symbol, ModuleItem>,
+    vtable: Vec<VtableEntry>,
 }
 
 impl Module {
@@ -889,16 +827,75 @@ impl Module {
     //     self
     // }
 
-    pub fn define_function(&mut self, name: impl Into<Symbol>, function: Function) -> usize {
+    fn define_vtable_entry(&mut self, name: impl Into<Symbol>, entry: VtableEntry) -> usize {
         let vtable_index = self.vtable.len();
         self.contents
             .insert(name.into(), ModuleItem::Function(vtable_index));
-        self.vtable.push(function);
+        self.vtable.push(entry);
         vtable_index
+    }
+
+    pub fn define_function(&mut self, function: Function) -> usize {
+        self.define_vtable_entry(function.name.clone(), VtableEntry::Function(function))
+    }
+
+    pub fn define_native_function(
+        &mut self,
+        name: impl Into<Symbol>,
+        function: impl NativeFunction + 'static,
+    ) -> usize {
+        self.define_vtable_entry(name, VtableEntry::NativeFunction(Arc::new(function)))
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone)]
+enum VtableEntry {
+    Function(Function),
+    NativeFunction(Arc<dyn NativeFunction>),
+}
+
+impl Debug for VtableEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Function(arg0) => f.debug_tuple("Function").field(arg0).finish(),
+            Self::NativeFunction(_arg0) => f.debug_tuple("NativeFunction").finish(),
+        }
+    }
+}
+
+impl PartialEq for VtableEntry {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Function(l0), Self::Function(r0)) => l0 == r0,
+            (Self::NativeFunction(l0), Self::NativeFunction(r0)) => l0.as_ptr() == r0.as_ptr(),
+            _ => false,
+        }
+    }
+}
+
+/// A native function for Bud.
+pub trait NativeFunction {
+    /// Invoke this function with `args`.
+    fn invoke(&self, args: &mut PoppedValues<'_>) -> Result<Value, FaultKind>;
+
+    #[doc(hidden)]
+    fn as_ptr(&self) -> *const u8;
+}
+
+impl<T> NativeFunction for T
+where
+    T: for<'a, 'b> Fn(&'b mut PoppedValues<'a>) -> Result<Value, FaultKind>,
+{
+    fn invoke(&self, args: &mut PoppedValues<'_>) -> Result<Value, FaultKind> {
+        self(args)
+    }
+
+    fn as_ptr(&self) -> *const u8 {
+        (self as *const T).cast::<u8>()
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum ModuleItem {
     Function(usize),
     // Module(Module),
@@ -909,9 +906,10 @@ enum ModuleItem {
 /// Each instance of this type has its own sandboxed environment. Its stack
 /// space, function declarations, and [`Environment`] are unique from all other
 /// instances of Bud with the exception that [`Symbol`]s are tracked globally.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Bud<Env> {
     stack: Stack,
+    init_variables: Vec<Symbol>,
     local_module: Module,
     environment: Env,
 }
@@ -938,6 +936,7 @@ where
             environment,
             stack: Stack::new(initial_stack_capacity, maximum_stack_capacity),
             local_module: Module::default(),
+            init_variables: Vec::new(),
         }
     }
 
@@ -956,23 +955,33 @@ where
         &mut self.environment
     }
 
-    /// Returns the stack of this virtual machine.
+    /// Registers a function with the provided name and returns self. This is a
+    /// builder-style function.
     #[must_use]
-    pub const fn stack(&self) -> &Stack {
-        &self.stack
+    pub fn with_function(mut self, function: Function) -> Self {
+        self.define_function(function);
+        self
     }
 
     /// Registers a function with the provided name and returns self. This is a
     /// builder-style function.
     #[must_use]
-    pub fn with_function(mut self, name: impl Into<Symbol>, function: Function) -> Self {
-        self.define_function(name, function);
+    pub fn with_native_function(
+        mut self,
+        name: impl Into<Symbol>,
+        function: impl NativeFunction + 'static,
+    ) -> Self {
+        self.define_native_function(name, function);
         self
     }
 
-    /// Defines a function with the provided name.
-    pub fn define_function(&mut self, name: impl Into<Symbol>, function: Function) -> usize {
-        self.local_module.define_function(name, function)
+    /// Defines a native function with the provided name.
+    pub fn define_native_function(
+        &mut self,
+        name: impl Into<Symbol>,
+        function: impl NativeFunction + 'static,
+    ) -> usize {
+        self.local_module.define_native_function(name, function)
     }
 
     /// Runs a set of instructions.
@@ -1011,11 +1020,63 @@ where
         operations: Cow<'a, [Instruction]>,
         variable_count: usize,
     ) -> Result<Output, Fault<'a, Env, Output>> {
-        let variables_offset = self.stack.len();
         if variable_count > 0 {
             self.stack.grow_by(variable_count)?;
         }
+        self.run_interactive(operations, variable_count, true)
+    }
+
+    /// Evaluates `source` interactively and returns the provided result.
+    ///
+    /// Bud is a compiled language. When compiling a chunk of source code, it is
+    /// organized into a series of declarations. If any non-declaration
+    /// statements are encountered, they are gathered into an initialization
+    /// function.
+    ///
+    /// The difference between this function and [`Bud::run_source()`] is that
+    /// the initialization function will be compiled with existing knowledge of
+    /// any local variables defined in previous code evaluated on this instance.
+    /// [`Bud::run_source()`] always executes the initialization code in its own
+    /// environment, preventing persisting variables across invoations.
+    pub fn evaluate<'a, ReturnType: FromStack>(
+        &'a mut self,
+        source: &str,
+    ) -> Result<ReturnType, Error<'a, Env, ReturnType>> {
+        let previous_variable_count = self.init_variables.len();
+        let unit = parse(source)?.compile(self);
+        for function in unit.vtable {
+            function.compile_into(self)?;
+        }
+
+        if let Some(init) = &unit.init {
+            if option_env!("PRINT_IR").is_some() {
+                println!("function init");
+            }
+
+            let function = init.compile(self)?;
+            let new_variables = self.init_variables.len() - previous_variable_count;
+            if new_variables > 0 {
+                self.stack.grow_by(new_variables)?;
+            }
+
+            self.run_interactive(Cow::Owned(function.code), self.init_variables.len(), false)
+                .map_err(Error::from)
+        } else {
+            ReturnType::from_value(Value::Void).map_err(Error::from)
+        }
+    }
+
+    /// Runs a set of instructions without modifying the stack before executing.
+    fn run_interactive<'a, Output: FromStack>(
+        &'a mut self,
+        operations: Cow<'a, [Instruction]>,
+        variable_count: usize,
+        pop_variables: bool,
+    ) -> Result<Output, Fault<'a, Env, Output>> {
         let return_offset = self.stack.len();
+        let variables_offset = return_offset
+            .checked_sub(variable_count)
+            .ok_or(FaultKind::StackUnderflow)?;
         let returned_value = match (StackFrame {
             module: &self.local_module,
             stack: &mut self.stack,
@@ -1048,7 +1109,11 @@ where
             }
             other => other?,
         };
-        self.stack.clear();
+        if pop_variables {
+            self.stack.truncate(variables_offset);
+        } else {
+            self.stack.truncate(return_offset);
+        }
         Output::from_value(returned_value).map_err(Fault::from)
     }
 
@@ -1095,17 +1160,26 @@ where
     }
 
     /// Compiles `source` and executes it in this context. Any declarations will
-    /// persist in the virtual machine.
+    /// persist in the virtual machine, but all local variables will be removed
+    /// from the stack upon completion.
+    ///
+    /// To enable persisting of local variables, use [`Bud::evaluate()`].
     pub fn run_source<Output: FromStack>(
         &mut self,
         source: &str,
     ) -> Result<Output, Error<'_, Env, Output>> {
         let unit = parse(source)?;
-        unit.compile().execute_in(self)
+        unit.compile(self).execute_in(self)
     }
+}
 
-    /// Returns the vtable index of a function with the provided name.
-    pub fn resolve_function_vtable_index(&self, name: &Symbol) -> Option<usize> {
+impl<Env> Scope for Bud<Env>
+where
+    Env: Environment,
+{
+    type Environment = Env;
+
+    fn resolve_function_vtable_index(&self, name: &Symbol) -> Option<usize> {
         if let Some(module_item) = self.local_module.contents.get(name) {
             match module_item {
                 ModuleItem::Function(index) => Some(*index),
@@ -1114,6 +1188,39 @@ where
         } else {
             None
         }
+    }
+
+    fn map_each_symbol(&self, callback: &mut impl FnMut(Symbol, ScopeSymbolKind)) {
+        // Take care to order the functions based on their vtable index
+        let mut functions = Vec::with_capacity(self.local_module.vtable.len());
+        for (symbol, item) in &self.local_module.contents {
+            match item {
+                ModuleItem::Function(index) => functions.push((symbol.clone(), *index)),
+            }
+        }
+
+        functions.sort_by(|a, b| a.1.cmp(&b.1));
+
+        for (symbol, _) in functions {
+            callback(symbol, ScopeSymbolKind::Function);
+        }
+
+        for variable in &self.init_variables {
+            callback(variable.clone(), ScopeSymbolKind::Variable);
+        }
+    }
+
+    fn define_function(&mut self, function: Function) -> Option<usize> {
+        Some(self.local_module.define_function(function))
+    }
+
+    fn define_variable(&mut self, name: Symbol, variable: crate::ir::Variable) {
+        if variable.index() >= self.init_variables.len() {
+            self.init_variables
+                .resize_with(variable.index() + 1, || Symbol::from(""));
+        }
+
+        self.init_variables[variable.index()] = name;
     }
 }
 
@@ -1154,7 +1261,10 @@ where
             let vtable_index = call_to_resume
                 .vtable_index
                 .expect("can only resume a called function");
-            let function = &self.module.vtable[vtable_index]; // TODO this module isn't necessarily right, but we don't really support modules.
+            let function = match &self.module.vtable[vtable_index] {
+                VtableEntry::Function(function) => function,
+                VtableEntry::NativeFunction(_) => unreachable!("cannot resume a native function"),
+            };
             let mut running_frame = StackFrame {
                 module: self.module,
                 stack: self.stack,
@@ -1236,19 +1346,18 @@ where
             }
 
             let operation = operations.get(self.operation_index);
-            let operation = match operation {
-                Some(operation) => operation,
-                None => {
-                    // Implicit return;
-                    let return_value = self.return_value.take().unwrap_or_else(|| {
-                        if self.return_offset < self.stack.len() {
-                            std::mem::take(&mut self.stack[self.return_offset])
-                        } else {
-                            Value::Void
-                        }
-                    });
-                    return Ok(return_value);
-                }
+            let operation = if let Some(operation) = operation {
+                operation
+            } else {
+                // Implicit return;
+                let return_value = self.return_value.take().unwrap_or_else(|| {
+                    if self.return_offset < self.stack.len() {
+                        std::mem::take(&mut self.stack[self.return_offset])
+                    } else {
+                        Value::Void
+                    }
+                });
+                return Ok(return_value);
             };
             self.operation_index += 1;
             match self.execute_operation(operation) {
@@ -1296,22 +1405,22 @@ where
                 left,
                 right,
                 destination,
-            } => self.add(left, right, *destination),
+            } => self.checked_add(left, right, *destination),
             Instruction::Sub {
                 left,
                 right,
                 destination,
-            } => self.sub(left, right, *destination),
+            } => self.checked_sub(left, right, *destination),
             Instruction::Multiply {
                 left,
                 right,
                 destination,
-            } => self.multiply(left, right, *destination),
+            } => self.checked_mul(left, right, *destination),
             Instruction::Divide {
                 left,
                 right,
                 destination,
-            } => self.divide(left, right, *destination),
+            } => self.checked_div(left, right, *destination),
             Instruction::If {
                 condition: value,
                 false_jump_to,
@@ -1358,6 +1467,11 @@ where
                 arg_count,
                 destination,
             } => self.call(*vtable_index, *arg_count, *destination),
+            Instruction::CallIntrinsic {
+                intrinsic,
+                arg_count,
+                destination,
+            } => self.intrinsic(*intrinsic, *arg_count, *destination),
             Instruction::CallInstance {
                 target,
                 name,
@@ -1397,15 +1511,6 @@ where
             Err(FaultKind::StackUnderflow)
         }
     }
-
-    // #[inline]
-    // fn pop_and_modify(&mut self) -> Result<(Value, &mut Value), FaultKind> {
-    //     if self.stack.len() + 1 > self.return_offset {
-    //         self.stack.pop_and_modify()
-    //     } else {
-    //         Err(FaultKind::StackUnderflow)
-    //     }
-    // }
 
     fn resolve_variable(&self, index: usize) -> Result<&Value, FaultKind> {
         if let Some(index) = self.variables_offset.checked_add(index) {
@@ -1459,166 +1564,6 @@ where
             ValueOrSource::Variable(index) => self.resolve_variable(*index),
             ValueOrSource::Value(value) => Ok(value),
         }
-    }
-
-    // floating point casts are intentional in this code.
-    fn add(
-        &mut self,
-        left: &ValueOrSource,
-        right: &ValueOrSource,
-        result: Destination,
-    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_or_source(left)?;
-        let right = self.resolve_value_or_source(right)?;
-
-        let produced_value = match (left, right) {
-            (Value::Integer(left), Value::Integer(right)) => {
-                left.checked_add(*right).map_or(Value::Void, Value::Integer)
-            }
-            (Value::Real(left), Value::Real(right)) => Value::Real(left + *right),
-            (Value::Real(_), other) => {
-                return Err(Fault::type_mismatch(
-                    "can't add @expected and `@received-value` (@received-type)",
-                    ValueKind::Real,
-                    other.clone(),
-                ))
-            }
-            (Value::Integer(_), other) => {
-                return Err(Fault::type_mismatch(
-                    "can't add @expected and `@received-value` (@received-type)",
-                    ValueKind::Integer,
-                    other.clone(),
-                ))
-            }
-            (other, _) => {
-                return Err(Fault::invalid_type(
-                    "`@received-value` (@received-type) is not able to be added",
-                    other.clone(),
-                ))
-            }
-        };
-        *self.resolve_value_source_mut(result)? = produced_value;
-        Ok(None)
-    }
-
-    // floating point casts are intentional in this code.
-    fn sub(
-        &mut self,
-        left: &ValueOrSource,
-        right: &ValueOrSource,
-        result: Destination,
-    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_or_source(left)?;
-        let right = self.resolve_value_or_source(right)?;
-
-        let produced_value = match (left, right) {
-            (Value::Integer(left), Value::Integer(right)) => {
-                left.checked_sub(*right).map_or(Value::Void, Value::Integer)
-            }
-            (Value::Real(left), Value::Real(right)) => Value::Real(left - *right),
-            (Value::Real(_), other) => {
-                return Err(Fault::type_mismatch(
-                    "can't subtract @expected and `@received-value` (@received-type)",
-                    ValueKind::Real,
-                    other.clone(),
-                ))
-            }
-            (Value::Integer(_), other) => {
-                return Err(Fault::type_mismatch(
-                    "can't subtract @expected and `@received-value` (@received-type)",
-                    ValueKind::Integer,
-                    other.clone(),
-                ))
-            }
-            (other, _) => {
-                return Err(Fault::invalid_type(
-                    "`@received-value` (@received-type) is not able to be subtracted",
-                    other.clone(),
-                ))
-            }
-        };
-        *self.resolve_value_source_mut(result)? = produced_value;
-        Ok(None)
-    }
-
-    // floating point casts are intentional in this code.
-    fn multiply(
-        &mut self,
-        left: &ValueOrSource,
-        right: &ValueOrSource,
-        result: Destination,
-    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_or_source(left)?;
-        let right = self.resolve_value_or_source(right)?;
-
-        let produced_value = match (left, right) {
-            (Value::Integer(left), Value::Integer(right)) => {
-                left.checked_mul(*right).map_or(Value::Void, Value::Integer)
-            }
-            (Value::Real(left), Value::Real(right)) => Value::Real(left * *right),
-            (Value::Real(_), other) => {
-                return Err(Fault::type_mismatch(
-                    "can't multiply @expected and `@received-value` (@received-type)",
-                    ValueKind::Real,
-                    other.clone(),
-                ))
-            }
-            (Value::Integer(_), other) => {
-                return Err(Fault::type_mismatch(
-                    "can't multiply @expected and `@received-value` (@received-type)",
-                    ValueKind::Integer,
-                    other.clone(),
-                ))
-            }
-            (other, _) => {
-                return Err(Fault::invalid_type(
-                    "`@received-value` (@received-type) is not able to be multiplied",
-                    other.clone(),
-                ))
-            }
-        };
-        *self.resolve_value_source_mut(result)? = produced_value;
-        Ok(None)
-    }
-
-    // floating point casts are intentional in this code.
-    fn divide(
-        &mut self,
-        left: &ValueOrSource,
-        right: &ValueOrSource,
-        result: Destination,
-    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_or_source(left)?;
-        let right = self.resolve_value_or_source(right)?;
-
-        let produced_value = match (left, right) {
-            (Value::Integer(left), Value::Integer(right)) => {
-                left.checked_div(*right).map_or(Value::Void, Value::Integer)
-            }
-            (Value::Real(left), Value::Real(right)) => Value::Real(left / *right),
-            (Value::Real(_), other) => {
-                return Err(Fault::type_mismatch(
-                    "can't divide @expected and `@received-value` (@received-type)",
-                    ValueKind::Real,
-                    other.clone(),
-                ))
-            }
-            (Value::Integer(_), other) => {
-                return Err(Fault::type_mismatch(
-                    "can't divide @expected and `@received-value` (@received-type)",
-                    ValueKind::Integer,
-                    other.clone(),
-                ))
-            }
-            (other, _) => {
-                return Err(Fault::invalid_type(
-                    "`@received-value` (@received-type) is not able to be divided",
-                    other.clone(),
-                ))
-            }
-        };
-        *self.resolve_value_source_mut(result)? = produced_value;
-        Ok(None)
     }
 
     fn r#if(
@@ -1749,33 +1694,59 @@ where
             .get(vtable_index)
             .ok_or(FaultKind::InvalidVtableIndex)?;
 
-        assert_eq!(function.arg_count, arg_count);
+        match function {
+            VtableEntry::Function(function) => {
+                assert_eq!(function.arg_count, arg_count);
 
-        let variables_offset = self.stack.len();
-        let return_offset = variables_offset + function.variable_count;
-        let arg_offset = variables_offset - function.arg_count;
-        if function.variable_count > 0 {
-            self.stack.grow_to(return_offset)?;
+                let variables_offset = self.stack.len();
+                let return_offset = variables_offset + function.variable_count;
+                let arg_offset = variables_offset - function.arg_count;
+                if function.variable_count > 0 {
+                    self.stack.grow_to(return_offset)?;
+                }
+
+                let mut frame = StackFrame {
+                    module: self.module,
+                    stack: self.stack,
+                    environment: self.environment,
+                    return_offset,
+                    destination,
+                    variables_offset,
+                    arg_offset,
+                    return_value: None,
+                    vtable_index: Some(vtable_index),
+                    operation_index: 0,
+                    _output: PhantomData,
+                };
+                let returned_value = frame.execute_operations(&function.code)?;
+
+                self.clean_stack_after_call(arg_offset, destination, returned_value)?;
+
+                Ok(None)
+            }
+            VtableEntry::NativeFunction(function) => {
+                let return_offset = self.stack.len();
+                let arg_offset = return_offset.checked_sub(arg_count);
+                match arg_offset {
+                    Some(arg_offset) if arg_offset >= self.return_offset => {}
+                    _ => return Err(Fault::stack_underflow()),
+                };
+
+                let produced_value = function.invoke(&mut self.stack.pop_n(arg_count))?;
+                match destination {
+                    Destination::Variable(variable) => {
+                        *self.resolve_variable_mut(variable)? = produced_value;
+                    }
+                    Destination::Stack => {
+                        self.stack.push(produced_value)?;
+                    }
+                    Destination::Return => {
+                        self.return_value = Some(produced_value);
+                    }
+                }
+                Ok(None)
+            }
         }
-
-        let mut frame = StackFrame {
-            module: self.module,
-            stack: self.stack,
-            environment: self.environment,
-            return_offset,
-            destination,
-            variables_offset,
-            arg_offset,
-            return_value: None,
-            vtable_index: Some(vtable_index),
-            operation_index: 0,
-            _output: PhantomData,
-        };
-        let returned_value = frame.execute_operations(&function.code)?;
-
-        self.clean_stack_after_call(arg_offset, destination, returned_value)?;
-
-        Ok(None)
     }
 
     fn call_instance(
@@ -1887,15 +1858,156 @@ where
 
         Ok(None)
     }
+
+    fn intrinsic(
+        &mut self,
+        intrinsic: Intrinsic,
+        arg_count: usize,
+        destination: Destination,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        // Verify the argument list is valid.
+        let return_offset = self.stack.len();
+        let arg_offset = return_offset.checked_sub(arg_count);
+        match arg_offset {
+            Some(arg_offset) if arg_offset >= self.return_offset => {}
+            _ => return Err(Fault::stack_underflow()),
+        };
+        let args = self.stack.pop_n(arg_count);
+
+        // If there was a fault, return.
+        let produced_value = match intrinsic {
+            Intrinsic::NewMap => {
+                Value::dynamic(<Env::Map as TryFrom<PoppedValues<'_>>>::try_from(args)?)
+            }
+            Intrinsic::NewList => Value::dynamic(args.collect::<Env::List>()),
+        };
+        match destination {
+            Destination::Variable(variable) => {
+                *self.resolve_variable_mut(variable)? = produced_value;
+            }
+            Destination::Stack => {
+                self.stack.push(produced_value)?;
+            }
+            Destination::Return => {
+                self.return_value = Some(produced_value);
+            }
+        }
+
+        Ok(None)
+    }
 }
 
+macro_rules! checked_op {
+    ($name:ident, $unchecked_name:ident, $fullname:literal) => {
+        impl<'a, Env, Output> StackFrame<'a, Env, Output>
+        where
+            Env: Environment,
+        {
+            fn $name(
+                &mut self,
+                left: &ValueOrSource,
+                right: &ValueOrSource,
+                result: Destination,
+            ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+                const TYPE_MISMATCH: &str = concat!(
+                    "can't ",
+                    $fullname,
+                    " @expected and `@received-value` (@received-type)"
+                );
+                let left_value = self.resolve_value_or_source(left)?;
+                let right_value = self.resolve_value_or_source(right)?;
+
+                let produced_value = match (left_value, right_value) {
+                    (Value::Integer(left), Value::Integer(right)) => {
+                        left.$name(*right).map_or(Value::Void, Value::Integer)
+                    }
+                    (Value::Real(left), Value::Real(right)) => {
+                        Value::Real(left.$unchecked_name(*right))
+                    }
+                    (Value::Dynamic(left), right) => {
+                        if let Some(value) = left.$name(right, false)? {
+                            value
+                        } else if let Value::Dynamic(right) = right {
+                            if let Some(value) = right.$name(left_value, true)? {
+                                value
+                            } else {
+                                return Err(Fault::type_mismatch(
+                                    TYPE_MISMATCH,
+                                    ValueKind::Dynamic(left.kind()),
+                                    right_value.clone(),
+                                ));
+                            }
+                        } else {
+                            return Err(Fault::type_mismatch(
+                                TYPE_MISMATCH,
+                                ValueKind::Dynamic(left.kind()),
+                                right.clone(),
+                            ));
+                        }
+                    }
+                    (left, Value::Dynamic(right)) => {
+                        if let Some(value) = right.$name(left, true)? {
+                            value
+                        } else {
+                            return Err(Fault::type_mismatch(
+                                TYPE_MISMATCH,
+                                ValueKind::Dynamic(right.kind()),
+                                left_value.clone(),
+                            ));
+                        }
+                    }
+                    (Value::Real(_), other) => {
+                        return Err(Fault::type_mismatch(
+                            TYPE_MISMATCH,
+                            ValueKind::Real,
+                            other.clone(),
+                        ))
+                    }
+                    (Value::Integer(_), other) => {
+                        return Err(Fault::type_mismatch(
+                            TYPE_MISMATCH,
+                            ValueKind::Integer,
+                            other.clone(),
+                        ))
+                    }
+                    (other, _) => {
+                        return Err(Fault::invalid_type(
+                            concat!(
+                                "`@received-value` (@received-type) does not support ",
+                                $fullname
+                            ),
+                            other.clone(),
+                        ))
+                    }
+                };
+                *self.resolve_value_source_mut(result)? = produced_value;
+                Ok(None)
+            }
+        }
+    };
+}
+
+checked_op!(checked_add, add, "add");
+checked_op!(checked_sub, sub, "subtract");
+checked_op!(checked_mul, mul, "multiply");
+checked_op!(checked_div, div, "divide");
+
 /// An unexpected event occurred while executing the virtual machine.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Fault<'a, Env, ReturnType> {
     /// The kind of fault this is.
     pub kind: FaultOrPause<'a, Env, ReturnType>,
     /// The stack trace of the virtual machine when the fault was raised.
     pub stack: Vec<FaultStackFrame>,
+}
+
+impl<Env, ReturnType> Clone for Fault<'static, Env, ReturnType> {
+    fn clone(&self) -> Self {
+        Self {
+            kind: self.kind.clone(),
+            stack: self.stack.clone(),
+        }
+    }
 }
 
 impl<'a, Env, ReturnType> Fault<'a, Env, ReturnType> {
@@ -1938,7 +2050,7 @@ impl<'a, Env, ReturnType> Display for Fault<'a, Env, ReturnType> {
 }
 
 /// A reason for a virtual machine [`Fault`].
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum FaultOrPause<'a, Env, ReturnType> {
     /// A fault occurred while processing instructions.
     Fault(FaultKind),
@@ -1950,8 +2062,17 @@ pub enum FaultOrPause<'a, Env, ReturnType> {
     Pause(PausedExecution<'a, Env, ReturnType>),
 }
 
+impl<Env, ReturnType> Clone for FaultOrPause<'static, Env, ReturnType> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Fault(arg0) => Self::Fault(arg0.clone()),
+            Self::Pause(_) => unreachable!("paused evaluations cannot be static lifetimes"),
+        }
+    }
+}
+
 /// An unexpected event within the virtual machine.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FaultKind {
     /// An attempt to push a value to the stack was made after the stack has
     /// reached its capacity.
@@ -2001,22 +2122,54 @@ pub enum FaultKind {
     },
     /// An error arose from dynamic types.
     Dynamic(DynamicFault),
+    /// An argument that was expected to a function was not passed.
+    ArgumentMissing(Symbol),
+    /// Too many arguments were passed to a function.
+    TooManyArguments(Value),
+    /// A value that does not support hashing was used as a key in a hash map.
+    ValueCannotBeHashed(Value),
+    /// A value was encountered that was out of range of valid values.
+    ValueOutOfRange(&'static str),
 }
 
 impl FaultKind {
-    fn invalid_type(message: impl Into<String>, received: Value) -> Self {
+    /// An invalid type was encountered.
+    ///
+    /// These patterns will be replaced in `message` before being Displayed:
+    ///
+    /// - @received-value
+    /// - @received-kind
+    pub fn invalid_type(message: impl Into<String>, received: Value) -> Self {
         FaultKind::InvalidType {
             message: message.into(),
             received,
         }
     }
 
-    fn type_mismatch(message: impl Into<String>, expected: ValueKind, received: Value) -> Self {
+    /// An type mismatch occurred.
+    ///
+    /// These patterns will be replaced in `message` before being Displayed:
+    ///
+    /// - @expected
+    /// - @received-value
+    /// - @received-kind
+    pub fn type_mismatch(message: impl Into<String>, expected: ValueKind, received: Value) -> Self {
         FaultKind::TypeMismatch {
             message: message.into(),
             expected,
             received,
         }
+    }
+
+    /// Returns a [`FaultKind::Dynamic`].
+    pub fn dynamic<T: Debug + Display + 'static>(fault: T) -> Self {
+        Self::Dynamic(DynamicFault::new(fault))
+    }
+}
+
+impl From<std::io::Error> for FaultKind {
+    fn from(io_err: std::io::Error) -> Self {
+        Self::Dynamic(DynamicFault::new(io_err))
     }
 }
 
@@ -2055,12 +2208,22 @@ impl Display for FaultKind {
                 f.write_str(&message)
             }
             FaultKind::Dynamic(dynamic) => dynamic.fmt(f),
+            FaultKind::ArgumentMissing(missing) => write!(f, "missing argument `{missing}`"),
+            FaultKind::TooManyArguments(extra) => write!(f, "unexpected argument `{extra}`"),
+            FaultKind::ValueCannotBeHashed(value) => {
+                write!(
+                    f,
+                    "value does not support hashing: `{value}` ({})",
+                    value.kind()
+                )
+            }
+            FaultKind::ValueOutOfRange(what) => write!(f, "`{what}` is out of valid range"),
         }
     }
 }
 
 /// A stack frame entry of a [`Fault`].
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct FaultStackFrame {
     /// The vtable index of the function being executed. If None, the
     /// instructions being executed were passed directly into [`Bud::run()`].
@@ -2071,7 +2234,7 @@ pub struct FaultStackFrame {
 }
 
 /// A paused code execution.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct PausedExecution<'a, Env, ReturnType> {
     context: Option<&'a mut Bud<Env>>,
     operations: Option<Cow<'a, [Instruction]>>,
@@ -2112,7 +2275,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct PausedFrame {
     return_offset: usize,
     arg_offset: usize,
@@ -2183,7 +2346,7 @@ impl FromStack for () {
 
 impl<T> FromStack for T
 where
-    T: DynamicValue,
+    T: DynamicValue + Clone,
 {
     fn from_value(value: Value) -> Result<Self, FaultKind> {
         value.into_dynamic().map_err(|value| {
@@ -2191,17 +2354,6 @@ where
         })
     }
 }
-
-/// A Rust value that has been wrapped for use in the virtual machine.
-#[derive(Clone, Debug)]
-pub struct Dynamic(
-    // The reason for `Arc<Box<dyn UnboxableDynamicValue>>` instead of `Arc<dyn
-    // UnboxableDynamicValue>` is the size. `Arc<dyn>` uses a fat pointer which
-    // results in 16-bytes being used. By boxing the `dyn` value first, the Arc
-    // pointer becomes a normal pointer resulting in this type being only 8
-    // bytes.
-    Arc<Box<dyn UnboxableDynamicValue>>,
-);
 
 #[test]
 fn sizes() {
@@ -2219,199 +2371,14 @@ fn sizes() {
     );
 }
 
-impl Dynamic {
-    fn new(value: impl DynamicValue + 'static) -> Self {
-        Self(Arc::new(Box::new(DynamicValueData(Some(value)))))
-    }
-
-    fn as_mut(&mut self) -> &mut Box<dyn UnboxableDynamicValue> {
-        if Arc::strong_count(&self.0) > 1 {
-            // More than one reference to this Arc, we have to create a
-            // clone instead. We do this before due to overlapping lifetime
-            // issues using get_mut twice. We can't use make_mut due to
-            // Box<dyn> not being cloneable.
-            let new_value = self.0.cloned();
-            self.0 = Arc::new(new_value);
-        }
-
-        Arc::get_mut(&mut self.0).expect("checked strong count") // This will need to change if we ever allow weak references.
-    }
-
-    fn call(&mut self, name: &Symbol, arguments: PoppedValues<'_>) -> Result<Value, FaultKind> {
-        self.as_mut().call(name, arguments)
-    }
-}
-
-impl Display for Dynamic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0.to_source() {
-            Some(value) => f.write_str(&value),
-            None => Ok(()),
-        }
-    }
-}
-
-trait UnboxableDynamicValue: Debug {
-    fn cloned(&self) -> Box<dyn UnboxableDynamicValue>;
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-    fn as_opt_any_mut(&mut self) -> &mut dyn Any;
-
-    fn is_truthy(&self) -> bool;
-    fn kind(&self) -> &'static str;
-    fn partial_eq(&self, other: &Value) -> Option<bool>;
-    fn partial_cmp(&self, other: &Value) -> Option<Ordering>;
-    fn call(&mut self, name: &Symbol, arguments: PoppedValues<'_>) -> Result<Value, FaultKind>;
-    fn to_source(&self) -> Option<String>;
-}
-
-#[derive(Clone)]
-struct DynamicValueData<T>(Option<T>);
-
-impl<T> DynamicValueData<T> {
-    #[inline]
-    fn value(&self) -> &T {
-        self.0.as_ref().expect("value taken")
-    }
-    #[inline]
-    fn value_mut(&mut self) -> &mut T {
-        self.0.as_mut().expect("value taken")
-    }
-}
-
-impl<T> UnboxableDynamicValue for DynamicValueData<T>
-where
-    T: DynamicValue + Any + Debug,
-{
-    fn cloned(&self) -> Box<dyn UnboxableDynamicValue> {
-        Box::new(self.clone())
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self.value()
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self.value_mut()
-    }
-
-    fn as_opt_any_mut(&mut self) -> &mut dyn Any {
-        &mut self.0
-    }
-
-    fn is_truthy(&self) -> bool {
-        self.value().is_truthy()
-    }
-
-    fn kind(&self) -> &'static str {
-        self.value().kind()
-    }
-
-    fn partial_eq(&self, other: &Value) -> Option<bool> {
-        self.value().partial_eq(other)
-    }
-
-    fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
-        self.value().partial_cmp(other)
-    }
-
-    fn call(&mut self, name: &Symbol, arguments: PoppedValues<'_>) -> Result<Value, FaultKind> {
-        self.value_mut().call(name, arguments)
-    }
-
-    fn to_source(&self) -> Option<String> {
-        self.value().to_source()
-    }
-}
-
-impl<T> DynamicValue for DynamicValueData<T>
-where
-    T: DynamicValue,
-{
-    fn is_truthy(&self) -> bool {
-        self.value().is_truthy()
-    }
-
-    fn kind(&self) -> &'static str {
-        self.value().kind()
-    }
-
-    fn partial_eq(&self, other: &Value) -> Option<bool> {
-        self.value().partial_eq(other)
-    }
-
-    fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
-        self.value().partial_cmp(other)
-    }
-
-    fn to_source(&self) -> Option<String> {
-        self.value().to_source()
-    }
-
-    fn call(&mut self, name: &Symbol, args: PoppedValues<'_>) -> Result<Value, FaultKind> {
-        self.value_mut().call(name, args)
-    }
-}
-
-impl<T> Debug for DynamicValueData<T>
-where
-    T: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(value) = self.0.as_ref() {
-            Debug::fmt(value, f)
-        } else {
-            f.debug_struct("DynamicValueData").finish_non_exhaustive()
-        }
-    }
-}
-
-impl<T> Display for DynamicValueData<T>
-where
-    T: Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(value) = self.0.as_ref() {
-            Display::fmt(value, f)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl DynamicValue for String {
-    fn is_truthy(&self) -> bool {
-        !self.is_empty()
-    }
-
-    fn kind(&self) -> &'static str {
-        "String"
-    }
-
-    fn partial_eq(&self, other: &Value) -> Option<bool> {
-        other.as_dynamic::<Self>().map(|other| self == other)
-    }
-
-    fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
-        other.as_dynamic::<Self>().map(|other| self.cmp(other))
-    }
-
-    fn call(&mut self, name: &Symbol, _args: PoppedValues<'_>) -> Result<Value, FaultKind> {
-        Err(FaultKind::UnknownFunction {
-            kind: ValueKind::Dynamic(self.kind()),
-            name: name.clone(),
-        })
-    }
-
-    fn to_source(&self) -> Option<String> {
-        Some(DisplayString::new(self).to_string())
-    }
-}
-
 /// Customizes the behavior of a virtual machine instance.
 pub trait Environment: 'static {
     /// The string type for this environment.
     type String: DynamicValue + for<'a> From<&'a str>;
+    /// The map type for this environment.
+    type Map: DynamicValue + for<'a> TryFrom<PoppedValues<'a>, Error = FaultKind>;
+    /// The list (array) type for this environment.
+    type List: DynamicValue + FromIterator<Value>;
 
     /// Called once before each instruction is executed.
     ///
@@ -2427,6 +2394,9 @@ pub trait Environment: 'static {
 
 impl Environment for () {
     type String = String;
+    type Map = HashMap;
+    type List = List;
+
     #[inline]
     fn step(&mut self) -> ExecutionBehavior {
         ExecutionBehavior::Continue
@@ -2460,6 +2430,8 @@ impl Budgeted {
 
 impl Environment for Budgeted {
     type String = String;
+    type Map = HashMap;
+    type List = List;
 
     #[inline]
     fn step(&mut self) -> ExecutionBehavior {
@@ -2529,6 +2501,7 @@ fn budget() {
 #[test]
 fn budget_with_frames() {
     let test = Function {
+        name: Symbol::from("test"),
         arg_count: 1,
         variable_count: 2,
         code: vec![
@@ -2587,7 +2560,7 @@ fn budget_with_frames() {
             Instruction::Push(ValueOrSource::Variable(0)),
         ],
     };
-    let mut context = Bud::default_for(Budgeted::new(0)).with_function("test", test);
+    let mut context = Bud::default_for(Budgeted::new(0)).with_function(test);
     let mut fault = context
         .run::<i64>(
             Cow::Borrowed(&[
@@ -2641,7 +2614,7 @@ impl Display for CodeBlock {
 }
 
 /// A stack of [`Value`]s.
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Stack {
     values: Vec<Value>,
     length: usize,
@@ -2785,27 +2758,17 @@ impl Stack {
         }
     }
 
-    // /// Pops a [`Value`] from the stack and returns a mutable reference to the
-    // /// next value.
-    // ///
-    // /// # Errors
-    // ///
-    // /// Returns [`FaultKind::StackUnderflow`] if the stack does not contain at
-    // /// least two values.
-    // #[inline]
-    // pub fn pop_and_modify(&mut self) -> Result<(Value, &mut Value), FaultKind> {
-    //     if self.values.len() >= 2 {
-    //         let first = self.values.pop().expect("bounds already checked");
-    //         self.remaining_capacity += 1;
-
-    //         Ok((
-    //             first,
-    //             self.values.last_mut().expect("bounds already checked"),
-    //         ))
-    //     } else {
-    //         Err(FaultKind::StackUnderflow)
-    //     }
-    // }
+    /// Truncates the stack to `new_length`. If the `new_length` is larger than
+    /// the current length, this function does nothing.
+    pub fn truncate(&mut self, new_length: usize) {
+        let values_to_remove = self.length.checked_sub(new_length);
+        match values_to_remove {
+            Some(values_to_remove) if values_to_remove > 0 => {
+                self.pop_n(values_to_remove);
+            }
+            _ => {}
+        }
+    }
 
     /// Returns the number of [`Value`]s contained in this stack.
     #[inline]
@@ -2863,13 +2826,13 @@ impl Stack {
         self.length -= removed;
     }
 
-    fn clear(&mut self) {
-        if self.length > 0 {
-            self.values[0..self.length].fill_with(|| Value::Void);
-        }
-        self.remaining_capacity += self.length;
-        self.length = 0;
-    }
+    // fn clear(&mut self) {
+    //     if self.length > 0 {
+    //         self.values[0..self.length].fill_with(|| Value::Void);
+    //     }
+    //     self.remaining_capacity += self.length;
+    //     self.length = 0;
+    // }
 
     #[inline]
     fn grow_to(&mut self, new_size: usize) -> Result<(), FaultKind> {
@@ -2886,8 +2849,10 @@ impl Stack {
         }
     }
 
+    /// Grows the stack by `additional_voids`, inserting [`Value::Void`] to fill
+    /// in any newly allocated space.
     #[inline]
-    fn grow_by(&mut self, additional_voids: usize) -> Result<(), FaultKind> {
+    pub fn grow_by(&mut self, additional_voids: usize) -> Result<(), FaultKind> {
         if let Some(remaining_capacity) = self.remaining_capacity.checked_sub(additional_voids) {
             self.remaining_capacity = remaining_capacity;
             let new_size = self.length + additional_voids;
@@ -2931,6 +2896,25 @@ pub struct PoppedValues<'a> {
     current: usize,
 }
 
+impl<'a> PoppedValues<'a> {
+    /// Returns the next value or returns a [`FaultKind::ArgumentMissing`] if no
+    /// more parameters are found.
+    pub fn next_argument(&mut self, name: &str) -> Result<Value, FaultKind> {
+        self.next()
+            .ok_or_else(|| FaultKind::ArgumentMissing(Symbol::from(name)))
+    }
+
+    /// Checks if all values have been iterated. If not,
+    /// [`FaultKind::TooManyArguments`] will be returned.
+    pub fn verify_empty(&mut self) -> Result<(), FaultKind> {
+        if let Some(extra) = self.next() {
+            Err(FaultKind::TooManyArguments(extra))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl<'a> Drop for PoppedValues<'a> {
     fn drop(&mut self) {
         self.stack.values[self.current..self.end].fill_with(|| Value::Void);
@@ -2951,20 +2935,27 @@ impl<'a> Iterator for PoppedValues<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.end - self.current, None)
+        let remaining = self.end - self.current;
+        (remaining, Some(remaining))
     }
 }
 
 impl<'a> ExactSizeIterator for PoppedValues<'a> {}
 
 /// A [`Fault`] that arose from a [`Dynamic`] value.
-#[derive(Debug)]
-pub struct DynamicFault(Box<dyn AnyDynamicError>);
+#[derive(Debug, Clone)]
+pub struct DynamicFault(Arc<dyn AnyDynamicError>);
+
+impl PartialEq for DynamicFault {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.data_ptr() == other.0.data_ptr()
+    }
+}
 
 impl DynamicFault {
     /// Returns a new instance containing the provided error.
     pub fn new<T: Debug + Display + 'static>(error: T) -> Self {
-        Self(Box::new(DynamicErrorContents(Some(error))))
+        Self(Arc::new(DynamicErrorContents(Some(error))))
     }
 
     /// Returns a reference to the original error, if `T` is the same type that
@@ -2977,7 +2968,9 @@ impl DynamicFault {
     /// Returns the original error if `T` is the same type that was provided
     /// during construction. If not, `Err(self)` will be returned.
     pub fn try_unwrap<T: Debug + Display + 'static>(mut self) -> Result<T, Self> {
-        if let Some(opt_any) = self.0.as_opt_any_mut().downcast_mut::<Option<T>>() {
+        if let Some(opt_any) = Arc::get_mut(&mut self.0)
+            .and_then(|arc| arc.as_opt_any_mut().downcast_mut::<Option<T>>())
+        {
             Ok(std::mem::take(opt_any).expect("value already taken"))
         } else {
             Err(self)
@@ -3011,6 +3004,9 @@ where
 trait AnyDynamicError: Debug + Display {
     fn as_any(&self) -> &dyn Any;
     fn as_opt_any_mut(&mut self) -> &mut dyn Any;
+
+    #[doc(hidden)]
+    fn data_ptr(&self) -> *const u8;
 }
 
 impl<T> AnyDynamicError for DynamicErrorContents<T>
@@ -3024,16 +3020,21 @@ where
     fn as_opt_any_mut(&mut self) -> &mut dyn Any {
         &mut self.0
     }
+
+    fn data_ptr(&self) -> *const u8 {
+        (self as *const Self).cast::<u8>()
+    }
 }
 
 #[test]
 fn invalid_variables() {
     let test = Function {
+        name: Symbol::from("test"),
         arg_count: 0,
         variable_count: 0,
         code: vec![Instruction::Push(ValueOrSource::Variable(0))],
     };
-    let mut context = Bud::empty().with_function("test", test);
+    let mut context = Bud::empty().with_function(test);
     assert!(matches!(
         context
             .run::<i64>(
@@ -3053,11 +3054,12 @@ fn invalid_variables() {
 #[test]
 fn invalid_argument() {
     let test = Function {
+        name: Symbol::from("test"),
         arg_count: 0,
         variable_count: 0,
         code: vec![Instruction::Push(ValueOrSource::Argument(0))],
     };
-    let mut context = Bud::empty().with_function("test", test);
+    let mut context = Bud::empty().with_function(test);
     assert!(matches!(
         context
             .run::<i64>(
@@ -3096,11 +3098,12 @@ fn invalid_vtable_index() {
 #[test]
 fn function_without_return_value() {
     let test = Function {
+        name: Symbol::from("test"),
         arg_count: 0,
         variable_count: 0,
         code: vec![],
     };
-    let mut context = Bud::empty().with_function("test", test);
+    let mut context = Bud::empty().with_function(test);
     assert_eq!(
         context
             .call::<Value, _, _>(&Symbol::from("test"), [])
@@ -3112,6 +3115,7 @@ fn function_without_return_value() {
 #[test]
 fn function_needs_extra_cleanup() {
     let test = Function {
+        name: Symbol::from("test"),
         arg_count: 0,
         variable_count: 0,
         code: vec![
@@ -3119,7 +3123,7 @@ fn function_needs_extra_cleanup() {
             Instruction::Push(ValueOrSource::Value(Value::Integer(2))),
         ],
     };
-    let mut context = Bud::empty().with_function("test", test);
+    let mut context = Bud::empty().with_function(test);
     assert_eq!(
         context
             .run::<Value>(
@@ -3134,5 +3138,5 @@ fn function_needs_extra_cleanup() {
         Value::Integer(1)
     );
 
-    assert!(context.stack().is_empty());
+    assert!(context.stack.is_empty());
 }

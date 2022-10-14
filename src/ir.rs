@@ -7,9 +7,12 @@ use std::{
 };
 
 use crate::{
-    ast::CompilationError,
+    ast::{CompilationError, NodeId},
     symbol::{OptionalSymbol, Symbol},
-    vm::{self, Bud, Comparison, Environment, FromStack, Value, ValueOrSource},
+    vm::{
+        self, Bud, Comparison, Environment, FromStack, Intrinsic, StringLiteralDisplay, Value,
+        ValueOrSource,
+    },
     Error,
 };
 
@@ -24,6 +27,13 @@ impl Display for Label {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Variable(usize);
+
+impl Variable {
+    #[must_use]
+    pub fn index(self) -> usize {
+        self.0
+    }
+}
 
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -78,6 +88,11 @@ pub enum Instruction {
     Return(Option<LiteralOrSource>),
     Call {
         function: Option<Symbol>,
+        arg_count: usize,
+        destination: Destination,
+    },
+    CallIntrinsic {
+        intrinsic: Intrinsic,
         arg_count: usize,
         destination: Destination,
     },
@@ -145,6 +160,13 @@ impl Display for Instruction {
                     write!(f, "recurse-call {arg_count} {destination}")
                 }
             }
+            Instruction::CallIntrinsic {
+                intrinsic,
+                arg_count,
+                destination,
+            } => {
+                write!(f, "intrinsic {intrinsic} {arg_count} {destination}")
+            }
             Instruction::CallInstance {
                 target,
                 name,
@@ -176,6 +198,12 @@ pub enum Literal {
     String(String),
 }
 
+#[derive(Debug, Clone)]
+pub struct Mapping {
+    pub key: NodeId,
+    pub value: NodeId,
+}
+
 impl Literal {
     #[must_use]
     pub fn instantiate<Env>(&self) -> Value
@@ -198,45 +226,9 @@ impl Display for Literal {
             Self::Integer(value) => Display::fmt(value, f),
             Self::Real(value) => Display::fmt(value, f),
             Self::Boolean(value) => Display::fmt(value, f),
-            Self::String(string) => Display::fmt(&DisplayString::new(string), f),
+            Self::String(string) => Display::fmt(&StringLiteralDisplay::new(string), f),
             Self::Void => f.write_str("Void"),
         }
-    }
-}
-
-#[must_use]
-pub struct DisplayString<'a>(&'a str);
-
-impl<'a> DisplayString<'a> {
-    pub fn new(value: &'a str) -> Self {
-        Self(value)
-    }
-}
-
-impl<'a> Display for DisplayString<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_char('"')?;
-        for ch in self.0.chars() {
-            match ch {
-                ch if ch.is_alphanumeric() || ch == ' ' || ch.is_ascii_punctuation() => {
-                    f.write_char(ch)?;
-                }
-                '\t' => {
-                    f.write_str("\\t")?;
-                }
-                '\r' => {
-                    f.write_str("\\r")?;
-                }
-                '\n' => {
-                    f.write_str("\\n")?;
-                }
-                other => {
-                    let codepoint = u32::from(other);
-                    write!(f, "\\u{{{codepoint:x}}}").expect("error writing codepoint");
-                }
-            }
-        }
-        f.write_char('"')
     }
 }
 
@@ -368,11 +360,11 @@ pub struct CodeBlockBuilder {
     args: usize,
     temporary_variables: usize,
     scope: HashMap<Symbol, ScopeSymbol>,
-    variables: HashMap<Symbol, Variable>,
+    pub(crate) variables: HashMap<Symbol, Variable>,
 }
 
 impl CodeBlockBuilder {
-    pub fn add_symbol(&mut self, symbol: impl Into<Symbol>, value: ScopeSymbol) {
+    pub(crate) fn add_symbol(&mut self, symbol: impl Into<Symbol>, value: ScopeSymbol) {
         if matches!(&value, ScopeSymbol::Argument(_)) {
             self.args += 1;
         }
@@ -481,9 +473,9 @@ pub struct CodeBlock {
 
 impl CodeBlock {
     #[allow(clippy::too_many_lines)]
-    pub fn link<Env>(&self, scope: &Bud<Env>) -> Result<vm::CodeBlock, CompilationError>
+    pub fn link<S>(&self, scope: &S) -> Result<vm::CodeBlock, CompilationError>
     where
-        Env: Environment,
+        S: Scope,
     {
         let mut labels = Vec::new();
         let mut labels_encountered = 0;
@@ -522,13 +514,14 @@ impl Display for CodeBlock {
     }
 }
 
-fn compile_instruction<Env>(
+#[allow(clippy::too_many_lines)] // Most are straight mappings...
+fn compile_instruction<S>(
     op: &Instruction,
     labels: &[Option<usize>],
-    scope: &Bud<Env>,
+    scope: &S,
 ) -> Result<Option<vm::Instruction>, CompilationError>
 where
-    Env: Environment,
+    S: Scope,
 {
     Ok(Some(match op {
         Instruction::Add {
@@ -536,8 +529,8 @@ where
             right,
             destination,
         } => vm::Instruction::Add {
-            left: left.instantiate::<Env>(),
-            right: right.instantiate::<Env>(),
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
         },
         Instruction::Sub {
@@ -545,8 +538,8 @@ where
             right,
             destination,
         } => vm::Instruction::Sub {
-            left: left.instantiate::<Env>(),
-            right: right.instantiate::<Env>(),
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
         },
         Instruction::Multiply {
@@ -554,8 +547,8 @@ where
             right,
             destination,
         } => vm::Instruction::Multiply {
-            left: left.instantiate::<Env>(),
-            right: right.instantiate::<Env>(),
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
         },
         Instruction::Divide {
@@ -563,15 +556,15 @@ where
             right,
             destination,
         } => vm::Instruction::Divide {
-            left: left.instantiate::<Env>(),
-            right: right.instantiate::<Env>(),
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
         },
         Instruction::If {
             condition,
             false_jump_to,
         } => vm::Instruction::If {
-            condition: condition.instantiate::<Env>(),
+            condition: condition.instantiate::<S::Environment>(),
             false_jump_to: labels[false_jump_to.0].expect("label not inserted"),
         },
         Instruction::JumpTo(label) => {
@@ -585,18 +578,20 @@ where
             action,
         } => vm::Instruction::Compare {
             comparison: *comparison,
-            left: left.instantiate::<Env>(),
-            right: right.instantiate::<Env>(),
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
             action: action.link(labels),
         },
-        Instruction::Push(value) => vm::Instruction::Push(value.instantiate::<Env>()),
+        Instruction::Push(value) => vm::Instruction::Push(value.instantiate::<S::Environment>()),
         Instruction::PopAndDrop => vm::Instruction::PopAndDrop,
-        Instruction::Return(value) => {
-            vm::Instruction::Return(value.as_ref().map(LiteralOrSource::instantiate::<Env>))
-        }
+        Instruction::Return(value) => vm::Instruction::Return(
+            value
+                .as_ref()
+                .map(LiteralOrSource::instantiate::<S::Environment>),
+        ),
         Instruction::Load { value, variable } => vm::Instruction::Load {
             variable_index: variable.0,
-            value: value.instantiate::<Env>(),
+            value: value.instantiate::<S::Environment>(),
         },
         Instruction::Call {
             function,
@@ -623,12 +618,30 @@ where
             arg_count,
             destination,
         } => vm::Instruction::CallInstance {
-            target: target.as_ref().map(LiteralOrSource::instantiate::<Env>),
+            target: target
+                .as_ref()
+                .map(LiteralOrSource::instantiate::<S::Environment>),
             name: name.clone(),
             arg_count: *arg_count,
             destination: destination.into(),
         },
+        Instruction::CallIntrinsic {
+            intrinsic,
+            arg_count,
+            destination,
+        } => vm::Instruction::CallIntrinsic {
+            intrinsic: *intrinsic,
+            arg_count: *arg_count,
+            destination: destination.into(),
+        },
     }))
+}
+
+#[derive(Debug)]
+pub enum ScopeSymbolKind {
+    Argument,
+    Variable,
+    Function,
 }
 
 #[derive(Debug)]
@@ -640,9 +653,9 @@ pub enum ScopeSymbol {
 
 #[derive(Debug)]
 pub struct Function {
-    name: Option<Symbol>,
-    args: Vec<Symbol>,
-    body: CodeBlock,
+    pub name: Option<Symbol>,
+    pub args: Vec<Symbol>,
+    pub body: CodeBlock,
 }
 
 impl Function {
@@ -654,9 +667,9 @@ impl Function {
         }
     }
 
-    pub fn compile_into<Env>(&self, context: &mut Bud<Env>) -> Result<usize, CompilationError>
+    pub fn compile<S>(&self, context: &mut S) -> Result<vm::Function, CompilationError>
     where
-        Env: Environment,
+        S: Scope,
     {
         let name = self
             .name
@@ -667,11 +680,23 @@ impl Function {
             println!("{block}");
         }
         let function = vm::Function {
+            name,
             arg_count: self.args.len(),
             code: block.code,
             variable_count: block.variables,
         };
-        let vtable_index = context.define_function(name, function);
+        Ok(function)
+    }
+
+    pub fn compile_into<S>(&self, context: &mut S) -> Result<usize, CompilationError>
+    where
+        S: Scope,
+    {
+        let function = self.compile(context)?;
+
+        let vtable_index = context
+            .define_function(function)
+            .ok_or(CompilationError::InvalidScope)?;
         Ok(vtable_index)
     }
 
@@ -683,9 +708,9 @@ impl Function {
 
 #[derive(Debug)]
 pub struct UnlinkedCodeUnit {
-    vtable: Vec<Function>,
-    modules: Vec<UnlinkedCodeUnit>,
-    init: Option<Function>,
+    pub vtable: Vec<Function>,
+    pub modules: Vec<UnlinkedCodeUnit>,
+    pub init: Option<Function>,
 }
 
 impl UnlinkedCodeUnit {
@@ -763,6 +788,34 @@ impl UnlinkedCodeUnit {
             Output::from_value(Value::Void).map_err(Error::from)
         }
     }
+}
+
+pub trait Scope {
+    type Environment: Environment;
+
+    /// Returns the vtable index of a function with the provided name.
+    fn resolve_function_vtable_index(&self, name: &Symbol) -> Option<usize>;
+    fn map_each_symbol(&self, callback: &mut impl FnMut(Symbol, ScopeSymbolKind));
+
+    /// Defines a function with the provided name.
+    fn define_function(&mut self, function: vm::Function) -> Option<usize>;
+    fn define_variable(&mut self, name: Symbol, variable: Variable);
+}
+
+impl Scope for () {
+    type Environment = ();
+
+    fn resolve_function_vtable_index(&self, _name: &Symbol) -> Option<usize> {
+        None
+    }
+
+    fn map_each_symbol(&self, _callback: &mut impl FnMut(Symbol, ScopeSymbolKind)) {}
+
+    fn define_function(&mut self, _function: vm::Function) -> Option<usize> {
+        None
+    }
+
+    fn define_variable(&mut self, _name: Symbol, _variable: Variable) {}
 }
 
 // #[test]

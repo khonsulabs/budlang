@@ -1,3 +1,4 @@
 /target
 perf.data*
 Cargo.lock
+dist/

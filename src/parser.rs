@@ -7,7 +7,7 @@
 use std::{fmt::Display, ops::Range, str::CharIndices};
 
 use crate::{
-    ast::{BinOpKind, Call, CodeUnit, Function, If, NodeId, SyntaxTreeBuilder},
+    ast::{BinOpKind, Call, CodeUnit, Function, If, Mapping, NodeId, SyntaxTreeBuilder},
     symbol::Symbol,
     vm::Comparison,
 };
@@ -49,6 +49,7 @@ enum TokenKind {
     EndOfLine,
     Comma,
     Period,
+    Colon,
 }
 
 #[derive(Debug, PartialEq)]
@@ -223,7 +224,7 @@ impl<'a> Lexer<'a> {
                     while self
                         .chars
                         .peek()
-                        .map_or(false, |(_, char)| char.is_alphanumeric())
+                        .map_or(false, |(_, char)| char.is_alphanumeric() || char == &'_')
                     {
                         end = self.chars.next().expect("just peeked").0;
                     }
@@ -343,7 +344,7 @@ impl<'a> Lexer<'a> {
 
                         Some(Ok(Token::new(TokenKind::Assign, offset..offset + 2)))
                     } else {
-                        todo!("figure out what colon means")
+                        Some(Ok(Token::at_offset(TokenKind::Colon, offset)))
                     }
                 }
                 Some((offset, char)) if char == ',' => {
@@ -761,9 +762,11 @@ fn parse_term(
     owning_function_name: Option<&str>,
 ) -> Result<NodeId, ParseError> {
     match first_token.kind {
-        TokenKind::Identifier(lookup_base) => {
-            parse_lookup(lookup_base, tree, tokens, owning_function_name)
-        }
+        TokenKind::Identifier(lookup_base) => match lookup_base.as_str() {
+            "true" => Ok(tree.boolean(true)),
+            "false" => Ok(tree.boolean(false)),
+            _ => parse_lookup(lookup_base, tree, tokens, owning_function_name),
+        },
         TokenKind::Integer(integer) => Ok(tree.integer(integer)),
         TokenKind::Real(integer) => Ok(tree.real(integer)),
         TokenKind::String(string) => Ok(tree.string(string)),
@@ -777,6 +780,8 @@ fn parse_term(
 
             Ok(expression)
         }
+        TokenKind::Open(BracketType::Curly) => parse_map(tree, tokens, owning_function_name),
+        TokenKind::Open(BracketType::Square) => parse_list(tree, tokens, owning_function_name),
         _ => todo!("parse_term: {first_token:?}"),
     }
 }
@@ -847,7 +852,73 @@ fn parse_lookup(
     Ok(base.expect("always at least a base lookup"))
 }
 
-#[derive(Debug)]
+fn parse_map(
+    tree: &SyntaxTreeBuilder,
+    tokens: &mut Lexer<'_>,
+    owning_function_name: Option<&str>,
+) -> Result<NodeId, ParseError> {
+    let mut mappings = Vec::new();
+    loop {
+        let first_token = tokens.next().unwrap()?;
+        if matches!(first_token.kind, TokenKind::Close(BracketType::Curly)) {
+            break;
+        }
+
+        let key = parse_expression(first_token, tree, tokens, owning_function_name)?;
+        let colon = tokens.next().unwrap()?;
+        assert!(matches!(colon.kind, TokenKind::Colon));
+        let first_token = tokens.next().unwrap()?;
+        let value = parse_expression(first_token, tree, tokens, owning_function_name)?;
+        mappings.push(Mapping { key, value });
+
+        match tokens.peek_token_kind() {
+            Some(TokenKind::Comma) => {
+                tokens.next();
+            }
+            Some(TokenKind::Close(BracketType::Curly)) => {
+                // let the beginning of the loop handle this.
+            }
+            _ => todo!("error parsing map, expected comma or close curly"),
+        }
+    }
+
+    Ok(tree.map_node(mappings))
+}
+
+fn parse_list(
+    tree: &SyntaxTreeBuilder,
+    tokens: &mut Lexer<'_>,
+    owning_function_name: Option<&str>,
+) -> Result<NodeId, ParseError> {
+    let mut values = Vec::new();
+    loop {
+        let first_token = tokens.next().unwrap()?;
+        if matches!(first_token.kind, TokenKind::Close(BracketType::Square)) {
+            break;
+        }
+
+        values.push(parse_expression(
+            first_token,
+            tree,
+            tokens,
+            owning_function_name,
+        )?);
+
+        match tokens.peek_token_kind() {
+            Some(TokenKind::Comma) => {
+                tokens.next();
+            }
+            Some(TokenKind::Close(BracketType::Square)) => {
+                // let the beginning of the loop handle this.
+            }
+            _ => todo!("error parsing map, expected comma or close square"),
+        }
+    }
+
+    Ok(tree.list_node(values))
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ParseError {
     Unexpected {
         offset: usize,

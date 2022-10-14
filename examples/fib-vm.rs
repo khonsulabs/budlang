@@ -1,12 +1,16 @@
 use std::borrow::Cow;
 
-use budlang::vm::{
-    Bud, CompareAction, Comparison, Destination, Function, Instruction, Value, ValueOrSource,
+use budlang::{
+    symbol::Symbol,
+    vm::{
+        Bud, CompareAction, Comparison, Destination, Function, Instruction, Value, ValueOrSource,
+    },
 };
 
 fn main() {
     const ARG_N: usize = 0;
     let fib = Function {
+        name: Symbol::from("fibonacci"),
         arg_count: 1,
         variable_count: 2,
         code: vec![
@@ -48,7 +52,7 @@ fn main() {
             },
         ],
     };
-    let mut context = Bud::empty().with_function("fibonacci", fib);
+    let mut context = Bud::empty().with_function(fib);
     let result: i64 = context
         .run(
             Cow::Borrowed(&[
