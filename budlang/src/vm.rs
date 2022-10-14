@@ -1043,8 +1043,11 @@ where
         source: &str,
     ) -> Result<ReturnType, Error<'a, Env, ReturnType>> {
         let previous_variable_count = self.init_variables.len();
-        let unit = parse(source)?.compile(self);
+        let unit = parse(source)?.compile(self)?;
         for function in unit.vtable {
+            if let (Some(name), Some(_)) = (&function.name, option_env!("PRINT_IR")) {
+                println!("function {}", name);
+            }
             function.compile_into(self)?;
         }
 
@@ -1169,7 +1172,7 @@ where
         source: &str,
     ) -> Result<Output, Error<'_, Env, Output>> {
         let unit = parse(source)?;
-        unit.compile(self).execute_in(self)
+        unit.compile(self)?.execute_in(self)
     }
 }
 
@@ -2598,18 +2601,49 @@ pub struct CodeBlock {
     pub(crate) code: Vec<Instruction>,
 }
 
-impl Display for CodeBlock {
+impl CodeBlock {
+    /// Returns a [`Display`] implementor that indents each printed operation
+    /// with `indentation`.
+    #[must_use]
+    pub fn display_indented<'a>(&'a self, indentation: &'a str) -> CodeBlockDisplay<'a> {
+        CodeBlockDisplay {
+            block: self,
+            indentation,
+        }
+    }
+}
+
+/// Displays a [`CodeBlock`] with optional indentation.
+pub struct CodeBlockDisplay<'a> {
+    block: &'a CodeBlock,
+    indentation: &'a str,
+}
+
+impl<'a> Display for CodeBlockDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut is_first = true;
-        for i in &self.code {
+        for i in &self.block.code {
             if is_first {
                 is_first = false;
             } else {
                 f.write_char('\n')?;
             }
+            f.write_str(self.indentation)?;
             Display::fmt(i, f)?;
         }
         Ok(())
+    }
+}
+
+impl Display for CodeBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(
+            &CodeBlockDisplay {
+                block: self,
+                indentation: "",
+            },
+            f,
+        )
     }
 }
 

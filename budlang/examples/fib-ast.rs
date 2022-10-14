@@ -33,7 +33,8 @@ fn main() {
             }),
         ),
     )
-    .compile(&mut ());
+    .compile(&mut ())
+    .unwrap();
 
     let mut context = vm::Bud::empty();
     let result: i64 = code_unit.execute_in(&mut context).unwrap();

@@ -35,8 +35,8 @@ impl ExpressionTree {
         self.node(self.root)
     }
 
-    pub fn generate_code(&self, block: &mut CodeBlockBuilder) {
-        self.root().generate_code(Destination::Return, block, self);
+    pub fn generate_code(&self, block: &mut CodeBlockBuilder) -> Result<(), CompilationError> {
+        self.root().generate_code(Destination::Return, block, self)
     }
 }
 
@@ -164,7 +164,7 @@ impl Node {
         result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) {
+    ) -> Result<(), CompilationError> {
         match self {
             Node::If(if_expr) => if_expr.generate_code(result, operations, tree),
             Node::BinOp(bin_op) => bin_op.generate_code(result, operations, tree),
@@ -173,29 +173,27 @@ impl Node {
                 for statement in &statements.0 {
                     let statement = tree.node(*statement);
                     let result = operations.new_temporary_variable();
-                    statement.generate_code(Destination::Variable(result), operations, tree);
+                    statement.generate_code(Destination::Variable(result), operations, tree)?;
                     last_result_var = Some(result);
                 }
                 if let Some(last_result) = last_result_var {
                     operations
                         .store_into_destination(LiteralOrSource::Variable(last_result), result);
                 }
+                Ok(())
             }
             Node::Assign(assign) => assign.generate_code(result, operations, tree),
             Node::Literal(literal) => {
                 operations
                     .store_into_destination(LiteralOrSource::Literal(literal.clone()), result);
+                Ok(())
             }
-            Node::Identifier(identifier) => {
-                operations.load_from_symbol(identifier, result);
-            }
+            Node::Identifier(identifier) => operations.load_from_symbol(identifier, result),
             Node::Map(map) => map.generate_code(result, operations, tree),
             Node::List(list) => list.generate_code(result, operations, tree),
             // Node::Lookup(lookup) => lookup.generate_code(operations, tree),
             Node::Call(call) => call.generate_code(result, operations, tree),
-            Node::Return(value) => {
-                Self::generate_return(*value, operations, tree);
-            }
+            Node::Return(value) => Self::generate_return(*value, operations, tree),
         }
     }
 
@@ -203,13 +201,14 @@ impl Node {
         &self,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) -> LiteralOrSource {
+    ) -> Result<LiteralOrSource, CompilationError> {
         match self {
-            Node::Literal(literal) => LiteralOrSource::Literal(literal.clone()),
+            Node::Literal(literal) => Ok(LiteralOrSource::Literal(literal.clone())),
             Node::Identifier(identifier) => match operations.symbol(identifier) {
-                Some(ScopeSymbol::Argument(arg)) => LiteralOrSource::Argument(*arg),
-                Some(ScopeSymbol::Variable(var)) => LiteralOrSource::Variable(*var),
-                _ => todo!("error: unexpected/unknown symbol"),
+                Some(ScopeSymbol::Argument(arg)) => Ok(LiteralOrSource::Argument(*arg)),
+                Some(ScopeSymbol::Variable(var)) => Ok(LiteralOrSource::Variable(*var)),
+                Some(ScopeSymbol::Function { .. }) => todo!("attempt to take function as value"),
+                None => Err(CompilationError::UndefinedIdentifier(identifier.clone())),
             },
             // Node::Lookup(lookup) => lookup.generate_code(operations, tree),
             // Node::Call(call) => call.generate_code(result, operations, tree),
@@ -218,8 +217,8 @@ impl Node {
             // }
             _ => {
                 let variable = operations.new_temporary_variable();
-                self.generate_code(Destination::Variable(variable), operations, tree);
-                LiteralOrSource::Variable(variable)
+                self.generate_code(Destination::Variable(variable), operations, tree)?;
+                Ok(LiteralOrSource::Variable(variable))
             }
         }
     }
@@ -228,9 +227,10 @@ impl Node {
         value_to_return: NodeId,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) {
+    ) -> Result<(), CompilationError> {
         let value_to_return = tree.node(value_to_return);
-        value_to_return.generate_code(Destination::Return, operations, tree);
+        value_to_return.generate_code(Destination::Return, operations, tree)?;
+        Ok(())
     }
 }
 
@@ -262,7 +262,7 @@ impl If {
         result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) {
+    ) -> Result<(), CompilationError> {
         let condition = tree.node(self.condition);
         let after_false_label = operations.new_label();
         let if_false_label = self.else_block.map(|_| operations.new_label());
@@ -276,8 +276,8 @@ impl If {
             // The if statement is a result of the comparison. Use the special
             // form of the comparison operator to branch instead of using an if
             // operation
-            let left = tree.node(*left).to_value_or_source(operations, tree);
-            let right = tree.node(*right).to_value_or_source(operations, tree);
+            let left = tree.node(*left).to_value_or_source(operations, tree)?;
+            let right = tree.node(*right).to_value_or_source(operations, tree)?;
             operations.push(Instruction::Compare {
                 comparison: *comparison,
                 left,
@@ -287,21 +287,22 @@ impl If {
         } else {
             // The if statement is a result of something more complex
             let condition_result = operations.new_temporary_variable();
-            condition.generate_code(Destination::Variable(condition_result), operations, tree);
+            condition.generate_code(Destination::Variable(condition_result), operations, tree)?;
             operations.push(Instruction::If {
                 condition: LiteralOrSource::Variable(condition_result),
                 false_jump_to,
             });
         }
         let true_block = tree.node(self.true_block);
-        true_block.generate_code(result, operations, tree);
+        true_block.generate_code(result, operations, tree)?;
         if let (Some(else_block), Some(if_false_label)) = (self.else_block, if_false_label) {
             operations.push(Instruction::JumpTo(after_false_label));
             operations.label(if_false_label);
             let else_block = tree.node(else_block);
-            else_block.generate_code(result, operations, tree);
+            else_block.generate_code(result, operations, tree)?;
         }
         operations.label(after_false_label);
+        Ok(())
     }
 }
 
@@ -321,9 +322,9 @@ impl BinOp {
         result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) {
+    ) -> Result<(), CompilationError> {
         self.kind
-            .generate_code(self.left, self.right, result, operations, tree);
+            .generate_code(self.left, self.right, result, operations, tree)
     }
 }
 
@@ -344,11 +345,11 @@ impl BinOpKind {
         destination: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) {
+    ) -> Result<(), CompilationError> {
         let left = tree.node(left);
         let right = tree.node(right);
-        let left = left.to_value_or_source(operations, tree);
-        let right = right.to_value_or_source(operations, tree);
+        let left = left.to_value_or_source(operations, tree)?;
+        let right = right.to_value_or_source(operations, tree)?;
 
         match self {
             BinOpKind::Add => operations.push(Instruction::Add {
@@ -378,6 +379,8 @@ impl BinOpKind {
                 action: CompareAction::Store(destination),
             }),
         }
+
+        Ok(())
     }
 }
 
@@ -422,13 +425,13 @@ impl Call {
         destination: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) {
+    ) -> Result<(), CompilationError> {
         match (self.target, self.name.as_ref()) {
             (None, None) => {
                 // Recursive call
                 for &arg in &self.args {
                     let arg = tree.node(arg);
-                    arg.generate_code(Destination::Stack, operations, tree);
+                    arg.generate_code(Destination::Stack, operations, tree)?;
                 }
 
                 operations.push(Instruction::Call {
@@ -441,7 +444,7 @@ impl Call {
                 // Global call
                 for &arg in &self.args {
                     let arg = tree.node(arg);
-                    arg.generate_code(Destination::Stack, operations, tree);
+                    arg.generate_code(Destination::Stack, operations, tree)?;
                 }
 
                 match operations.lookup(symbol) {
@@ -474,14 +477,14 @@ impl Call {
                     }
                 } else {
                     let target_result = operations.new_temporary_variable();
-                    target.generate_code(Destination::Variable(target_result), operations, tree);
+                    target.generate_code(Destination::Variable(target_result), operations, tree)?;
                     LiteralOrSource::Variable(target_result)
                 };
 
                 // Push the arguments
                 for &arg in &self.args {
                     let arg = tree.node(arg);
-                    arg.generate_code(Destination::Stack, operations, tree);
+                    arg.generate_code(Destination::Stack, operations, tree)?;
                 }
 
                 // Invoke the call
@@ -494,6 +497,7 @@ impl Call {
             }
             (Some(_), None) => todo!("invalid instruction"),
         }
+        Ok(())
     }
 }
 
@@ -509,16 +513,17 @@ impl Assign {
         result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) {
+    ) -> Result<(), CompilationError> {
         match tree.node(self.target) {
             Node::Identifier(name) => {
                 let variable = operations.variable_index_from_name(name);
                 let value = tree.node(self.value);
-                value.generate_code(Destination::Variable(variable), operations, tree);
+                value.generate_code(Destination::Variable(variable), operations, tree)?;
                 operations.store_into_destination(LiteralOrSource::Variable(variable), result);
             }
             _ => todo!("not a variable name"),
         }
+        Ok(())
     }
 }
 
@@ -533,12 +538,12 @@ impl Map {
         result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) {
+    ) -> Result<(), CompilationError> {
         for mapping in &self.mappings {
             tree.node(mapping.key)
-                .generate_code(Destination::Stack, operations, tree);
+                .generate_code(Destination::Stack, operations, tree)?;
             tree.node(mapping.value)
-                .generate_code(Destination::Stack, operations, tree);
+                .generate_code(Destination::Stack, operations, tree)?;
         }
 
         operations.push(Instruction::CallIntrinsic {
@@ -546,6 +551,7 @@ impl Map {
             arg_count: self.mappings.len() * 2,
             destination: result,
         });
+        Ok(())
     }
 }
 
@@ -566,10 +572,10 @@ impl List {
         result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
-    ) {
+    ) -> Result<(), CompilationError> {
         for value in &self.values {
             tree.node(*value)
-                .generate_code(Destination::Stack, operations, tree);
+                .generate_code(Destination::Stack, operations, tree)?;
         }
 
         operations.push(Instruction::CallIntrinsic {
@@ -577,6 +583,7 @@ impl List {
             arg_count: self.values.len(),
             destination: result,
         });
+        Ok(())
     }
 }
 
@@ -727,7 +734,10 @@ impl CodeUnit {
         self
     }
 
-    pub fn compile<InitScope: Scope>(self, scope: &mut InitScope) -> UnlinkedCodeUnit {
+    pub fn compile<InitScope: Scope>(
+        self,
+        scope: &mut InitScope,
+    ) -> Result<UnlinkedCodeUnit, CompilationError> {
         let init = match self.init_statements.len() {
             0 => None,
             1 => Some(self.init_statements[0]),
@@ -741,12 +751,12 @@ impl CodeUnit {
                 for (index, arg) in f.args.iter().enumerate() {
                     block.add_symbol(arg.clone(), ScopeSymbol::Argument(index));
                 }
-                f.body.generate_code(&mut block);
-                ir::Function::new(f.name, f.args, block.finish())
+                f.body.generate_code(&mut block)?;
+                Ok(ir::Function::new(f.name, f.args, block.finish()))
             })
-            .collect();
+            .collect::<Result<_, CompilationError>>()?;
 
-        let init = init.map(|body| {
+        let init = if let Some(body) = init {
             let mut block = CodeBlockBuilder::default();
             // Define any existing variables
             scope.map_each_symbol(&mut |symbol, kind| match kind {
@@ -755,21 +765,24 @@ impl CodeUnit {
                 }
                 ScopeSymbolKind::Function | ScopeSymbolKind::Argument => {}
             });
-            self.init_tree.finish(body).generate_code(&mut block);
+            self.init_tree.finish(body).generate_code(&mut block)?;
             for (symbol, variable) in &block.variables {
                 scope.define_variable(symbol.clone(), *variable);
             }
 
-            ir::Function::new("__init", Vec::new(), block.finish())
-        });
-        UnlinkedCodeUnit::new(
+            Some(ir::Function::new("__init", Vec::new(), block.finish()))
+        } else {
+            None
+        };
+
+        Ok(UnlinkedCodeUnit::new(
             vtable,
             self.modules
                 .into_iter()
                 .map(|unit| unit.compile(scope))
-                .collect(),
+                .collect::<Result<_, CompilationError>>()?,
             init,
-        )
+        ))
     }
 }
 
@@ -822,6 +835,7 @@ impl Function {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CompilationError {
     UndefinedFunction(Symbol),
+    UndefinedIdentifier(Symbol),
     InvalidScope,
 }
 
@@ -835,6 +849,9 @@ impl Display for CompilationError {
             }
             CompilationError::InvalidScope => {
                 write!(f, "the scope used did not support a required operation")
+            }
+            CompilationError::UndefinedIdentifier(symbol) => {
+                write!(f, "undefined identifier: {symbol}")
             }
         }
     }

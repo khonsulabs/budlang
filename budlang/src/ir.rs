@@ -424,15 +424,22 @@ impl CodeBlockBuilder {
         self.scope.get(symbol)
     }
 
-    pub fn load_from_symbol(&mut self, symbol: &Symbol, destination: Destination) {
-        match self.scope.get(symbol).unwrap() {
-            ScopeSymbol::Argument(index) => {
+    pub fn load_from_symbol(
+        &mut self,
+        symbol: &Symbol,
+        destination: Destination,
+    ) -> Result<(), CompilationError> {
+        match self.scope.get(symbol) {
+            Some(ScopeSymbol::Argument(index)) => {
                 self.store_into_destination(LiteralOrSource::Argument(*index), destination);
+                Ok(())
             }
-            ScopeSymbol::Variable(variable) => {
+            Some(ScopeSymbol::Variable(variable)) => {
                 self.store_into_destination(LiteralOrSource::Variable(*variable), destination);
+                Ok(())
             }
-            ScopeSymbol::Function { .. } => todo!("pushing a vtable entry?"),
+            Some(ScopeSymbol::Function { .. }) => todo!("pushing a vtable entry?"),
+            None => Err(CompilationError::UndefinedIdentifier(symbol.clone())),
         }
     }
 
@@ -677,7 +684,7 @@ impl Function {
             .expect("compiling an unnamed function into a context isn't allowed");
         let block = self.body.link(context)?;
         if option_env!("PRINT_IR").is_some() {
-            println!("{block}");
+            println!("{}", block.display_indented("  "));
         }
         let function = vm::Function {
             name,
