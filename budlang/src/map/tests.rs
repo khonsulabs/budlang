@@ -237,7 +237,7 @@ fn random_build_and_drain_bad_hasher() {
     // that this map has no unsafe code, we could just ignore the tests but it
     // seems better to just reduce the count.
     #[cfg(miri)]
-    const COUNT: usize = 300;
+    const COUNT: usize = 30;
     #[cfg(not(miri))]
     const COUNT: usize = 3_000;
     random_build_and_drain(BadHasher(0), COUNT);
@@ -249,7 +249,7 @@ fn random_build_and_drain_std_hasher() {
     // that this map has no unsafe code, we could just ignore the tests but it
     // seems better to just reduce the count.
     #[cfg(miri)]
-    const COUNT: usize = 500;
+    const COUNT: usize = 50;
     #[cfg(not(miri))]
     const COUNT: usize = 5_000;
     random_build_and_drain(RandomState::default(), COUNT);
