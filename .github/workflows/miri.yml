@@ -1,3 +1,6 @@
+# Why run Miri when there is no unsafe code? Because Miri can produce memory
+# effects to better test atomic usages.
+
 name: Miri
 
 on: [push]

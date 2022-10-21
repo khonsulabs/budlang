@@ -1,6 +1,7 @@
 use assert_cmd::Command;
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn eval() {
     let mut cmd = Command::cargo_bin("bud").unwrap();
     let result = cmd.arg("1 + 2").assert().success();
@@ -9,6 +10,7 @@ fn eval() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn pipe() {
     let mut cmd = Command::cargo_bin("bud").unwrap();
     let result = cmd.write_stdin("1 + 2").assert().success();
@@ -17,6 +19,7 @@ fn pipe() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn eval_and_pipe() {
     let mut cmd = Command::cargo_bin("bud").unwrap();
     let result = cmd.arg("1 + 2").write_stdin("3 + 4").assert().success();
@@ -25,6 +28,7 @@ fn eval_and_pipe() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn run_file() {
     std::fs::write(
         "run_file.bud",
