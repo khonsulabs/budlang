@@ -839,6 +839,23 @@
 <span id="839">839</span>
 <span id="840">840</span>
 <span id="841">841</span>
+<span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
+<span id="849">849</span>
+<span id="850">850</span>
+<span id="851">851</span>
+<span id="852">852</span>
+<span id="853">853</span>
+<span id="854">854</span>
+<span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">allow</span>(<span class="ident">missing_docs</span>, <span class="ident">clippy::missing_panics_doc</span>)]</span> <span class="comment">// TODO docs and panics for ast</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::{
@@ -876,8 +893,8 @@
         <span class="self">self</span>.<span class="ident">node</span>(<span class="self">self</span>.<span class="ident">root</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">generate_code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">block</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>) {
-        <span class="self">self</span>.<span class="ident">root</span>().<span class="ident">generate_code</span>(<span class="ident">Destination::Return</span>, <span class="ident">block</span>, <span class="self">self</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">generate_code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">block</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">root</span>().<span class="ident">generate_code</span>(<span class="ident">Destination::Return</span>, <span class="ident">block</span>, <span class="self">self</span>)
     }
 }
 
@@ -1005,7 +1022,7 @@
         <span class="ident">result</span>: <span class="ident">Destination</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">Node::If</span>(<span class="ident">if_expr</span>) =&gt; <span class="ident">if_expr</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
             <span class="ident">Node::BinOp</span>(<span class="ident">bin_op</span>) =&gt; <span class="ident">bin_op</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
@@ -1014,29 +1031,27 @@
                 <span class="kw">for</span> <span class="ident">statement</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">statements</span>.<span class="number">0</span> {
                     <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="kw-2">*</span><span class="ident">statement</span>);
                     <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">operations</span>.<span class="ident">new_temporary_variable</span>();
-                    <span class="ident">statement</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">result</span>), <span class="ident">operations</span>, <span class="ident">tree</span>);
+                    <span class="ident">statement</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">result</span>), <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
                     <span class="ident">last_result_var</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">result</span>);
                 }
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">last_result</span>) <span class="op">=</span> <span class="ident">last_result_var</span> {
                     <span class="ident">operations</span>
                         .<span class="ident">store_into_destination</span>(<span class="ident">LiteralOrSource::Variable</span>(<span class="ident">last_result</span>), <span class="ident">result</span>);
                 }
+                <span class="prelude-val">Ok</span>(())
             }
             <span class="ident">Node::Assign</span>(<span class="ident">assign</span>) =&gt; <span class="ident">assign</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
             <span class="ident">Node::Literal</span>(<span class="ident">literal</span>) =&gt; {
                 <span class="ident">operations</span>
                     .<span class="ident">store_into_destination</span>(<span class="ident">LiteralOrSource::Literal</span>(<span class="ident">literal</span>.<span class="ident">clone</span>()), <span class="ident">result</span>);
+                <span class="prelude-val">Ok</span>(())
             }
-            <span class="ident">Node::Identifier</span>(<span class="ident">identifier</span>) =&gt; {
-                <span class="ident">operations</span>.<span class="ident">load_from_symbol</span>(<span class="ident">identifier</span>, <span class="ident">result</span>);
-            }
+            <span class="ident">Node::Identifier</span>(<span class="ident">identifier</span>) =&gt; <span class="ident">operations</span>.<span class="ident">load_from_symbol</span>(<span class="ident">identifier</span>, <span class="ident">result</span>),
             <span class="ident">Node::Map</span>(<span class="ident">map</span>) =&gt; <span class="ident">map</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
             <span class="ident">Node::List</span>(<span class="ident">list</span>) =&gt; <span class="ident">list</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
             <span class="comment">// Node::Lookup(lookup) =&gt; lookup.generate_code(operations, tree),</span>
             <span class="ident">Node::Call</span>(<span class="ident">call</span>) =&gt; <span class="ident">call</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
-            <span class="ident">Node::Return</span>(<span class="ident">value</span>) =&gt; {
-                <span class="ident"><span class="self">Self</span>::generate_return</span>(<span class="kw-2">*</span><span class="ident">value</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
-            }
+            <span class="ident">Node::Return</span>(<span class="ident">value</span>) =&gt; <span class="ident"><span class="self">Self</span>::generate_return</span>(<span class="kw-2">*</span><span class="ident">value</span>, <span class="ident">operations</span>, <span class="ident">tree</span>),
         }
     }
 
@@ -1044,13 +1059,14 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) -&gt; <span class="ident">LiteralOrSource</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">LiteralOrSource</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Node::Literal</span>(<span class="ident">literal</span>) =&gt; <span class="ident">LiteralOrSource::Literal</span>(<span class="ident">literal</span>.<span class="ident">clone</span>()),
+            <span class="ident">Node::Literal</span>(<span class="ident">literal</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">LiteralOrSource::Literal</span>(<span class="ident">literal</span>.<span class="ident">clone</span>())),
             <span class="ident">Node::Identifier</span>(<span class="ident">identifier</span>) =&gt; <span class="kw">match</span> <span class="ident">operations</span>.<span class="ident">symbol</span>(<span class="ident">identifier</span>) {
-                <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Argument</span>(<span class="ident">arg</span>)) =&gt; <span class="ident">LiteralOrSource::Argument</span>(<span class="kw-2">*</span><span class="ident">arg</span>),
-                <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Variable</span>(<span class="ident">var</span>)) =&gt; <span class="ident">LiteralOrSource::Variable</span>(<span class="kw-2">*</span><span class="ident">var</span>),
-                <span class="kw">_</span> =&gt; <span class="macro">todo!</span>(<span class="string">&quot;error: unexpected/unknown symbol&quot;</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Argument</span>(<span class="ident">arg</span>)) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">LiteralOrSource::Argument</span>(<span class="kw-2">*</span><span class="ident">arg</span>)),
+                <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Variable</span>(<span class="ident">var</span>)) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">LiteralOrSource::Variable</span>(<span class="kw-2">*</span><span class="ident">var</span>)),
+                <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Function</span> { .. }) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;attempt to take function as value&quot;</span>),
+                <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">CompilationError::UndefinedIdentifier</span>(<span class="ident">identifier</span>.<span class="ident">clone</span>())),
             },
             <span class="comment">// Node::Lookup(lookup) =&gt; lookup.generate_code(operations, tree),</span>
             <span class="comment">// Node::Call(call) =&gt; call.generate_code(result, operations, tree),</span>
@@ -1059,8 +1075,8 @@
             <span class="comment">// }</span>
             <span class="kw">_</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">variable</span> <span class="op">=</span> <span class="ident">operations</span>.<span class="ident">new_temporary_variable</span>();
-                <span class="self">self</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">variable</span>), <span class="ident">operations</span>, <span class="ident">tree</span>);
-                <span class="ident">LiteralOrSource::Variable</span>(<span class="ident">variable</span>)
+                <span class="self">self</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">variable</span>), <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
+                <span class="prelude-val">Ok</span>(<span class="ident">LiteralOrSource::Variable</span>(<span class="ident">variable</span>))
             }
         }
     }
@@ -1069,9 +1085,10 @@
         <span class="ident">value_to_return</span>: <span class="ident">NodeId</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">value_to_return</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="ident">value_to_return</span>);
-        <span class="ident">value_to_return</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Return</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+        <span class="ident">value_to_return</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Return</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -1103,7 +1120,7 @@
         <span class="ident">result</span>: <span class="ident">Destination</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">condition</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="self">self</span>.<span class="ident">condition</span>);
         <span class="kw">let</span> <span class="ident">after_false_label</span> <span class="op">=</span> <span class="ident">operations</span>.<span class="ident">new_label</span>();
         <span class="kw">let</span> <span class="ident">if_false_label</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">else_block</span>.<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">operations</span>.<span class="ident">new_label</span>());
@@ -1117,8 +1134,8 @@
             <span class="comment">// The if statement is a result of the comparison. Use the special</span>
             <span class="comment">// form of the comparison operator to branch instead of using an if</span>
             <span class="comment">// operation</span>
-            <span class="kw">let</span> <span class="ident">left</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="kw-2">*</span><span class="ident">left</span>).<span class="ident">to_value_or_source</span>(<span class="ident">operations</span>, <span class="ident">tree</span>);
-            <span class="kw">let</span> <span class="ident">right</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="kw-2">*</span><span class="ident">right</span>).<span class="ident">to_value_or_source</span>(<span class="ident">operations</span>, <span class="ident">tree</span>);
+            <span class="kw">let</span> <span class="ident">left</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="kw-2">*</span><span class="ident">left</span>).<span class="ident">to_value_or_source</span>(<span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">right</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="kw-2">*</span><span class="ident">right</span>).<span class="ident">to_value_or_source</span>(<span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
             <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">Instruction::Compare</span> {
                 <span class="ident">comparison</span>: <span class="kw-2">*</span><span class="ident">comparison</span>,
                 <span class="ident">left</span>,
@@ -1128,21 +1145,22 @@
         } <span class="kw">else</span> {
             <span class="comment">// The if statement is a result of something more complex</span>
             <span class="kw">let</span> <span class="ident">condition_result</span> <span class="op">=</span> <span class="ident">operations</span>.<span class="ident">new_temporary_variable</span>();
-            <span class="ident">condition</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">condition_result</span>), <span class="ident">operations</span>, <span class="ident">tree</span>);
+            <span class="ident">condition</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">condition_result</span>), <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
             <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">Instruction::If</span> {
                 <span class="ident">condition</span>: <span class="ident">LiteralOrSource::Variable</span>(<span class="ident">condition_result</span>),
                 <span class="ident">false_jump_to</span>,
             });
         }
         <span class="kw">let</span> <span class="ident">true_block</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="self">self</span>.<span class="ident">true_block</span>);
-        <span class="ident">true_block</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+        <span class="ident">true_block</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">else_block</span>), <span class="prelude-val">Some</span>(<span class="ident">if_false_label</span>)) <span class="op">=</span> (<span class="self">self</span>.<span class="ident">else_block</span>, <span class="ident">if_false_label</span>) {
             <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">Instruction::JumpTo</span>(<span class="ident">after_false_label</span>));
             <span class="ident">operations</span>.<span class="ident">label</span>(<span class="ident">if_false_label</span>);
             <span class="kw">let</span> <span class="ident">else_block</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="ident">else_block</span>);
-            <span class="ident">else_block</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+            <span class="ident">else_block</span>.<span class="ident">generate_code</span>(<span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
         }
         <span class="ident">operations</span>.<span class="ident">label</span>(<span class="ident">after_false_label</span>);
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -1162,9 +1180,9 @@
         <span class="ident">result</span>: <span class="ident">Destination</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">kind</span>
-            .<span class="ident">generate_code</span>(<span class="self">self</span>.<span class="ident">left</span>, <span class="self">self</span>.<span class="ident">right</span>, <span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+            .<span class="ident">generate_code</span>(<span class="self">self</span>.<span class="ident">left</span>, <span class="self">self</span>.<span class="ident">right</span>, <span class="ident">result</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)
     }
 }
 
@@ -1185,11 +1203,11 @@
         <span class="ident">destination</span>: <span class="ident">Destination</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">left</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="ident">left</span>);
         <span class="kw">let</span> <span class="ident">right</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="ident">right</span>);
-        <span class="kw">let</span> <span class="ident">left</span> <span class="op">=</span> <span class="ident">left</span>.<span class="ident">to_value_or_source</span>(<span class="ident">operations</span>, <span class="ident">tree</span>);
-        <span class="kw">let</span> <span class="ident">right</span> <span class="op">=</span> <span class="ident">right</span>.<span class="ident">to_value_or_source</span>(<span class="ident">operations</span>, <span class="ident">tree</span>);
+        <span class="kw">let</span> <span class="ident">left</span> <span class="op">=</span> <span class="ident">left</span>.<span class="ident">to_value_or_source</span>(<span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">right</span> <span class="op">=</span> <span class="ident">right</span>.<span class="ident">to_value_or_source</span>(<span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
 
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">BinOpKind::Add</span> =&gt; <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">Instruction::Add</span> {
@@ -1219,6 +1237,8 @@
                 <span class="ident">action</span>: <span class="ident">CompareAction::Store</span>(<span class="ident">destination</span>),
             }),
         }
+
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -1263,13 +1283,13 @@
         <span class="ident">destination</span>: <span class="ident">Destination</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">match</span> (<span class="self">self</span>.<span class="ident">target</span>, <span class="self">self</span>.<span class="ident">name</span>.<span class="ident">as_ref</span>()) {
             (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>) =&gt; {
                 <span class="comment">// Recursive call</span>
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">arg</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">args</span> {
                     <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="ident">arg</span>);
-                    <span class="ident">arg</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+                    <span class="ident">arg</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
                 }
 
                 <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">Instruction::Call</span> {
@@ -1282,7 +1302,7 @@
                 <span class="comment">// Global call</span>
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">arg</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">args</span> {
                     <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="ident">arg</span>);
-                    <span class="ident">arg</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+                    <span class="ident">arg</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
                 }
 
                 <span class="kw">match</span> <span class="ident">operations</span>.<span class="ident">lookup</span>(<span class="ident">symbol</span>) {
@@ -1315,14 +1335,14 @@
                     }
                 } <span class="kw">else</span> {
                     <span class="kw">let</span> <span class="ident">target_result</span> <span class="op">=</span> <span class="ident">operations</span>.<span class="ident">new_temporary_variable</span>();
-                    <span class="ident">target</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">target_result</span>), <span class="ident">operations</span>, <span class="ident">tree</span>);
+                    <span class="ident">target</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">target_result</span>), <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
                     <span class="ident">LiteralOrSource::Variable</span>(<span class="ident">target_result</span>)
                 };
 
                 <span class="comment">// Push the arguments</span>
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">arg</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">args</span> {
                     <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="ident">arg</span>);
-                    <span class="ident">arg</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+                    <span class="ident">arg</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
                 }
 
                 <span class="comment">// Invoke the call</span>
@@ -1335,6 +1355,7 @@
             }
             (<span class="prelude-val">Some</span>(<span class="kw">_</span>), <span class="prelude-val">None</span>) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;invalid instruction&quot;</span>),
         }
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -1350,16 +1371,17 @@
         <span class="ident">result</span>: <span class="ident">Destination</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="self">self</span>.<span class="ident">target</span>) {
             <span class="ident">Node::Identifier</span>(<span class="ident">name</span>) =&gt; {
                 <span class="kw">let</span> <span class="ident">variable</span> <span class="op">=</span> <span class="ident">operations</span>.<span class="ident">variable_index_from_name</span>(<span class="ident">name</span>);
                 <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">node</span>(<span class="self">self</span>.<span class="ident">value</span>);
-                <span class="ident">value</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">variable</span>), <span class="ident">operations</span>, <span class="ident">tree</span>);
+                <span class="ident">value</span>.<span class="ident">generate_code</span>(<span class="ident">Destination::Variable</span>(<span class="ident">variable</span>), <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
                 <span class="ident">operations</span>.<span class="ident">store_into_destination</span>(<span class="ident">LiteralOrSource::Variable</span>(<span class="ident">variable</span>), <span class="ident">result</span>);
             }
             <span class="kw">_</span> =&gt; <span class="macro">todo!</span>(<span class="string">&quot;not a variable name&quot;</span>),
         }
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -1374,12 +1396,12 @@
         <span class="ident">result</span>: <span class="ident">Destination</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">for</span> <span class="ident">mapping</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mappings</span> {
             <span class="ident">tree</span>.<span class="ident">node</span>(<span class="ident">mapping</span>.<span class="ident">key</span>)
-                .<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+                .<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
             <span class="ident">tree</span>.<span class="ident">node</span>(<span class="ident">mapping</span>.<span class="ident">value</span>)
-                .<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+                .<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
         }
 
         <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">Instruction::CallIntrinsic</span> {
@@ -1387,6 +1409,7 @@
             <span class="ident">arg_count</span>: <span class="self">self</span>.<span class="ident">mappings</span>.<span class="ident">len</span>() <span class="op">*</span> <span class="number">2</span>,
             <span class="ident">destination</span>: <span class="ident">result</span>,
         });
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -1407,10 +1430,10 @@
         <span class="ident">result</span>: <span class="ident">Destination</span>,
         <span class="ident">operations</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CodeBlockBuilder</span>,
         <span class="ident">tree</span>: <span class="kw-2">&amp;</span><span class="ident">ExpressionTree</span>,
-    ) {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">values</span> {
             <span class="ident">tree</span>.<span class="ident">node</span>(<span class="kw-2">*</span><span class="ident">value</span>)
-                .<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>);
+                .<span class="ident">generate_code</span>(<span class="ident">Destination::Stack</span>, <span class="ident">operations</span>, <span class="ident">tree</span>)<span class="question-mark">?</span>;
         }
 
         <span class="ident">operations</span>.<span class="ident">push</span>(<span class="ident">Instruction::CallIntrinsic</span> {
@@ -1418,6 +1441,7 @@
             <span class="ident">arg_count</span>: <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">len</span>(),
             <span class="ident">destination</span>: <span class="ident">result</span>,
         });
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -1568,7 +1592,10 @@
         <span class="self">self</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compile</span><span class="op">&lt;</span><span class="ident">InitScope</span>: <span class="ident">Scope</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">scope</span>: <span class="kw-2">&amp;mut</span> <span class="ident">InitScope</span>) -&gt; <span class="ident">UnlinkedCodeUnit</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compile</span><span class="op">&lt;</span><span class="ident">InitScope</span>: <span class="ident">Scope</span><span class="op">&gt;</span>(
+        <span class="self">self</span>,
+        <span class="ident">scope</span>: <span class="kw-2">&amp;mut</span> <span class="ident">InitScope</span>,
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">UnlinkedCodeUnit</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">init</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">init_statements</span>.<span class="ident">len</span>() {
             <span class="number">0</span> =&gt; <span class="prelude-val">None</span>,
             <span class="number">1</span> =&gt; <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">init_statements</span>[<span class="number">0</span>]),
@@ -1582,12 +1609,12 @@
                 <span class="kw">for</span> (<span class="ident">index</span>, <span class="ident">arg</span>) <span class="kw">in</span> <span class="ident">f</span>.<span class="ident">args</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
                     <span class="ident">block</span>.<span class="ident">add_symbol</span>(<span class="ident">arg</span>.<span class="ident">clone</span>(), <span class="ident">ScopeSymbol::Argument</span>(<span class="ident">index</span>));
                 }
-                <span class="ident">f</span>.<span class="ident">body</span>.<span class="ident">generate_code</span>(<span class="kw-2">&amp;mut</span> <span class="ident">block</span>);
-                <span class="ident">ir::Function::new</span>(<span class="ident">f</span>.<span class="ident">name</span>, <span class="ident">f</span>.<span class="ident">args</span>, <span class="ident">block</span>.<span class="ident">finish</span>())
+                <span class="ident">f</span>.<span class="ident">body</span>.<span class="ident">generate_code</span>(<span class="kw-2">&amp;mut</span> <span class="ident">block</span>)<span class="question-mark">?</span>;
+                <span class="prelude-val">Ok</span>(<span class="ident">ir::Function::new</span>(<span class="ident">f</span>.<span class="ident">name</span>, <span class="ident">f</span>.<span class="ident">args</span>, <span class="ident">block</span>.<span class="ident">finish</span>()))
             })
-            .<span class="ident">collect</span>();
+            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">init</span> <span class="op">=</span> <span class="ident">init</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">body</span><span class="op">|</span> {
+        <span class="kw">let</span> <span class="ident">init</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">body</span>) <span class="op">=</span> <span class="ident">init</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">CodeBlockBuilder::default</span>();
             <span class="comment">// Define any existing variables</span>
             <span class="ident">scope</span>.<span class="ident">map_each_symbol</span>(<span class="kw-2">&amp;mut</span> <span class="op">|</span><span class="ident">symbol</span>, <span class="ident">kind</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">kind</span> {
@@ -1596,21 +1623,24 @@
                 }
                 <span class="ident">ScopeSymbolKind::Function</span> <span class="op">|</span> <span class="ident">ScopeSymbolKind::Argument</span> =&gt; {}
             });
-            <span class="self">self</span>.<span class="ident">init_tree</span>.<span class="ident">finish</span>(<span class="ident">body</span>).<span class="ident">generate_code</span>(<span class="kw-2">&amp;mut</span> <span class="ident">block</span>);
+            <span class="self">self</span>.<span class="ident">init_tree</span>.<span class="ident">finish</span>(<span class="ident">body</span>).<span class="ident">generate_code</span>(<span class="kw-2">&amp;mut</span> <span class="ident">block</span>)<span class="question-mark">?</span>;
             <span class="kw">for</span> (<span class="ident">symbol</span>, <span class="ident">variable</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">block</span>.<span class="ident">variables</span> {
                 <span class="ident">scope</span>.<span class="ident">define_variable</span>(<span class="ident">symbol</span>.<span class="ident">clone</span>(), <span class="kw-2">*</span><span class="ident">variable</span>);
             }
 
-            <span class="ident">ir::Function::new</span>(<span class="string">&quot;__init&quot;</span>, <span class="ident">Vec::new</span>(), <span class="ident">block</span>.<span class="ident">finish</span>())
-        });
-        <span class="ident">UnlinkedCodeUnit::new</span>(
+            <span class="prelude-val">Some</span>(<span class="ident">ir::Function::new</span>(<span class="string">&quot;__init&quot;</span>, <span class="ident">Vec::new</span>(), <span class="ident">block</span>.<span class="ident">finish</span>()))
+        } <span class="kw">else</span> {
+            <span class="prelude-val">None</span>
+        };
+
+        <span class="prelude-val">Ok</span>(<span class="ident">UnlinkedCodeUnit::new</span>(
             <span class="ident">vtable</span>,
             <span class="self">self</span>.<span class="ident">modules</span>
                 .<span class="ident">into_iter</span>()
                 .<span class="ident">map</span>(<span class="op">|</span><span class="ident">unit</span><span class="op">|</span> <span class="ident">unit</span>.<span class="ident">compile</span>(<span class="ident">scope</span>))
-                .<span class="ident">collect</span>(),
+                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>,
             <span class="ident">init</span>,
-        )
+        ))
     }
 }
 
@@ -1663,6 +1693,7 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CompilationError</span> {
     <span class="ident">UndefinedFunction</span>(<span class="ident">Symbol</span>),
+    <span class="ident">UndefinedIdentifier</span>(<span class="ident">Symbol</span>),
     <span class="ident">InvalidScope</span>,
 }
 
@@ -1676,6 +1707,9 @@
             }
             <span class="ident">CompilationError::InvalidScope</span> =&gt; {
                 <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;the scope used did not support a required operation&quot;</span>)
+            }
+            <span class="ident">CompilationError::UndefinedIdentifier</span>(<span class="ident">symbol</span>) =&gt; {
+                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;undefined identifier: {symbol}&quot;</span>)
             }
         }
     }

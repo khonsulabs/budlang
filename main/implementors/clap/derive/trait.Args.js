@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["budlang_cli"] = [{"text":"impl Args for <a class=\"struct\" href=\"budlang_cli/struct.Args.html\" title=\"struct budlang_cli::Args\">Args</a>","synthetic":false,"types":["budlang_cli::Args"]}];
+implementors["bud"] = [{"text":"impl Args for <a class=\"struct\" href=\"bud/struct.Args.html\" title=\"struct bud::Args\">Args</a>","synthetic":false,"types":["bud::Args"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

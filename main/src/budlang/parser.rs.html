@@ -1071,6 +1071,20 @@
 <span id="1071">1071</span>
 <span id="1072">1072</span>
 <span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
+<span id="1078">1078</span>
+<span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
+<span id="1087">1087</span>
 </pre><pre class="rust"><code><span class="comment">// TODO docs for parser</span>
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">missing_docs</span>)]</span>
 <span class="comment">// We use the Range type which doesn&#39;t allow this, and it&#39;s not worth making a</span>
@@ -1686,6 +1700,20 @@
                     ..
                 })) =&gt; {
                     <span class="ident">args</span>.<span class="ident">push</span>(<span class="ident">arg_name</span>);
+
+                    <span class="kw">match</span> <span class="ident">tokens</span>.<span class="ident">expect_next</span>(<span class="string">&quot;comma&quot;</span>)<span class="question-mark">?</span> {
+                        <span class="ident">Token</span> {
+                            <span class="ident">kind</span>: <span class="ident">TokenKind::Comma</span>,
+                            ..
+                        } =&gt; {}
+                        <span class="ident">Token</span> {
+                            <span class="ident">kind</span>: <span class="ident">TokenKind::Close</span>(<span class="ident">BracketType::Paren</span>),
+                            ..
+                        } =&gt; {
+                            <span class="kw">break</span>;
+                        }
+                        <span class="ident">other</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ParseError::Unexpected</span>(<span class="ident">other</span>)),
+                    }
                 }
                 <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">token</span>)) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;unexpected token {token:?}&quot;</span>),
                 <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">err</span>)) =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>),

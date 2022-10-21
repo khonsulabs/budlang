@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["budlang_cli"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.64.0/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"enum\" href=\"budlang_cli/enum.SourceId.html\" title=\"enum budlang_cli::SourceId\">SourceId</a>","synthetic":false,"types":["budlang_cli::SourceId"]}];
+implementors["bud"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.64.0/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"enum\" href=\"bud/enum.SourceId.html\" title=\"enum bud::SourceId\">SourceId</a>","synthetic":false,"types":["bud::SourceId"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

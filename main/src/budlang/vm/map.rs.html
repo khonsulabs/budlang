@@ -255,6 +255,7 @@
 <span id="255">255</span>
 <span id="256">256</span>
 <span id="257">257</span>
+<span id="258">258</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">collections::hash_map::RandomState</span>,
     <span class="ident">fmt::Debug</span>,
@@ -263,6 +264,7 @@
 };
 
 <span class="kw">use</span> <span class="kw">crate</span>::{
+    <span class="ident">map::BudMap</span>,
     <span class="ident">symbol::Symbol</span>,
     <span class="ident">vm</span>::{<span class="ident">DynamicValue</span>, <span class="ident">Value</span>},
 };
@@ -273,7 +275,7 @@
 <span class="doccomment">/// a [`Value`] that does not support hashing by returning an error.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// This type uses a [`Mutex`] for interior mutability.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span> <span class="op">=</span> <span class="ident">RandomState</span><span class="op">&gt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">std::collections::HashMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span>)
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span> <span class="op">=</span> <span class="ident">RandomState</span><span class="op">&gt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BudMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span>)
 <span class="kw">where</span>
     <span class="ident">State</span>: <span class="ident">BuildHasher</span>;
 
@@ -292,14 +294,14 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std::collections::HashMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">State</span>: <span class="ident">BuildHasher</span>,
-{
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">collection</span>: <span class="ident">std::collections::HashMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="ident">collection</span>))
-    }
-}
+<span class="comment">// impl&lt;State&gt; From&lt;std::collections::HashMap&lt;Value, Value, State&gt;&gt; for HashMap&lt;State&gt;</span>
+<span class="comment">// where</span>
+<span class="comment">//     State: BuildHasher,</span>
+<span class="comment">// {</span>
+<span class="comment">//     fn from(collection: std::collections::HashMap&lt;Value, Value, State&gt;) -&gt; Self {</span>
+<span class="comment">//         Self(Mutex::new(collection))</span>
+<span class="comment">//     }</span>
+<span class="comment">// }</span>
 
 <span class="kw">impl</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">RandomState</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Returns a new, empty hash map.</span>
@@ -307,49 +309,49 @@
     <span class="doccomment">/// Equivalent to [`std::collections::HashMap::new()`].</span>
     <span class="attribute">#[<span class="ident">must_use</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="ident">std::collections::HashMap::new</span>()))
+        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="ident">BudMap::default</span>()))
     }
 
-    <span class="doccomment">/// Returns a hash map that can contain at least `capacity` without</span>
-    <span class="doccomment">/// reallocation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Equivalent to [`std::collections::HashMap::with_capacity()`].</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_capacity</span>(<span class="ident">capacity</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="ident">std::collections::HashMap::with_capacity</span>(
-            <span class="ident">capacity</span>,
-        )))
-    }
+    <span class="comment">// /// Returns a hash map that can contain at least `capacity` without</span>
+    <span class="comment">// /// reallocation.</span>
+    <span class="comment">// ///</span>
+    <span class="comment">// /// Equivalent to [`std::collections::HashMap::with_capacity()`].</span>
+    <span class="comment">// #[must_use]</span>
+    <span class="comment">// pub fn with_capacity(capacity: usize) -&gt; Self {</span>
+    <span class="comment">//     Self(Mutex::new(std::collections::HashMap::with_capacity(</span>
+    <span class="comment">//         capacity,</span>
+    <span class="comment">//     )))</span>
+    <span class="comment">// }</span>
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">State</span>: <span class="ident">BuildHasher</span>,
 {
-    <span class="doccomment">/// Returns a new, empty hash map that uses `hash_builder` to initialize the</span>
-    <span class="doccomment">/// hasher used for this map.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Equivalent to [`std::collections::HashMap::with_hasher()`].</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_hasher</span>(<span class="ident">hash_builder</span>: <span class="ident">State</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="ident">std::collections::HashMap::with_hasher</span>(
-            <span class="ident">hash_builder</span>,
-        )))
-    }
+    <span class="comment">// /// Returns a new, empty hash map that uses `hash_builder` to initialize the</span>
+    <span class="comment">// /// hasher used for this map.</span>
+    <span class="comment">// ///</span>
+    <span class="comment">// /// Equivalent to [`std::collections::HashMap::with_hasher()`].</span>
+    <span class="comment">// #[must_use]</span>
+    <span class="comment">// pub fn with_hasher(hash_builder: State) -&gt; Self {</span>
+    <span class="comment">//     Self(Mutex::new(std::collections::HashMap::with_hasher(</span>
+    <span class="comment">//         hash_builder,</span>
+    <span class="comment">//     )))</span>
+    <span class="comment">// }</span>
 
-    <span class="doccomment">/// Returns a hash map that can contain at least `capacity` without</span>
-    <span class="doccomment">/// reallocation, using `hash_builder` to initialize the hasher used for</span>
-    <span class="doccomment">/// this map.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Equivalent to [`std::collections::HashMap::with_capacity_and_hasher()`].</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_capacity_and_hasher</span>(<span class="ident">capacity</span>: <span class="ident">usize</span>, <span class="ident">hash_builder</span>: <span class="ident">State</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(
-            <span class="ident">std::collections::HashMap::with_capacity_and_hasher</span>(<span class="ident">capacity</span>, <span class="ident">hash_builder</span>),
-        ))
-    }
+    <span class="comment">// /// Returns a hash map that can contain at least `capacity` without</span>
+    <span class="comment">// /// reallocation, using `hash_builder` to initialize the hasher used for</span>
+    <span class="comment">// /// this map.</span>
+    <span class="comment">// ///</span>
+    <span class="comment">// /// Equivalent to [`std::collections::HashMap::with_capacity_and_hasher()`].</span>
+    <span class="comment">// #[must_use]</span>
+    <span class="comment">// pub fn with_capacity_and_hasher(capacity: usize, hash_builder: State) -&gt; Self {</span>
+    <span class="comment">//     Self(Mutex::new(</span>
+    <span class="comment">//         std::collections::HashMap::with_capacity_and_hasher(capacity, hash_builder),</span>
+    <span class="comment">//     ))</span>
+    <span class="comment">// }</span>
 
-    <span class="kw">fn</span> <span class="ident">map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">std::collections::HashMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">BudMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">PoisonError::into_inner</span>)
     }
 
@@ -386,7 +388,7 @@
     }
 
     <span class="doccomment">/// Extracts the contained collection type.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">std::collections::HashMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">BudMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">into_inner</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">PoisonError::into_inner</span>)
     }
 }
@@ -400,7 +402,7 @@
                 <span class="string">&quot;odd number of arguments passed to map constructor&quot;</span>,
             ));
         }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">std::collections::HashMap::with_capacity</span>(<span class="ident">values</span>.<span class="ident">len</span>() <span class="op">/</span> <span class="number">2</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">BudMap::with_capacity</span>(<span class="ident">values</span>.<span class="ident">len</span>() <span class="op">/</span> <span class="number">2</span>);
 
         <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">key</span>) <span class="op">=</span> <span class="ident">values</span>.<span class="ident">next</span>() {
             <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">values</span>.<span class="ident">next</span>().<span class="ident">expect</span>(<span class="string">&quot;checked for odd length&quot;</span>);
@@ -408,7 +410,7 @@
             <span class="ident">map</span>.<span class="ident">insert</span>(<span class="ident">check_hashable</span>(<span class="ident">key</span>)<span class="question-mark">?</span>, <span class="ident">value</span>);
         }
 
-        <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::from</span>(<span class="ident">map</span>))
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="ident">map</span>)))
     }
 }
 
@@ -422,7 +424,7 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>
 <span class="kw">where</span>
-    <span class="ident">State</span>: <span class="ident">BuildHasher</span>,
+    <span class="ident">State</span>: <span class="ident">BuildHasher</span> <span class="op">+</span> <span class="ident">Debug</span>,
 {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
         <span class="ident">Debug::fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>, <span class="ident">f</span>)
@@ -431,7 +433,7 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> <span class="ident">DynamicValue</span> <span class="kw">for</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>
 <span class="kw">where</span>
-    <span class="ident">State</span>: <span class="ident">BuildHasher</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">State</span>: <span class="ident">BuildHasher</span> <span class="op">+</span> <span class="ident">Debug</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
     <span class="kw">fn</span> <span class="ident">is_truthy</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="op">!</span><span class="self">self</span>.<span class="ident">map</span>().<span class="ident">is_empty</span>()
