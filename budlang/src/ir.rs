@@ -3,6 +3,7 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
+    env,
     fmt::{Display, Write},
 };
 
@@ -683,7 +684,7 @@ impl Function {
             .clone()
             .expect("compiling an unnamed function into a context isn't allowed");
         let block = self.body.link(context)?;
-        if option_env!("PRINT_IR").is_some() {
+        if env::var("PRINT_IR").is_ok() {
             println!("{}", block.display_indented("  "));
         }
         let function = vm::Function {
@@ -749,7 +750,7 @@ impl UnlinkedCodeUnit {
 
         // Compile each function
         for (index, function) in self.vtable.iter().enumerate() {
-            if option_env!("PRINT_IR").is_some() {
+            if env::var("PRINT_IR").is_ok() {
                 if let Some(name) = &function.name {
                     println!(
                         "function #{index} - {name}({})",
@@ -777,7 +778,7 @@ impl UnlinkedCodeUnit {
 
         // Execute the module initializer if it exists
         if let Some(init) = &self.init {
-            if option_env!("PRINT_IR").is_some() {
+            if env::var("PRINT_IR").is_ok() {
                 println!("function init");
             }
             let vtable_index = init.compile_into(context)?;

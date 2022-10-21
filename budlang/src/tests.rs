@@ -237,7 +237,7 @@ fn maps() {
             ..
         })
     ));
-    let map = Bud::empty()
+    let map = dbg!(Bud::empty()
         .run_source::<HashMap>(
             r#"
                 a := {1: true}
@@ -247,7 +247,7 @@ fn maps() {
                 a
             "#,
         )
-        .unwrap();
+        .unwrap());
     assert_eq!(map.get(&Value::Integer(1)), Some(Value::Boolean(true)));
     assert_eq!(map.get(&Value::Integer(2)), None);
     assert_eq!(map.get(&Value::Integer(3)), Some(Value::Boolean(true)));

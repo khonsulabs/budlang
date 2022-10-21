@@ -3,6 +3,7 @@ use std::{
     borrow::Cow,
     cmp::Ordering,
     collections::{HashMap as StdHashMap, VecDeque},
+    env,
     fmt::{Debug, Display, Write},
     hash::{Hash, Hasher},
     marker::PhantomData,
@@ -1045,14 +1046,14 @@ where
         let previous_variable_count = self.init_variables.len();
         let unit = parse(source)?.compile(self)?;
         for function in unit.vtable {
-            if let (Some(name), Some(_)) = (&function.name, option_env!("PRINT_IR")) {
+            if let (Some(name), Ok(_)) = (&function.name, env::var("PRINT_IR")) {
                 println!("function {}", name);
             }
             function.compile_into(self)?;
         }
 
         if let Some(init) = &unit.init {
-            if option_env!("PRINT_IR").is_some() {
+            if env::var("PRINT_IR").is_ok() {
                 println!("function init");
             }
 

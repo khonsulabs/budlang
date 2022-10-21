@@ -613,6 +613,20 @@ fn parse_function(tokens: &mut Lexer<'_>) -> Result<Function, ParseError> {
                     ..
                 })) => {
                     args.push(arg_name);
+
+                    match tokens.expect_next("comma")? {
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        } => {}
+                        Token {
+                            kind: TokenKind::Close(BracketType::Paren),
+                            ..
+                        } => {
+                            break;
+                        }
+                        other => return Err(ParseError::Unexpected(other)),
+                    }
                 }
                 Some(Ok(token)) => todo!("unexpected token {token:?}"),
                 Some(Err(err)) => return Err(err),

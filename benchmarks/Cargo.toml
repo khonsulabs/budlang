@@ -1,0 +1,18 @@
+[package]
+name = "benchmarks"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+budlang = { path = "../budlang" }
+
+[dev-dependencies]
+criterion = { version = "0.4", features = ["html_reports"] }
+fastrand = "1.8.0"
+indexmap = "1.9.1"
+fnv = "1.0.7"
+
+[[bench]]
+name = "budmap"
+harness = false

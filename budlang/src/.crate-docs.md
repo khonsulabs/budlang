@@ -83,7 +83,7 @@ It probably doesn't do what you need (yet):
 - [x] Add List type
 - [x] Add Map type
 - [x] Ability to write Rust functions
-- [ ] Implement a REPL
+- [x] Implement a REPL
 - [ ] Consider static variables for persistent module state.
 
 Bud is compiled to a virtual machine written using only memory-safe abstractions

@@ -21,6 +21,8 @@ use crate::vm::{Fault, FaultOrPause};
 pub mod ast;
 pub mod ir;
 // mod optimizer;
+/// A `HashMap` implementation that provides a defined iteration order.
+pub mod map;
 /// The interface for parsing Bud code.
 pub mod parser;
 /// An "interned" string-like type used for identifiers in Bud.

@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
             &source_id,
             source_cache
         );
-        println!("{value}");
+        print_value(false, &value);
     }
 
     let is_interactive = stdin().is_tty();
@@ -75,7 +75,7 @@ fn main() -> anyhow::Result<()> {
             &SourceId::CommandLine,
             source_cache
         );
-        println!("{value}");
+        print_value(false, &value);
 
         // If we are on an interactive shell, running a command should exit
         // immediately. If we aren't on an interactive shell, we should process
@@ -115,7 +115,7 @@ fn main() -> anyhow::Result<()> {
                     let result =
                         unwrap_or_print_error!(bud.evaluate(&buffer), &source_id, source_cache);
 
-                    println!("> {result}");
+                    print_value(true, &result);
                 }
                 Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
                     break Ok(());
@@ -128,10 +128,22 @@ fn main() -> anyhow::Result<()> {
     } else {
         let mut piped = String::new();
         stdin().read_to_string(&mut piped)?;
-        let result = bud.evaluate::<Value>(&piped).unwrap();
-        println!("{result}");
+        if !piped.is_empty() {
+            let result = bud.evaluate::<Value>(&piped).unwrap();
+            print_value(false, &result);
+        }
 
         Ok(())
+    }
+}
+
+fn print_value(is_interactive: bool, value: &Value) {
+    if !matches!(value, Value::Void) {
+        if is_interactive {
+            println!("> {value}");
+        } else {
+            println!("{value}");
+        }
     }
 }
 
@@ -215,108 +227,6 @@ fn print_error(
         eprintln!("Error: {error}");
     }
     Ok(())
-
-    // match error.kind {
-    //     ErrorKind::Halt(arg) => {
-    //         report = report.with_message("halt!");
-    //         if !arg.is_empty() {
-    //             let arg_as_string = arg.to_string();
-    //             report.add_label(
-    //                 ariadne::Label::new((arg.source.source.clone(), arg.source.range))
-    //                     .with_message(arg_as_string),
-    //             );
-    //         }
-    //     }
-    //     ErrorKind::ValueOutOfRange => {
-    //         report = report.with_message("invalid value");
-    //         report.add_label(
-    //             ariadne::Label::new((error.source.source, error.source.range))
-    //                 .with_message("value out of range"),
-    //         );
-    //     }
-    //     ErrorKind::MissingEnd(ch) => {
-    //         report = report.with_message(format!("missing end '{ch}'"));
-    //         report.add_label(
-    //             ariadne::Label::new((error.source.source, error.source.range))
-    //                 .with_message(format!("missing end '{ch}'")),
-    //         );
-    //     }
-    //     ErrorKind::UnexpectedParen => {
-    //         report = report.with_message("unexpected ')'");
-    //         report.add_label(
-    //             ariadne::Label::new((error.source.source, error.source.range))
-    //                 .with_message("this ')' has no opening '('"),
-    //         );
-    //     }
-    //     ErrorKind::UndefinedVariable(name) => {
-    //         report = report.with_message("undefined variable");
-    //         report.add_label(
-    //             ariadne::Label::new((error.source.source, error.source.range))
-    //                 .with_message(format!("no variable named '{name}' was found")),
-    //         );
-    //     }
-    //     ErrorKind::UndefinedFunction(name) => {
-    //         report = report.with_message("undefined invokable");
-    //         report.add_label(
-    //             ariadne::Label::new((error.source.source, error.source.range))
-    //                 .with_message(format!("no invokable named `{name}` was found")),
-    //         );
-    //     }
-    //     ErrorKind::UnexpectedChar(ch) => {
-    //         report = report.with_message("parse error");
-    //         report.add_label(
-    //             ariadne::Label::new((error.source.source, error.source.range))
-    //                 .with_message(format!("'{ch}' is not valid here")),
-    //         );
-    //     }
-    //     ErrorKind::TypeMismatch { expected, found } => {
-    //         report = report.with_message("type mismatch");
-    //         report.add_label(
-    //             ariadne::Label::new((found.source.source.clone(), found.source.range.clone()))
-    //                 .with_message(format!(
-    //                     "expected {expected}, but found `{found}` ({})",
-    //                     found.kind()
-    //                 )),
-    //         );
-    //     }
-    //     ErrorKind::InvalidTypeForOperation { atom, message } => {
-    //         report = report.with_message(message);
-    //         report.add_label(
-    //             ariadne::Label::new((atom.source.source, atom.source.range))
-    //                 .with_message(format!("found atom `{}`", atom.primitive)),
-    //         );
-    //     }
-    //     ErrorKind::Expected { message, found } => {
-    //         report = report.with_message(format!("expected {message}"));
-    //         report.add_label(
-    //             ariadne::Label::new((found.source.source.clone(), found.source.range.clone()))
-    //                 .with_message(format!("found `{found}`")),
-    //         );
-    //     }
-    //     ErrorKind::Other(message) => {
-    //         report = report.with_message(message);
-    //     }
-    // }
-    // for frame in error.stack {
-    //     report.add_label(
-    //         ariadne::Label::new((frame.location.source, frame.location.range)).with_message(
-    //             if let Some(name) = frame.name {
-    //                 format!("while invoking `{name}`")
-    //             } else {
-    //                 String::from("while evaluating")
-    //             },
-    //         ),
-    //     );
-    // }
-    // report
-    //     .with_config(
-    //         ariadne::Config::default()
-    //             .with_label_attach(ariadne::LabelAttach::Start)
-    //             .with_underlines(false),
-    //     )
-    //     .finish()
-    //     .eprint(cache)?;
-    // Ok(())
 }
 
 pub static DEFAULT_PROMPT_INDICATOR: &str = ") ";

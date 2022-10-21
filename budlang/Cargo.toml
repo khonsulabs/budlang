@@ -13,5 +13,3 @@ edition = "2021"
 keywords = ["scripting", "language"]
 categories = ["compilers"]
 readme = "./README.md"
-
-[dependencies]

@@ -6,6 +6,7 @@ use std::{
 };
 
 use crate::{
+    map::BudMap,
     symbol::Symbol,
     vm::{DynamicValue, Value},
 };
@@ -16,7 +17,7 @@ use super::{FaultKind, PoppedValues};
 /// a [`Value`] that does not support hashing by returning an error.
 ///
 /// This type uses a [`Mutex`] for interior mutability.
-pub struct HashMap<State = RandomState>(Mutex<std::collections::HashMap<Value, Value, State>>)
+pub struct HashMap<State = RandomState>(Mutex<BudMap<Value, Value, State>>)
 where
     State: BuildHasher;
 
@@ -35,14 +36,14 @@ where
     }
 }
 
-impl<State> From<std::collections::HashMap<Value, Value, State>> for HashMap<State>
-where
-    State: BuildHasher,
-{
-    fn from(collection: std::collections::HashMap<Value, Value, State>) -> Self {
-        Self(Mutex::new(collection))
-    }
-}
+// impl<State> From<std::collections::HashMap<Value, Value, State>> for HashMap<State>
+// where
+//     State: BuildHasher,
+// {
+//     fn from(collection: std::collections::HashMap<Value, Value, State>) -> Self {
+//         Self(Mutex::new(collection))
+//     }
+// }
 
 impl HashMap<RandomState> {
     /// Returns a new, empty hash map.
@@ -50,49 +51,49 @@ impl HashMap<RandomState> {
     /// Equivalent to [`std::collections::HashMap::new()`].
     #[must_use]
     pub fn new() -> Self {
-        Self(Mutex::new(std::collections::HashMap::new()))
+        Self(Mutex::new(BudMap::default()))
     }
 
-    /// Returns a hash map that can contain at least `capacity` without
-    /// reallocation.
-    ///
-    /// Equivalent to [`std::collections::HashMap::with_capacity()`].
-    #[must_use]
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(Mutex::new(std::collections::HashMap::with_capacity(
-            capacity,
-        )))
-    }
+    // /// Returns a hash map that can contain at least `capacity` without
+    // /// reallocation.
+    // ///
+    // /// Equivalent to [`std::collections::HashMap::with_capacity()`].
+    // #[must_use]
+    // pub fn with_capacity(capacity: usize) -> Self {
+    //     Self(Mutex::new(std::collections::HashMap::with_capacity(
+    //         capacity,
+    //     )))
+    // }
 }
 
 impl<State> HashMap<State>
 where
     State: BuildHasher,
 {
-    /// Returns a new, empty hash map that uses `hash_builder` to initialize the
-    /// hasher used for this map.
-    ///
-    /// Equivalent to [`std::collections::HashMap::with_hasher()`].
-    #[must_use]
-    pub fn with_hasher(hash_builder: State) -> Self {
-        Self(Mutex::new(std::collections::HashMap::with_hasher(
-            hash_builder,
-        )))
-    }
+    // /// Returns a new, empty hash map that uses `hash_builder` to initialize the
+    // /// hasher used for this map.
+    // ///
+    // /// Equivalent to [`std::collections::HashMap::with_hasher()`].
+    // #[must_use]
+    // pub fn with_hasher(hash_builder: State) -> Self {
+    //     Self(Mutex::new(std::collections::HashMap::with_hasher(
+    //         hash_builder,
+    //     )))
+    // }
 
-    /// Returns a hash map that can contain at least `capacity` without
-    /// reallocation, using `hash_builder` to initialize the hasher used for
-    /// this map.
-    ///
-    /// Equivalent to [`std::collections::HashMap::with_capacity_and_hasher()`].
-    #[must_use]
-    pub fn with_capacity_and_hasher(capacity: usize, hash_builder: State) -> Self {
-        Self(Mutex::new(
-            std::collections::HashMap::with_capacity_and_hasher(capacity, hash_builder),
-        ))
-    }
+    // /// Returns a hash map that can contain at least `capacity` without
+    // /// reallocation, using `hash_builder` to initialize the hasher used for
+    // /// this map.
+    // ///
+    // /// Equivalent to [`std::collections::HashMap::with_capacity_and_hasher()`].
+    // #[must_use]
+    // pub fn with_capacity_and_hasher(capacity: usize, hash_builder: State) -> Self {
+    //     Self(Mutex::new(
+    //         std::collections::HashMap::with_capacity_and_hasher(capacity, hash_builder),
+    //     ))
+    // }
 
-    fn map(&self) -> MutexGuard<'_, std::collections::HashMap<Value, Value, State>> {
+    fn map(&self) -> MutexGuard<'_, BudMap<Value, Value, State>> {
         self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
@@ -129,7 +130,7 @@ where
     }
 
     /// Extracts the contained collection type.
-    pub fn into_inner(self) -> std::collections::HashMap<Value, Value, State> {
+    pub fn into_inner(self) -> BudMap<Value, Value, State> {
         self.0.into_inner().unwrap_or_else(PoisonError::into_inner)
     }
 }
@@ -143,7 +144,7 @@ impl<'a> TryFrom<PoppedValues<'a>> for HashMap<RandomState> {
                 "odd number of arguments passed to map constructor",
             ));
         }
-        let mut map = std::collections::HashMap::with_capacity(values.len() / 2);
+        let mut map = BudMap::with_capacity(values.len() / 2);
 
         while let Some(key) = values.next() {
             let value = values.next().expect("checked for odd length");
@@ -151,7 +152,7 @@ impl<'a> TryFrom<PoppedValues<'a>> for HashMap<RandomState> {
             map.insert(check_hashable(key)?, value);
         }
 
-        Ok(Self::from(map))
+        Ok(Self(Mutex::new(map)))
     }
 }
 
@@ -165,7 +166,7 @@ fn check_hashable(value: Value) -> Result<Value, FaultKind> {
 
 impl<State> Debug for HashMap<State>
 where
-    State: BuildHasher,
+    State: BuildHasher + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self.0, f)
@@ -174,7 +175,7 @@ where
 
 impl<State> DynamicValue for HashMap<State>
 where
-    State: BuildHasher + Clone + Send + Sync + 'static,
+    State: BuildHasher + Debug + Clone + Send + Sync + 'static,
 {
     fn is_truthy(&self) -> bool {
         !self.map().is_empty()
