@@ -233,10 +233,24 @@ fn random_build_and_drain<Hasher: BuildHasher>(hasher: Hasher, maximum_size: usi
 
 #[test]
 fn random_build_and_drain_bad_hasher() {
-    random_build_and_drain(BadHasher(0), 3_000);
+    // miri runs out of memory in CI when run with too large of a data set. Give
+    // that this map has no unsafe code, we could just ignore the tests but it
+    // seems better to just reduce the count.
+    #[cfg(miri)]
+    const COUNT: usize = 300;
+    #[cfg(not(miri))]
+    const COUNT: usize = 3_000;
+    random_build_and_drain(BadHasher(0), COUNT);
 }
 
 #[test]
 fn random_build_and_drain_std_hasher() {
-    random_build_and_drain(RandomState::default(), 5_000);
+    // miri runs out of memory in CI when run with too large of a data set. Give
+    // that this map has no unsafe code, we could just ignore the tests but it
+    // seems better to just reduce the count.
+    #[cfg(miri)]
+    const COUNT: usize = 500;
+    #[cfg(not(miri))]
+    const COUNT: usize = 5_000;
+    random_build_and_drain(RandomState::default(), COUNT);
 }
