@@ -1,5 +1,4 @@
 use std::{
-    cmp::Ordering,
     collections::hash_map::RandomState,
     hash::{BuildHasher, Hash, Hasher},
     slice,
