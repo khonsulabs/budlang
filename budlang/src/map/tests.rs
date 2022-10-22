@@ -4,7 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::map::BudMap;
+use crate::map::{BudMap, Entry};
 
 /// This hash implementor is designed to cause collisions by being a terrible
 /// algorithm (only xor) and restricting the hash space to 8 bits. This means
@@ -52,16 +52,26 @@ impl DebugRng {
 #[test]
 fn ordered_map_test() {
     let mut map = BudMap::default();
+    assert!(map.is_empty());
+    assert_eq!(map.get(&0), None);
+    assert_eq!(map.remove(&0), None);
+    assert_eq!(map.get_by_index(0), None);
+    assert_eq!(map.iter().next(), None);
+
     map.insert(1, 1);
     map.insert(4, 2);
     map.insert(2, 3);
     map.insert(3, 4);
     map.insert(5, 5);
+
+    // Verify get-by-index ordering
     assert_eq!(map.get_by_index(0), Some(&1));
     assert_eq!(map.get_by_index(1), Some(&2));
     assert_eq!(map.get_by_index(2), Some(&3));
     assert_eq!(map.get_by_index(3), Some(&4));
     assert_eq!(map.get_by_index(4), Some(&5));
+
+    // Verify iteration order
     let mut iter = map.iter();
     assert_eq!(iter.next(), Some((&1, &1)));
     assert_eq!(iter.next(), Some((&4, &2)));
@@ -70,18 +80,37 @@ fn ordered_map_test() {
     assert_eq!(iter.next(), Some((&5, &5)));
     assert!(iter.next().is_none());
 
+    // Verify retrieving by key works
+    assert_eq!(map.get(&1), Some(&1));
+    assert_eq!(map.get(&4), Some(&2));
+    assert_eq!(map.get(&2), Some(&3));
+    assert_eq!(map.get(&3), Some(&4));
+    assert_eq!(map.get(&5), Some(&5));
+
+    // Remove an entry
     assert_eq!(map.remove(&2), Some(3));
+
+    // Verify the new order matches what we expect with indexing
     assert_eq!(map.get_by_index(0), Some(&1));
     assert_eq!(map.get_by_index(1), Some(&2));
     assert_eq!(map.get_by_index(2), Some(&5));
     assert_eq!(map.get_by_index(3), Some(&4));
     assert_eq!(map.get_by_index(4), None);
+
+    // Verify new order with iteration
     let mut iter = map.iter();
     assert_eq!(iter.next(), Some((&1, &1)));
     assert_eq!(iter.next(), Some((&4, &2)));
     assert_eq!(iter.next(), Some((&5, &5)));
     assert_eq!(iter.next(), Some((&3, &4)));
     assert!(iter.next().is_none());
+
+    // Verify key status
+    assert_eq!(map.get(&1), Some(&1));
+    assert_eq!(map.get(&4), Some(&2));
+    assert_eq!(map.get(&2), None);
+    assert_eq!(map.get(&3), Some(&4));
+    assert_eq!(map.get(&5), Some(&5));
 }
 
 impl BuildHasher for BadHasher {
@@ -253,4 +282,65 @@ fn random_build_and_drain_std_hasher() {
     #[cfg(not(miri))]
     const COUNT: usize = 5_000;
     random_build_and_drain(RandomState::default(), COUNT);
+}
+
+#[test]
+fn entry() {
+    let mut map = BudMap::default();
+    assert!(matches!(map.entry(0), Entry::Vacant(_)));
+    // Ensure that the vacant entry didn't show up somehow.
+    assert_eq!(map.len(), 0);
+
+    match map.entry(0) {
+        Entry::Vacant(entry) => entry.insert("a"),
+        Entry::Occupied(_) => unreachable!(),
+    }
+
+    assert_eq!(map.len(), 1);
+    assert_eq!(map.get(&0), Some(&"a"));
+
+    match map.entry(0) {
+        Entry::Occupied(entry) => {
+            assert_eq!(entry.key(), &0);
+            assert_eq!(entry.value(), &"a");
+            assert_eq!(entry.replace("b"), "a");
+        }
+        Entry::Vacant(_) => unreachable!(),
+    }
+    assert_eq!(map.get(&0), Some(&"b"));
+
+    match map.entry(0) {
+        Entry::Occupied(entry) => {
+            assert_eq!(entry.remove(), "b");
+        }
+        Entry::Vacant(_) => unreachable!(),
+    }
+    assert_eq!(map.get(&0), None);
+}
+
+#[test]
+fn hash_misses() {
+    // Because we know bad hasher's approach to hashing, we can create some
+    // specific test cases that are hard to cover otherwise.
+    let mut map = BudMap::with_hasher(BadHasher(0));
+    map.insert(0xFF, 1);
+    map.insert(0xFF00, 2);
+
+    // We've tested the simple paths in other tests, but testing that collision
+    // paths return None on various APIs isn't covered anywhere else.
+    assert_eq!(map.get(&0x00FF_0000), None);
+    assert_eq!(map.remove(&0x00FF_0000), None);
+    assert!(matches!(map.entry(0x00FF_0000), Entry::Vacant(_)));
+}
+
+#[test]
+fn collision_reuse() {
+    let mut map = BudMap::with_hasher(BadHasher(0));
+    map.insert(0xFF, 1);
+    assert_eq!(map.bins.len(), 8, "smallest map size changed");
+    map.insert(0xFF00, 2);
+    assert_eq!(map.bins.len(), 9, "didn't collide");
+    assert_eq!(map.remove(&0xFF00), Some(2));
+    map.insert(0xFF00, 3);
+    assert_eq!(map.bins.len(), 9, "new bin allocated");
 }

@@ -17,7 +17,7 @@ use std::{
 /// this collection that doesn't require borrowing the original value.
 /// Additionally, methods can be used to retrieve entries by index instead of
 /// just by key.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BudMap<Key, Value, HashBuilder = RandomState> {
     /// A dense list of all entries in this map. This is where the actual
     /// key/value data is stored.
@@ -35,29 +35,6 @@ pub struct BudMap<Key, Value, HashBuilder = RandomState> {
     free_collision_head: OptionalIndex,
     /// The [`BuildHasher`] implementor via which keys are hashed.
     hash_builder: HashBuilder,
-}
-
-impl<Key, Value, HashBuilder> Clone for BudMap<Key, Value, HashBuilder>
-where
-    Key: Clone,
-    Value: Clone,
-    HashBuilder: Clone,
-{
-    fn clone(&self) -> Self {
-        fn clone_vec_with_capacity<T: Clone>(vec: &Vec<T>) -> Vec<T> {
-            let mut new_vec = Vec::with_capacity(vec.capacity());
-            new_vec.extend_from_slice(vec);
-            new_vec
-        }
-
-        Self {
-            entries: clone_vec_with_capacity(&self.entries),
-            bins: clone_vec_with_capacity(&self.bins),
-            bin_mask: self.bin_mask,
-            free_collision_head: self.free_collision_head,
-            hash_builder: self.hash_builder.clone(),
-        }
-    }
 }
 
 impl<Key, Value> Default for BudMap<Key, Value, RandomState> {
@@ -168,8 +145,6 @@ where
         let should_grow = match (current_length, current_capacity) {
             // No capacity, always grow
             (0, _) => true,
-            // Map with 4 bins, reallocate on the fourth
-            (current_length, 4) => current_length == 4,
             // Map with 8 bins, reallocate on the 6th
             (current_length, 8) => current_length >= 6,
             // Map with 16 bins, reallocate on the 13th
@@ -204,24 +179,16 @@ where
                 let capacity_growth = new_bin_count - self.entries.len();
                 self.entries.reserve_exact(capacity_growth);
 
-                // Clear and extend the bins
-                match new_bin_count.cmp(&self.bins.len()) {
-                    Ordering::Less | Ordering::Equal => {
-                        self.bins.truncate(new_bin_count);
-                        self.bins.fill(Bin::default());
-                    }
-                    Ordering::Greater => {
-                        // Trying to reuse the existing vec here will always
-                        // cause extra data IO than necessary, beacuse we are
-                        // clearing the existing bins. If we clear before we
-                        // extend, the data written for the clear is an extra
-                        // write that could be avoided. If we clear after we
-                        // extend, the underlying data copy when the vec is
-                        // resized is wasted.
-                        self.bins.clear();
-                        self.bins.resize(new_bin_count, Bin::default());
-                    }
-                }
+                // Clear and extend the bins.
+                // Trying to reuse the existing vec here will always
+                // cause extra data IO than necessary, beacuse we are
+                // clearing the existing bins. If we clear before we
+                // extend, the data written for the clear is an extra
+                // write that could be avoided. If we clear after we
+                // extend, the underlying data copy when the vec is
+                // resized is wasted.
+                self.bins.clear();
+                self.bins.resize(new_bin_count, Bin::default());
 
                 self.bin_mask = BinMask::from_count(new_bin_count);
                 self.free_collision_head = OptionalIndex::none();
@@ -630,7 +597,6 @@ const fn hash_to_bin(hash: u64, bins: BinMask) -> usize {
 }
 
 fn next_bucket_size(current_size: usize) -> Option<usize> {
-    // Return a minimum of 4, making the smallest map able to contain 3 elements.
     Some(current_size.checked_next_power_of_two()?.max(8))
 }
 
