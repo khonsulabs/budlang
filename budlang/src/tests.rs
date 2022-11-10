@@ -387,3 +387,32 @@ fn loops() {
         .unwrap();
     assert_eq!(result, 100);
 }
+
+#[test]
+fn conditioned_loops() {
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                a := 0
+                loop while a < 10
+                    a := a + 1
+                end
+                a
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 10);
+
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                a := 0
+                loop until a = 10
+                    a := a + 1
+                end
+                a
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 10);
+}

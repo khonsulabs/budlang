@@ -12,8 +12,8 @@ use std::{
 
 use crate::{
     ast::{
-        BinOpKind, Break, Call, CodeUnit, Continue, Function, If, Loop, Mapping, NodeId,
-        SyntaxTreeBuilder,
+        BinOpKind, Break, Call, CodeUnit, Continue, Function, If, Loop, LoopParameters, Mapping,
+        NodeId, SyntaxTreeBuilder,
     },
     symbol::Symbol,
     vm::Comparison,
@@ -745,13 +745,29 @@ fn parse_expression(
             };
 
             let next_token = tokens.expect_next("loop condition or end of line")?;
-            match &next_token.kind {
-                TokenKind::Identifier(sym) if sym == "while" => todo!("while loop"),
-                TokenKind::Identifier(sym) if sym == "until" => todo!("until loop"),
+            let parameters = match &next_token.kind {
+                TokenKind::Identifier(sym) if sym == "while" => {
+                    let first_token = tokens.expect_next("loop condition")?;
+                    Some(LoopParameters::While(parse_expression(
+                        first_token,
+                        tree,
+                        tokens,
+                        owning_function_name,
+                    )?))
+                }
+                TokenKind::Identifier(sym) if sym == "until" => {
+                    let first_token = tokens.expect_next("loop condition")?;
+                    Some(LoopParameters::Until(parse_expression(
+                        first_token,
+                        tree,
+                        tokens,
+                        owning_function_name,
+                    )?))
+                }
                 TokenKind::Identifier(sym) if sym == "for" => todo!("for loop"),
-                TokenKind::EndOfLine => {}
+                TokenKind::EndOfLine => None,
                 _ => return Err(ParseError::Unexpected(next_token)),
-            }
+            };
 
             let body = parse_statements(tree, tokens, owning_function_name)?;
             match tokens.expect_next("end")?.kind {
@@ -760,7 +776,11 @@ fn parse_expression(
             }
             tokens.expect_end_of_line_or_eof()?;
 
-            Ok(tree.loop_node(Loop { name, body }))
+            Ok(tree.loop_node(Loop {
+                name,
+                parameters,
+                body,
+            }))
         }
         TokenKind::Identifier(symbol) if symbol == "break" || symbol == "continue" => {
             parse_loop_keyword(symbol, tree, tokens, owning_function_name)

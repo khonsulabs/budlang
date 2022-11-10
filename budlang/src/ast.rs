@@ -617,6 +617,7 @@ impl List {
 #[derive(Debug)]
 pub struct Loop {
     pub name: Option<Symbol>,
+    pub parameters: Option<LoopParameters>,
     pub body: NodeId,
 }
 
@@ -630,7 +631,42 @@ impl Loop {
         let mut scope = operations.begin_loop(self.name.clone(), result);
 
         let continue_label = scope.continue_label;
+        let break_label = scope.break_label;
+
         scope.label_continue();
+
+        match &self.parameters {
+            Some(LoopParameters::Until(expr)) => {
+                let condition_result = scope.new_temporary_variable();
+                let continue_evaluation = scope.new_label();
+                tree.node(*expr).generate_code(
+                    Destination::Variable(condition_result),
+                    &mut scope,
+                    tree,
+                )?;
+                scope.push(Instruction::If {
+                    condition: LiteralOrSource::Variable(condition_result),
+                    false_jump_to: continue_evaluation,
+                });
+                scope.push(Instruction::JumpTo(break_label));
+
+                scope.label(continue_evaluation);
+            }
+            Some(LoopParameters::While(expr)) => {
+                let condition_result = scope.new_temporary_variable();
+                tree.node(*expr).generate_code(
+                    Destination::Variable(condition_result),
+                    &mut scope,
+                    tree,
+                )?;
+                scope.push(Instruction::If {
+                    condition: LiteralOrSource::Variable(condition_result),
+                    false_jump_to: break_label,
+                });
+            }
+            None => {}
+        }
+
         let body = tree.node(self.body);
         body.generate_code(result, &mut scope, tree)?;
         scope.push(Instruction::JumpTo(continue_label));
@@ -638,6 +674,12 @@ impl Loop {
 
         Ok(())
     }
+}
+
+#[derive(Debug)]
+pub enum LoopParameters {
+    Until(NodeId),
+    While(NodeId),
 }
 
 #[derive(Clone, Debug)]
