@@ -11,7 +11,10 @@ use std::{
 };
 
 use crate::{
-    ast::{BinOpKind, Call, CodeUnit, Function, If, Mapping, NodeId, SyntaxTreeBuilder},
+    ast::{
+        BinOpKind, Break, Call, CodeUnit, Continue, Function, If, Loop, Mapping, NodeId,
+        SyntaxTreeBuilder,
+    },
     symbol::Symbol,
     vm::Comparison,
 };
@@ -57,6 +60,7 @@ enum TokenKind {
     Comma,
     Period,
     Colon,
+    Hash,
     Unknown(char),
 }
 impl Display for TokenKind {
@@ -87,6 +91,7 @@ impl Display for TokenKind {
             TokenKind::Comma => f.write_char(','),
             TokenKind::Period => f.write_char('.'),
             TokenKind::Colon => f.write_char(':'),
+            TokenKind::Hash => f.write_char('#'),
             TokenKind::Unknown(token) => Display::fmt(token, f),
         }
     }
@@ -392,6 +397,9 @@ impl<'a> Lexer<'a> {
                 }
                 Some((offset, char)) if char == '.' => {
                     Some(Ok(Token::at_offset(TokenKind::Period, offset)))
+                }
+                Some((offset, char)) if char == '#' => {
+                    Some(Ok(Token::at_offset(TokenKind::Hash, offset)))
                 }
                 Some((offset, char)) if char == '(' => Some(Ok(Token::at_offset(
                     TokenKind::Open(BracketType::Paren),
@@ -712,7 +720,90 @@ fn parse_expression(
 
             Ok(tree.if_node(if_op))
         }
+        TokenKind::Identifier(symbol) if symbol == "loop" => {
+            // loop [#label] while <expr>
+            // loop [#label] until <expr>
+            // loop [#label] for x := <initial> [down] to <break when equal> [step <amount>]
+            // loop [#label]
+            // break [#label] [expr]
+            // continue [#label]
+
+            let name = if let Some(TokenKind::Hash) = tokens.peek_token_kind() {
+                tokens.next();
+                let name = tokens.expect_next("loop name")?;
+                match name.kind {
+                    TokenKind::Identifier(name) => Some(name),
+                    other => {
+                        return Err(ParseError::Unexpected(Token {
+                            range: name.range,
+                            kind: other,
+                        }))
+                    }
+                }
+            } else {
+                None
+            };
+
+            let next_token = tokens.expect_next("loop condition or end of line")?;
+            match &next_token.kind {
+                TokenKind::Identifier(sym) if sym == "while" => todo!("while loop"),
+                TokenKind::Identifier(sym) if sym == "until" => todo!("until loop"),
+                TokenKind::Identifier(sym) if sym == "for" => todo!("for loop"),
+                TokenKind::EndOfLine => {}
+                _ => return Err(ParseError::Unexpected(next_token)),
+            }
+
+            let body = parse_statements(tree, tokens, owning_function_name)?;
+            match tokens.expect_next("end")?.kind {
+                TokenKind::Identifier(end) if end == "end" => {}
+                other => todo!("unexpected {other:?}"),
+            }
+            tokens.expect_end_of_line_or_eof()?;
+
+            Ok(tree.loop_node(Loop { name, body }))
+        }
+        TokenKind::Identifier(symbol) if symbol == "break" || symbol == "continue" => {
+            parse_loop_keyword(symbol, tree, tokens, owning_function_name)
+        }
         _ => parse_assign_expression(first_token, tree, tokens, owning_function_name),
+    }
+}
+
+fn parse_loop_keyword(
+    keyword: &Symbol,
+    tree: &SyntaxTreeBuilder,
+    tokens: &mut Lexer<'_>,
+    owning_function_name: Option<&str>,
+) -> Result<NodeId, ParseError> {
+    let name = if let Some(TokenKind::Hash) = tokens.peek_token_kind() {
+        tokens.next();
+        let name = tokens.expect_next("loop name")?;
+        match &name.kind {
+            TokenKind::Identifier(name) => Some(name.clone()),
+            _ => return Err(ParseError::Unexpected(name)),
+        }
+    } else {
+        None
+    };
+
+    if keyword == "break" {
+        let value = if let Some(TokenKind::EndOfLine) = tokens.peek_token_kind() {
+            None
+        } else {
+            let first_token = tokens.expect_next("end of line or expression")?;
+            Some(parse_expression(
+                first_token,
+                tree,
+                tokens,
+                owning_function_name,
+            )?)
+        };
+        tokens.expect_end_of_line_or_eof()?;
+        Ok(tree.break_node(Break { name, value }))
+    } else {
+        assert_eq!(keyword, "continue");
+        tokens.expect_end_of_line_or_eof()?;
+        Ok(tree.continue_node(Continue { name }))
     }
 }
 

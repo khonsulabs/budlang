@@ -317,3 +317,73 @@ fn interactive() {
         .unwrap();
     assert_eq!(session.evaluate::<i64>("bar()").unwrap(), 42);
 }
+
+#[test]
+fn loops() {
+    // Basic loop with continue and break usage
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                a := 0
+                total := 0
+                loop
+                    a := a + 1
+                    if a = 5
+                        break total
+                    else
+                        if a = 3
+                            continue
+                        end
+                    end
+                    total := total + a
+                end
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 1 + 2 + 4);
+
+    // Test labeled break
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                a := 1
+                loop #infinite
+                    loop
+                        if a = 10
+                            break #infinite a
+                        else
+                            a := a + 1
+                        end
+                    end
+                end
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 10);
+
+    // Test labeled continue
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                b := 0
+                c := 0
+                loop #outer
+                    if b = 10
+                        break c
+                    end
+                    b := b + 1
+                    a := 0
+                    loop
+                        if a = 10
+                            continue #outer
+                        end
+                        a := a + 1
+                        c := c + 1
+                        continue
+                    end
+                end
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 100);
+}

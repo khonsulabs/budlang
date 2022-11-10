@@ -80,8 +80,8 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
             Node::BinOp(binop) => f
                 .debug_struct("BinOp")
                 .field("kind", &binop.kind)
-                .field("left", &binop.left)
-                .field("right", &binop.right)
+                .field("left", &self.node(binop.left))
+                .field("right", &self.node(binop.right))
                 .finish(),
             Node::Assign(assign) => f
                 .debug_struct("Assign")
@@ -102,6 +102,10 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
                 }
                 dbg.finish()
             }
+            Node::Loop(l) => f
+                .debug_struct("Loop")
+                .field("body", &self.node(l.body))
+                .finish(),
             // Node::Lookup(lookup) => f
             //     .debug_struct("Lookup")
             //     .field("base", &self.node(lookup.base))
@@ -138,6 +142,23 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
                 let value = self.node(*value);
                 f.debug_struct("Return").field("value", &value).finish()
             }
+            Node::Break(value) => {
+                let mut s = f.debug_struct("Break");
+                if let Some(name) = &value.name {
+                    s.field("name", name);
+                }
+                if let Some(value) = value.value {
+                    s.field("result", &self.node(value));
+                }
+                s.finish()
+            }
+            Node::Continue(value) => {
+                let mut s = f.debug_struct("Continue");
+                if let Some(name) = &value.name {
+                    s.field("name", name);
+                }
+                s.finish()
+            }
         }
     }
 }
@@ -156,6 +177,9 @@ enum Node {
     // Lookup(Lookup),
     Call(Call),
     Return(NodeId),
+    Loop(Loop),
+    Break(Break),
+    Continue(Continue),
 }
 
 impl Node {
@@ -194,6 +218,9 @@ impl Node {
             // Node::Lookup(lookup) => lookup.generate_code(operations, tree),
             Node::Call(call) => call.generate_code(result, operations, tree),
             Node::Return(value) => Self::generate_return(*value, operations, tree),
+            Node::Loop(l) => l.generate_code(result, operations, tree),
+            Node::Break(l) => l.generate_code(result, operations, tree),
+            Node::Continue(l) => l.generate_code(result, operations, tree),
         }
     }
 
@@ -587,17 +614,81 @@ impl List {
     }
 }
 
-// #[derive(Debug, Clone)]
-// pub struct Lookup {
-//     base: NodeId,
-//     name: Symbol,
-// }
+#[derive(Debug)]
+pub struct Loop {
+    pub name: Option<Symbol>,
+    pub body: NodeId,
+}
 
-// impl Lookup {
-//     fn generate_code(&self, operations: &mut CodeBlockBuilder, tree: &ExpressionTree) {
-//         todo!()
-//     }
-// }
+impl Loop {
+    fn generate_code(
+        &self,
+        result: Destination,
+        operations: &mut CodeBlockBuilder,
+        tree: &ExpressionTree,
+    ) -> Result<(), CompilationError> {
+        let mut scope = operations.begin_loop(self.name.clone(), result);
+
+        let continue_label = scope.continue_label;
+        scope.label_continue();
+        let body = tree.node(self.body);
+        body.generate_code(result, &mut scope, tree)?;
+        scope.push(Instruction::JumpTo(continue_label));
+        scope.label_break();
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Break {
+    pub name: Option<Symbol>,
+    pub value: Option<NodeId>,
+}
+
+impl Break {
+    fn generate_code(
+        &self,
+        _result: Destination,
+        operations: &mut CodeBlockBuilder,
+        tree: &ExpressionTree,
+    ) -> Result<(), CompilationError> {
+        if let Some(loop_info) = operations.loop_info(self.name.as_ref()) {
+            let break_label = loop_info.break_label;
+            if let Some(value) = self.value {
+                let result = loop_info.loop_result;
+                let value = tree.node(value);
+                value.generate_code(result, operations, tree)?;
+            }
+            operations.push(Instruction::JumpTo(break_label));
+            Ok(())
+        } else {
+            todo!("not in a loop or invalid loop name")
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Continue {
+    pub name: Option<Symbol>,
+}
+
+impl Continue {
+    fn generate_code(
+        &self,
+        _result: Destination,
+        operations: &mut CodeBlockBuilder,
+        _tree: &ExpressionTree,
+    ) -> Result<(), CompilationError> {
+        if let Some(loop_info) = operations.loop_info(self.name.as_ref()) {
+            let continue_label = loop_info.continue_label;
+            operations.push(Instruction::JumpTo(continue_label));
+            Ok(())
+        } else {
+            todo!("not in a loop or invalid loop name")
+        }
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct SyntaxTreeBuilder(RefCell<Vec<Node>>);
@@ -617,6 +708,18 @@ impl SyntaxTreeBuilder {
 
     pub fn if_node(&self, node: If) -> NodeId {
         self.push(Node::If(node))
+    }
+
+    pub fn loop_node(&self, node: Loop) -> NodeId {
+        self.push(Node::Loop(node))
+    }
+
+    pub fn break_node(&self, node: Break) -> NodeId {
+        self.push(Node::Break(node))
+    }
+
+    pub fn continue_node(&self, node: Continue) -> NodeId {
+        self.push(Node::Continue(node))
     }
 
     pub fn binop_node(&self, kind: BinOpKind, left: NodeId, right: NodeId) -> NodeId {

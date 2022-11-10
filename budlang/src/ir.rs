@@ -1,10 +1,11 @@
 #![allow(missing_docs, clippy::missing_panics_doc)] // TODO docs and panics for ir
 
 use std::{
-    borrow::Cow,
+    borrow::{Borrow, BorrowMut, Cow},
     collections::HashMap,
     env,
     fmt::{Display, Write},
+    ops::{Deref, DerefMut},
 };
 
 use crate::{
@@ -361,6 +362,7 @@ pub struct CodeBlockBuilder {
     args: usize,
     temporary_variables: usize,
     scope: HashMap<Symbol, ScopeSymbol>,
+    labels: CodeLabels,
     pub(crate) variables: HashMap<Symbol, Variable>,
 }
 
@@ -404,6 +406,11 @@ impl CodeBlockBuilder {
     #[must_use]
     pub fn lookup(&self, symbol: &Symbol) -> Option<&ScopeSymbol> {
         self.scope.get(symbol)
+    }
+
+    #[must_use]
+    pub fn loop_info(&self, name: Option<&Symbol>) -> Option<&LoopInfo> {
+        self.labels.find(name)
     }
 
     pub fn store_into_destination(&mut self, value: LiteralOrSource, destination: Destination) {
@@ -471,6 +478,125 @@ impl CodeBlockBuilder {
             code: self.ops,
         }
     }
+
+    pub fn begin_loop(&mut self, name: Option<Symbol>, result: Destination) -> LoopScope<'_, Self> {
+        let break_label = self.new_label();
+        let continue_label = self.new_label();
+        self.labels.begin(LoopInfo {
+            name,
+            break_label,
+            continue_label,
+            loop_result: result,
+        });
+        LoopScope {
+            owner: self,
+            break_label,
+            continue_label,
+        }
+    }
+}
+
+pub struct LoopScope<'a, T>
+where
+    T: BorrowMut<CodeBlockBuilder>,
+{
+    owner: &'a mut T,
+    pub break_label: Label,
+    pub continue_label: Label,
+}
+
+impl<'a, T> LoopScope<'a, T>
+where
+    T: BorrowMut<CodeBlockBuilder>,
+{
+    pub fn label_break(&mut self) {
+        self.owner.borrow_mut().label(self.break_label);
+    }
+
+    pub fn label_continue(&mut self) {
+        self.owner.borrow_mut().label(self.continue_label);
+    }
+}
+
+impl<'a, T> Borrow<CodeBlockBuilder> for LoopScope<'a, T>
+where
+    T: BorrowMut<CodeBlockBuilder>,
+{
+    fn borrow(&self) -> &CodeBlockBuilder {
+        (*self.owner).borrow()
+    }
+}
+
+impl<'a, T> BorrowMut<CodeBlockBuilder> for LoopScope<'a, T>
+where
+    T: BorrowMut<CodeBlockBuilder>,
+{
+    fn borrow_mut(&mut self) -> &mut CodeBlockBuilder {
+        self.owner.borrow_mut()
+    }
+}
+
+impl<'a, T> Deref for LoopScope<'a, T>
+where
+    T: BorrowMut<CodeBlockBuilder>,
+{
+    type Target = CodeBlockBuilder;
+
+    fn deref(&self) -> &Self::Target {
+        self.borrow()
+    }
+}
+
+impl<'a, T> DerefMut for LoopScope<'a, T>
+where
+    T: BorrowMut<CodeBlockBuilder>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.owner.borrow_mut()
+    }
+}
+
+impl<'a, T> Drop for LoopScope<'a, T>
+where
+    T: BorrowMut<CodeBlockBuilder>,
+{
+    fn drop(&mut self) {
+        self.labels.exit_block();
+    }
+}
+
+#[derive(Debug, Default)]
+struct CodeLabels {
+    scopes: Vec<LoopInfo>,
+}
+
+impl CodeLabels {
+    fn begin(&mut self, info: LoopInfo) {
+        self.scopes.push(info);
+    }
+
+    fn exit_block(&mut self) {
+        self.scopes.pop();
+    }
+
+    fn find(&self, name: Option<&Symbol>) -> Option<&LoopInfo> {
+        if name.is_some() {
+            self.scopes
+                .iter()
+                .rev()
+                .find(|info| info.name.as_ref() == name)
+        } else {
+            self.scopes.last()
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LoopInfo {
+    pub name: Option<Symbol>,
+    pub break_label: Label,
+    pub continue_label: Label,
+    pub loop_result: Destination,
 }
 
 #[derive(Debug)]
