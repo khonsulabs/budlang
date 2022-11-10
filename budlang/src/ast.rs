@@ -8,8 +8,8 @@ use std::{
 
 use crate::{
     ir::{
-        self, CodeBlockBuilder, CompareAction, Destination, Instruction, Literal, LiteralOrSource,
-        Scope, ScopeSymbol, ScopeSymbolKind, UnlinkedCodeUnit,
+        self, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, Literal,
+        LiteralOrSource, LoopScope, Scope, ScopeSymbol, ScopeSymbolKind, UnlinkedCodeUnit,
     },
     symbol::{OptionalSymbol, Symbol},
     vm::{Comparison, Intrinsic},
@@ -633,38 +633,105 @@ impl Loop {
         let continue_label = scope.continue_label;
         let break_label = scope.break_label;
 
-        scope.label_continue();
-
         match &self.parameters {
             Some(LoopParameters::Until(expr)) => {
-                let condition_result = scope.new_temporary_variable();
-                let continue_evaluation = scope.new_label();
-                tree.node(*expr).generate_code(
-                    Destination::Variable(condition_result),
-                    &mut scope,
-                    tree,
-                )?;
-                scope.push(Instruction::If {
-                    condition: LiteralOrSource::Variable(condition_result),
-                    false_jump_to: continue_evaluation,
-                });
-                scope.push(Instruction::JumpTo(break_label));
-
-                scope.label(continue_evaluation);
+                Self::generate_until_preamble(*expr, break_label, &mut scope, tree)?;
             }
             Some(LoopParameters::While(expr)) => {
-                let condition_result = scope.new_temporary_variable();
-                tree.node(*expr).generate_code(
-                    Destination::Variable(condition_result),
-                    &mut scope,
-                    tree,
-                )?;
-                scope.push(Instruction::If {
-                    condition: LiteralOrSource::Variable(condition_result),
-                    false_jump_to: break_label,
-                });
+                Self::generate_while_preamble(*expr, break_label, &mut scope, tree)?;
             }
-            None => {}
+            Some(LoopParameters::For {
+                var_name,
+                initial_value,
+                stop_value,
+                step,
+                ascending,
+                inclusive,
+            }) => {
+                // Initialize the variable
+                let variable = scope.variable_index_from_name(var_name);
+                if let Some(initial_value) = *initial_value {
+                    tree.node(initial_value).generate_code(
+                        Destination::Variable(variable),
+                        &mut scope,
+                        tree,
+                    )?;
+                }
+
+                // On the first pass, we skip executing the step instructions
+                let after_step = scope.new_label();
+                scope.push(Instruction::JumpTo(after_step));
+
+                // We evaluate the value of the step once at the start of the loop, not on each iteration.
+
+                let stop_value = match tree.node(*stop_value) {
+                    Node::Literal(literal) => LiteralOrSource::Literal(literal.clone()),
+                    other => {
+                        let stop_result = scope.new_temporary_variable();
+                        other.generate_code(
+                            Destination::Variable(stop_result),
+                            &mut scope,
+                            tree,
+                        )?;
+                        LiteralOrSource::Variable(stop_result)
+                    }
+                };
+
+                let step = if let Some(step) = step {
+                    let step_result = scope.new_temporary_variable();
+                    tree.node(*step).generate_code(
+                        Destination::Variable(step_result),
+                        &mut scope,
+                        tree,
+                    )?;
+                    LiteralOrSource::Variable(step_result)
+                } else if *ascending {
+                    LiteralOrSource::Literal(Literal::Integer(1))
+                } else {
+                    LiteralOrSource::Literal(Literal::Integer(-1))
+                };
+
+                // Loop body
+                scope.label_continue();
+                // Step
+                scope.push(Instruction::Add {
+                    left: LiteralOrSource::Variable(variable),
+                    right: step,
+                    destination: Destination::Variable(variable),
+                });
+                scope.label(after_step);
+
+                // Condition check
+                match (*inclusive, *ascending) {
+                    (true, true) => scope.push(Instruction::Compare {
+                        comparison: Comparison::GreaterThanOrEqual,
+                        left: stop_value,
+                        right: LiteralOrSource::Variable(variable),
+                        action: CompareAction::JumpIfFalse(break_label),
+                    }),
+                    (true, false) => scope.push(Instruction::Compare {
+                        comparison: Comparison::LessThanOrEqual,
+                        left: stop_value,
+                        right: LiteralOrSource::Variable(variable),
+                        action: CompareAction::JumpIfFalse(break_label),
+                    }),
+                    (false, true) => scope.push(Instruction::Compare {
+                        comparison: Comparison::LessThan,
+                        left: LiteralOrSource::Variable(variable),
+                        right: stop_value,
+                        action: CompareAction::JumpIfFalse(break_label),
+                    }),
+                    (false, false) => scope.push(Instruction::Compare {
+                        comparison: Comparison::GreaterThan,
+                        left: LiteralOrSource::Variable(variable),
+                        right: stop_value,
+                        action: CompareAction::JumpIfFalse(break_label),
+                    }),
+                }
+            }
+            None => {
+                scope.label_continue();
+            }
         }
 
         let body = tree.node(self.body);
@@ -674,12 +741,60 @@ impl Loop {
 
         Ok(())
     }
+
+    fn generate_until_preamble(
+        condition: NodeId,
+        break_label: Label,
+        scope: &mut LoopScope<'_, CodeBlockBuilder>,
+        tree: &ExpressionTree,
+    ) -> Result<(), CompilationError> {
+        scope.label_continue();
+
+        let condition_result = scope.new_temporary_variable();
+        let continue_evaluation = scope.new_label();
+        tree.node(condition)
+            .generate_code(Destination::Variable(condition_result), scope, tree)?;
+        scope.push(Instruction::If {
+            condition: LiteralOrSource::Variable(condition_result),
+            false_jump_to: continue_evaluation,
+        });
+        scope.push(Instruction::JumpTo(break_label));
+
+        scope.label(continue_evaluation);
+        Ok(())
+    }
+
+    fn generate_while_preamble(
+        condition: NodeId,
+        break_label: Label,
+        scope: &mut LoopScope<'_, CodeBlockBuilder>,
+        tree: &ExpressionTree,
+    ) -> Result<(), CompilationError> {
+        scope.label_continue();
+
+        let condition_result = scope.new_temporary_variable();
+        tree.node(condition)
+            .generate_code(Destination::Variable(condition_result), scope, tree)?;
+        scope.push(Instruction::If {
+            condition: LiteralOrSource::Variable(condition_result),
+            false_jump_to: break_label,
+        });
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
 pub enum LoopParameters {
     Until(NodeId),
     While(NodeId),
+    For {
+        var_name: Symbol,
+        initial_value: Option<NodeId>,
+        stop_value: NodeId,
+        step: Option<NodeId>,
+        ascending: bool,
+        inclusive: bool,
+    },
 }
 
 #[derive(Clone, Debug)]

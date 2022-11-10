@@ -416,3 +416,55 @@ fn conditioned_loops() {
         .unwrap();
     assert_eq!(result, 10);
 }
+
+#[test]
+fn for_loops() {
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                sum := 0
+                loop for x := 0 to 5
+                    sum := sum + x
+                end
+                sum
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 1 + 2 + 3 + 4);
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                sum := 0
+                loop for x := 0 to 5 inclusive
+                    sum := sum + x
+                end
+                sum
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 1 + 2 + 3 + 4 + 5);
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                sum := 0
+                loop for x := 5 down to 1
+                    sum := sum + x
+                end
+                sum
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 5 + 4 + 3 + 2);
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                sum := 0
+                loop for x := 5 down to 1 inclusive
+                    sum := sum + x
+                end
+                sum
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 5 + 4 + 3 + 2 + 1);
+}
