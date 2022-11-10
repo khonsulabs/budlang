@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/vm/map.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>map.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../budlang/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/vm/map.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>map.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../budlang/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -256,263 +256,263 @@
 <span id="256">256</span>
 <span id="257">257</span>
 <span id="258">258</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">collections::hash_map::RandomState</span>,
-    <span class="ident">fmt::Debug</span>,
-    <span class="ident">hash::BuildHasher</span>,
-    <span class="ident">sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>, <span class="ident">PoisonError</span>},
+</pre><pre class="rust"><code><span class="kw">use </span>std::{
+    collections::hash_map::RandomState,
+    fmt::Debug,
+    hash::BuildHasher,
+    sync::{Mutex, MutexGuard, PoisonError},
 };
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">map::BudMap</span>,
-    <span class="ident">symbol::Symbol</span>,
-    <span class="ident">vm</span>::{<span class="ident">DynamicValue</span>, <span class="ident">Value</span>},
+<span class="kw">use crate</span>::{
+    map::BudMap,
+    symbol::Symbol,
+    vm::{DynamicValue, Value},
 };
 
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">FaultKind</span>, <span class="ident">PoppedValues</span>};
+<span class="kw">use super</span>::{FaultKind, PoppedValues};
 
-<span class="doccomment">/// A wrapper for [`std::collections::HashMap&lt;Value,Value&gt;`] that prevents using</span>
-<span class="doccomment">/// a [`Value`] that does not support hashing by returning an error.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This type uses a [`Mutex`] for interior mutability.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span> <span class="op">=</span> <span class="ident">RandomState</span><span class="op">&gt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BudMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span>)
-<span class="kw">where</span>
-    <span class="ident">State</span>: <span class="ident">BuildHasher</span>;
+<span class="doccomment">/// A wrapper for [`std::collections::HashMap&lt;Value,Value&gt;`] that prevents using
+/// a [`Value`] that does not support hashing by returning an error.
+///
+/// This type uses a [`Mutex`] for interior mutability.
+</span><span class="kw">pub struct </span>HashMap&lt;State = RandomState&gt;(Mutex&lt;BudMap&lt;Value, Value, State&gt;&gt;)
+<span class="kw">where
+    </span>State: BuildHasher;
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">RandomState</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::new</span>()
+<span class="kw">impl </span>Default <span class="kw">for </span>HashMap&lt;RandomState&gt; {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::new()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">State</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">BuildHasher</span>,
+<span class="kw">impl</span>&lt;State&gt; Clone <span class="kw">for </span>HashMap&lt;State&gt;
+<span class="kw">where
+    </span>State: Clone + BuildHasher,
 {
-    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="self">self</span>.<span class="ident">map</span>().<span class="ident">clone</span>()))
+    <span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(Mutex::new(<span class="self">self</span>.map().clone()))
     }
 }
 
-<span class="comment">// impl&lt;State&gt; From&lt;std::collections::HashMap&lt;Value, Value, State&gt;&gt; for HashMap&lt;State&gt;</span>
-<span class="comment">// where</span>
-<span class="comment">//     State: BuildHasher,</span>
-<span class="comment">// {</span>
-<span class="comment">//     fn from(collection: std::collections::HashMap&lt;Value, Value, State&gt;) -&gt; Self {</span>
-<span class="comment">//         Self(Mutex::new(collection))</span>
-<span class="comment">//     }</span>
-<span class="comment">// }</span>
+<span class="comment">// impl&lt;State&gt; From&lt;std::collections::HashMap&lt;Value, Value, State&gt;&gt; for HashMap&lt;State&gt;
+// where
+//     State: BuildHasher,
+// {
+//     fn from(collection: std::collections::HashMap&lt;Value, Value, State&gt;) -&gt; Self {
+//         Self(Mutex::new(collection))
+//     }
+// }
 
-<span class="kw">impl</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">RandomState</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Returns a new, empty hash map.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Equivalent to [`std::collections::HashMap::new()`].</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="ident">BudMap::default</span>()))
+</span><span class="kw">impl </span>HashMap&lt;RandomState&gt; {
+    <span class="doccomment">/// Returns a new, empty hash map.
+    ///
+    /// Equivalent to [`std::collections::HashMap::new()`].
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(Mutex::new(BudMap::default()))
     }
 
-    <span class="comment">// /// Returns a hash map that can contain at least `capacity` without</span>
-    <span class="comment">// /// reallocation.</span>
-    <span class="comment">// ///</span>
-    <span class="comment">// /// Equivalent to [`std::collections::HashMap::with_capacity()`].</span>
-    <span class="comment">// #[must_use]</span>
-    <span class="comment">// pub fn with_capacity(capacity: usize) -&gt; Self {</span>
-    <span class="comment">//     Self(Mutex::new(std::collections::HashMap::with_capacity(</span>
-    <span class="comment">//         capacity,</span>
-    <span class="comment">//     )))</span>
-    <span class="comment">// }</span>
-}
+    <span class="comment">// /// Returns a hash map that can contain at least `capacity` without
+    // /// reallocation.
+    // ///
+    // /// Equivalent to [`std::collections::HashMap::with_capacity()`].
+    // #[must_use]
+    // pub fn with_capacity(capacity: usize) -&gt; Self {
+    //     Self(Mutex::new(std::collections::HashMap::with_capacity(
+    //         capacity,
+    //     )))
+    // }
+</span>}
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">State</span>: <span class="ident">BuildHasher</span>,
+<span class="kw">impl</span>&lt;State&gt; HashMap&lt;State&gt;
+<span class="kw">where
+    </span>State: BuildHasher,
 {
-    <span class="comment">// /// Returns a new, empty hash map that uses `hash_builder` to initialize the</span>
-    <span class="comment">// /// hasher used for this map.</span>
-    <span class="comment">// ///</span>
-    <span class="comment">// /// Equivalent to [`std::collections::HashMap::with_hasher()`].</span>
-    <span class="comment">// #[must_use]</span>
-    <span class="comment">// pub fn with_hasher(hash_builder: State) -&gt; Self {</span>
-    <span class="comment">//     Self(Mutex::new(std::collections::HashMap::with_hasher(</span>
-    <span class="comment">//         hash_builder,</span>
-    <span class="comment">//     )))</span>
-    <span class="comment">// }</span>
+    <span class="comment">// /// Returns a new, empty hash map that uses `hash_builder` to initialize the
+    // /// hasher used for this map.
+    // ///
+    // /// Equivalent to [`std::collections::HashMap::with_hasher()`].
+    // #[must_use]
+    // pub fn with_hasher(hash_builder: State) -&gt; Self {
+    //     Self(Mutex::new(std::collections::HashMap::with_hasher(
+    //         hash_builder,
+    //     )))
+    // }
 
-    <span class="comment">// /// Returns a hash map that can contain at least `capacity` without</span>
-    <span class="comment">// /// reallocation, using `hash_builder` to initialize the hasher used for</span>
-    <span class="comment">// /// this map.</span>
-    <span class="comment">// ///</span>
-    <span class="comment">// /// Equivalent to [`std::collections::HashMap::with_capacity_and_hasher()`].</span>
-    <span class="comment">// #[must_use]</span>
-    <span class="comment">// pub fn with_capacity_and_hasher(capacity: usize, hash_builder: State) -&gt; Self {</span>
-    <span class="comment">//     Self(Mutex::new(</span>
-    <span class="comment">//         std::collections::HashMap::with_capacity_and_hasher(capacity, hash_builder),</span>
-    <span class="comment">//     ))</span>
-    <span class="comment">// }</span>
+    // /// Returns a hash map that can contain at least `capacity` without
+    // /// reallocation, using `hash_builder` to initialize the hasher used for
+    // /// this map.
+    // ///
+    // /// Equivalent to [`std::collections::HashMap::with_capacity_and_hasher()`].
+    // #[must_use]
+    // pub fn with_capacity_and_hasher(capacity: usize, hash_builder: State) -&gt; Self {
+    //     Self(Mutex::new(
+    //         std::collections::HashMap::with_capacity_and_hasher(capacity, hash_builder),
+    //     ))
+    // }
 
-    <span class="kw">fn</span> <span class="ident">map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">BudMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">PoisonError::into_inner</span>)
+    </span><span class="kw">fn </span>map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MutexGuard&lt;<span class="lifetime">&#39;_</span>, BudMap&lt;Value, Value, State&gt;&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    <span class="doccomment">/// Returns the number of items contained.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">map</span>().<span class="ident">len</span>()
+    <span class="doccomment">/// Returns the number of items contained.
+    </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.map().len()
     }
 
-    <span class="doccomment">/// Returns true if this map contains no items.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">map</span>().<span class="ident">is_empty</span>()
+    <span class="doccomment">/// Returns true if this map contains no items.
+    </span><span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.map().is_empty()
     }
 
-    <span class="doccomment">/// Inserts a key-value pair into the map.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Equivalent to [`std::collections::HashMap::insert()`], except this</span>
-    <span class="doccomment">/// function checks that `key.implements_hash()` returns true. If it does</span>
-    <span class="doccomment">/// not, [`FaultKind::ValueCannotBeHashed`] will be returned.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">k</span>: <span class="ident">Value</span>, <span class="ident">v</span>: <span class="ident">Value</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">map</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">map</span>();
-        <span class="prelude-val">Ok</span>(<span class="ident">map</span>.<span class="ident">insert</span>(<span class="ident">check_hashable</span>(<span class="ident">k</span>)<span class="question-mark">?</span>, <span class="ident">v</span>))
+    <span class="doccomment">/// Inserts a key-value pair into the map.
+    ///
+    /// Equivalent to [`std::collections::HashMap::insert()`], except this
+    /// function checks that `key.implements_hash()` returns true. If it does
+    /// not, [`FaultKind::ValueCannotBeHashed`] will be returned.
+    </span><span class="kw">pub fn </span>insert(<span class="kw-2">&amp;</span><span class="self">self</span>, k: Value, v: Value) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>map = <span class="self">self</span>.map();
+        <span class="prelude-val">Ok</span>(map.insert(check_hashable(k)<span class="question-mark">?</span>, v))
     }
 
-    <span class="doccomment">/// Returns the value associated with `key`, if present.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">map</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">map</span>();
-        <span class="ident">map</span>.<span class="ident">get</span>(<span class="ident">key</span>).<span class="ident">cloned</span>()
+    <span class="doccomment">/// Returns the value associated with `key`, if present.
+    </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
+        <span class="kw">let </span>map = <span class="self">self</span>.map();
+        map.get(key).cloned()
     }
 
-    <span class="doccomment">/// Removes the value associated with `key`, if present.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">map</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">map</span>();
-        <span class="ident">map</span>.<span class="ident">remove</span>(<span class="ident">key</span>)
+    <span class="doccomment">/// Removes the value associated with `key`, if present.
+    </span><span class="kw">pub fn </span>remove(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>map = <span class="self">self</span>.map();
+        map.remove(key)
     }
 
-    <span class="doccomment">/// Extracts the contained collection type.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">BudMap</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Value</span>, <span class="ident">State</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">into_inner</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">PoisonError::into_inner</span>)
+    <span class="doccomment">/// Extracts the contained collection type.
+    </span><span class="kw">pub fn </span>into_inner(<span class="self">self</span>) -&gt; BudMap&lt;Value, Value, State&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.into_inner().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">PoppedValues</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">RandomState</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">FaultKind</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TryFrom&lt;PoppedValues&lt;<span class="lifetime">&#39;a</span>&gt;&gt; <span class="kw">for </span>HashMap&lt;RandomState&gt; {
+    <span class="kw">type </span>Error = FaultKind;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="kw-2">mut</span> <span class="ident">values</span>: <span class="ident">PoppedValues</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">values</span>.<span class="ident">len</span>() <span class="op">&amp;</span> <span class="number">1</span> <span class="op">==</span> <span class="number">1</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">FaultKind::dynamic</span>(
+    <span class="kw">fn </span>try_from(<span class="kw-2">mut </span>values: PoppedValues&lt;<span class="lifetime">&#39;a</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">if </span>values.len() &amp; <span class="number">1 </span>== <span class="number">1 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(FaultKind::dynamic(
                 <span class="string">&quot;odd number of arguments passed to map constructor&quot;</span>,
             ));
         }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">BudMap::with_capacity</span>(<span class="ident">values</span>.<span class="ident">len</span>() <span class="op">/</span> <span class="number">2</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>map = BudMap::with_capacity(values.len() / <span class="number">2</span>);
 
-        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">key</span>) <span class="op">=</span> <span class="ident">values</span>.<span class="ident">next</span>() {
-            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">values</span>.<span class="ident">next</span>().<span class="ident">expect</span>(<span class="string">&quot;checked for odd length&quot;</span>);
+        <span class="kw">while let </span><span class="prelude-val">Some</span>(key) = values.next() {
+            <span class="kw">let </span>value = values.next().expect(<span class="string">&quot;checked for odd length&quot;</span>);
 
-            <span class="ident">map</span>.<span class="ident">insert</span>(<span class="ident">check_hashable</span>(<span class="ident">key</span>)<span class="question-mark">?</span>, <span class="ident">value</span>);
+            map.insert(check_hashable(key)<span class="question-mark">?</span>, value);
         }
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="ident">map</span>)))
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(Mutex::new(map)))
     }
 }
 
-<span class="kw">fn</span> <span class="ident">check_hashable</span>(<span class="ident">value</span>: <span class="ident">Value</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">value</span>.<span class="ident">implements_hash</span>() {
-        <span class="prelude-val">Ok</span>(<span class="ident">value</span>)
-    } <span class="kw">else</span> {
-        <span class="prelude-val">Err</span>(<span class="ident">FaultKind::ValueCannotBeHashed</span>(<span class="ident">value</span>))
+<span class="kw">fn </span>check_hashable(value: Value) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt; {
+    <span class="kw">if </span>value.implements_hash() {
+        <span class="prelude-val">Ok</span>(value)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">Err</span>(FaultKind::ValueCannotBeHashed(value))
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">State</span>: <span class="ident">BuildHasher</span> <span class="op">+</span> <span class="ident">Debug</span>,
+<span class="kw">impl</span>&lt;State&gt; Debug <span class="kw">for </span>HashMap&lt;State&gt;
+<span class="kw">where
+    </span>State: BuildHasher + Debug,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="ident">Debug::fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>, <span class="ident">f</span>)
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        Debug::fmt(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>, f)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> <span class="ident">DynamicValue</span> <span class="kw">for</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">State</span>: <span class="ident">BuildHasher</span> <span class="op">+</span> <span class="ident">Debug</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+<span class="kw">impl</span>&lt;State&gt; DynamicValue <span class="kw">for </span>HashMap&lt;State&gt;
+<span class="kw">where
+    </span>State: BuildHasher + Debug + Clone + Send + Sync + <span class="lifetime">&#39;static</span>,
 {
-    <span class="kw">fn</span> <span class="ident">is_truthy</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="op">!</span><span class="self">self</span>.<span class="ident">map</span>().<span class="ident">is_empty</span>()
+    <span class="kw">fn </span>is_truthy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.map().is_empty()
     }
 
-    <span class="kw">fn</span> <span class="ident">kind</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-        <span class="string">&quot;Map&quot;</span>
-    }
+    <span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+        <span class="string">&quot;Map&quot;
+    </span>}
 
-    <span class="kw">fn</span> <span class="ident">partial_eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">other</span>) <span class="op">=</span> <span class="ident">other</span>.<span class="ident">as_dynamic</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>() {
-            <span class="kw">let</span> <span class="ident">lhs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">map</span>();
-            <span class="kw">let</span> <span class="ident">rhs</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">map</span>();
-            <span class="kw">if</span> <span class="ident">lhs</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="ident">rhs</span>.<span class="ident">len</span>() {
-                <span class="kw">for</span> (<span class="ident">lkey</span>, <span class="ident">lvalue</span>) <span class="kw">in</span> <span class="ident">lhs</span>.<span class="ident">iter</span>() {
-                    <span class="kw">if</span> <span class="ident">rhs</span>.<span class="ident">get</span>(<span class="ident">lkey</span>).<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">rvalue</span><span class="op">|</span> <span class="ident">lvalue</span> <span class="op">!</span><span class="op">=</span> <span class="ident">rvalue</span>) {
-                        <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="bool-val">false</span>);
+    <span class="kw">fn </span>partial_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(other) = other.as_dynamic::&lt;<span class="self">Self</span>&gt;() {
+            <span class="kw">let </span>lhs = <span class="self">self</span>.map();
+            <span class="kw">let </span>rhs = other.map();
+            <span class="kw">if </span>lhs.len() == rhs.len() {
+                <span class="kw">for </span>(lkey, lvalue) <span class="kw">in </span>lhs.iter() {
+                    <span class="kw">if </span>rhs.get(lkey).map_or(<span class="bool-val">true</span>, |rvalue| lvalue != rvalue) {
+                        <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="bool-val">false</span>);
                     }
                 }
                 <span class="prelude-val">Some</span>(<span class="bool-val">true</span>)
-            } <span class="kw">else</span> {
+            } <span class="kw">else </span>{
                 <span class="prelude-val">Some</span>(<span class="bool-val">false</span>)
             }
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 
-    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>, <span class="ident">args</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PoppedValues</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">name</span>.<span class="ident">as_str</span>() {
-            <span class="string">&quot;count&quot;</span> =&gt; {
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">i64::try_from</span>(<span class="self">self</span>.<span class="ident">map</span>().<span class="ident">len</span>())
-                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">FaultKind::ValueOutOfRange</span>(<span class="string">&quot;count&quot;</span>))<span class="question-mark">?</span>;
-                <span class="prelude-val">Ok</span>(<span class="ident">Value::Integer</span>(<span class="ident">len</span>))
+    <span class="kw">fn </span>call(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol, args: <span class="kw-2">&amp;mut </span>PoppedValues&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt; {
+        <span class="kw">match </span>name.as_str() {
+            <span class="string">&quot;count&quot; </span>=&gt; {
+                args.verify_empty()<span class="question-mark">?</span>;
+                <span class="kw">let </span>len = i64::try_from(<span class="self">self</span>.map().len())
+                    .map_err(|<span class="kw">_</span>| FaultKind::ValueOutOfRange(<span class="string">&quot;count&quot;</span>))<span class="question-mark">?</span>;
+                <span class="prelude-val">Ok</span>(Value::Integer(len))
             }
-            <span class="string">&quot;insert&quot;</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">args</span>
-                    .<span class="ident">next</span>()
-                    .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">FaultKind::ArgumentMissing</span>(<span class="ident">Symbol::from</span>(<span class="string">&quot;key&quot;</span>)))<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">args</span>
-                    .<span class="ident">next</span>()
-                    .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">FaultKind::ArgumentMissing</span>(<span class="ident">Symbol::from</span>(<span class="string">&quot;value&quot;</span>)))<span class="question-mark">?</span>;
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
+            <span class="string">&quot;insert&quot; </span>=&gt; {
+                <span class="kw">let </span>key = args
+                    .next()
+                    .ok_or_else(|| FaultKind::ArgumentMissing(Symbol::from(<span class="string">&quot;key&quot;</span>)))<span class="question-mark">?</span>;
+                <span class="kw">let </span>value = args
+                    .next()
+                    .ok_or_else(|| FaultKind::ArgumentMissing(Symbol::from(<span class="string">&quot;value&quot;</span>)))<span class="question-mark">?</span>;
+                args.verify_empty()<span class="question-mark">?</span>;
 
-                <span class="kw">let</span> <span class="ident">contained_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">insert</span>(<span class="ident">key</span>, <span class="ident">value</span>)<span class="question-mark">?</span>.<span class="ident">unwrap_or_default</span>();
+                <span class="kw">let </span>contained_value = <span class="self">self</span>.insert(key, value)<span class="question-mark">?</span>.unwrap_or_default();
 
-                <span class="prelude-val">Ok</span>(<span class="ident">contained_value</span>)
+                <span class="prelude-val">Ok</span>(contained_value)
             }
-            <span class="string">&quot;get&quot;</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">args</span>
-                    .<span class="ident">next</span>()
-                    .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">FaultKind::ArgumentMissing</span>(<span class="ident">Symbol::from</span>(<span class="string">&quot;key&quot;</span>)))<span class="question-mark">?</span>;
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
+            <span class="string">&quot;get&quot; </span>=&gt; {
+                <span class="kw">let </span>key = args
+                    .next()
+                    .ok_or_else(|| FaultKind::ArgumentMissing(Symbol::from(<span class="string">&quot;key&quot;</span>)))<span class="question-mark">?</span>;
+                args.verify_empty()<span class="question-mark">?</span>;
 
-                <span class="kw">let</span> <span class="ident">contained_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>).<span class="ident">unwrap_or_default</span>();
+                <span class="kw">let </span>contained_value = <span class="self">self</span>.get(<span class="kw-2">&amp;</span>key).unwrap_or_default();
 
-                <span class="prelude-val">Ok</span>(<span class="ident">contained_value</span>)
+                <span class="prelude-val">Ok</span>(contained_value)
             }
-            <span class="string">&quot;remove&quot;</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">args</span>
-                    .<span class="ident">next</span>()
-                    .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">FaultKind::ArgumentMissing</span>(<span class="ident">Symbol::from</span>(<span class="string">&quot;key&quot;</span>)))<span class="question-mark">?</span>;
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
+            <span class="string">&quot;remove&quot; </span>=&gt; {
+                <span class="kw">let </span>key = args
+                    .next()
+                    .ok_or_else(|| FaultKind::ArgumentMissing(Symbol::from(<span class="string">&quot;key&quot;</span>)))<span class="question-mark">?</span>;
+                args.verify_empty()<span class="question-mark">?</span>;
 
-                <span class="kw">let</span> <span class="ident">contained_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>).<span class="ident">unwrap_or_default</span>();
+                <span class="kw">let </span>contained_value = <span class="self">self</span>.remove(<span class="kw-2">&amp;</span>key).unwrap_or_default();
 
-                <span class="prelude-val">Ok</span>(<span class="ident">contained_value</span>)
+                <span class="prelude-val">Ok</span>(contained_value)
             }
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">FaultKind::UnknownFunction</span> {
-                <span class="ident">kind</span>: <span class="ident"><span class="kw">super</span>::ValueKind::Dynamic</span>(<span class="self">self</span>.<span class="ident">kind</span>()),
-                <span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">clone</span>(),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(FaultKind::UnknownFunction {
+                kind: <span class="kw">super</span>::ValueKind::Dynamic(<span class="self">self</span>.kind()),
+                name: name.clone(),
             }),
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">to_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="kw">fn </span>to_source(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+        <span class="prelude-val">None
+    </span>}
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0 (a55dd71d5 2022-09-19)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

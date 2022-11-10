@@ -1,3 +1,3 @@
-(function() {var implementors = {};
-implementors["budlang"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.64.0/core/iter/traits/collect/trait.FromIterator.html\" title=\"trait core::iter::traits::collect::FromIterator\">FromIterator</a>&lt;<a class=\"enum\" href=\"budlang/vm/enum.Value.html\" title=\"enum budlang::vm::Value\">Value</a>&gt; for <a class=\"struct\" href=\"budlang/vm/struct.List.html\" title=\"struct budlang::vm::List\">List</a>","synthetic":false,"types":["budlang::vm::list::List"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
+(function() {var implementors = {
+"budlang":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.65.0/core/iter/traits/collect/trait.FromIterator.html\" title=\"trait core::iter::traits::collect::FromIterator\">FromIterator</a>&lt;<a class=\"enum\" href=\"budlang/vm/enum.Value.html\" title=\"enum budlang::vm::Value\">Value</a>&gt; for <a class=\"struct\" href=\"budlang/vm/struct.List.html\" title=\"struct budlang::vm::List\">List</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

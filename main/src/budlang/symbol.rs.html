@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/symbol.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>symbol.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../budlang/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/symbol.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>symbol.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../budlang/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -242,249 +242,249 @@
 <span id="242">242</span>
 <span id="243">243</span>
 <span id="244">244</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">borrow::Borrow</span>,
-    <span class="ident">collections::HashSet</span>,
-    <span class="ident">fmt::Display</span>,
-    <span class="ident">hash::Hash</span>,
-    <span class="ident">ops::Deref</span>,
-    <span class="ident">sync</span>::{
-        <span class="ident">atomic</span>::{<span class="self">self</span>, <span class="ident">AtomicBool</span>},
-        <span class="ident">Arc</span>, <span class="ident">Mutex</span>,
+</pre><pre class="rust"><code><span class="kw">use </span>std::{
+    borrow::Borrow,
+    collections::HashSet,
+    fmt::Display,
+    hash::Hash,
+    ops::Deref,
+    sync::{
+        atomic::{<span class="self">self</span>, AtomicBool},
+        Arc, Mutex,
     },
 };
 
-<span class="kw">static</span> <span class="ident">ACTIVE_SYMBOLS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbols</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="prelude-val">None</span>);
+<span class="kw">static </span>ACTIVE_SYMBOLS: Mutex&lt;<span class="prelude-ty">Option</span>&lt;Symbols&gt;&gt; = Mutex::new(<span class="prelude-val">None</span>);
 
-<span class="kw">fn</span> <span class="ident">with_active_symbols</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">logic</span>: <span class="kw">impl</span> <span class="ident">FnOnce</span>(<span class="kw-2">&amp;mut</span> <span class="ident">Symbols</span>) -&gt; <span class="ident">T</span>) -&gt; <span class="ident">T</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">symbols</span> <span class="op">=</span> <span class="ident">ACTIVE_SYMBOLS</span>.<span class="ident">lock</span>().<span class="ident">expect</span>(<span class="string">&quot;poisoned&quot;</span>);
-    <span class="kw">if</span> <span class="ident">symbols</span>.<span class="ident">is_none</span>() {
-        <span class="kw-2">*</span><span class="ident">symbols</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Symbols</span> {
-            <span class="ident">active</span>: <span class="ident">HashSet::new</span>(),
-            <span class="ident">slots</span>: <span class="ident">Vec::new</span>(),
-            <span class="ident">free_slots</span>: <span class="ident">Vec::new</span>(),
+<span class="kw">fn </span>with_active_symbols&lt;T&gt;(logic: <span class="kw">impl </span>FnOnce(<span class="kw-2">&amp;mut </span>Symbols) -&gt; T) -&gt; T {
+    <span class="kw">let </span><span class="kw-2">mut </span>symbols = ACTIVE_SYMBOLS.lock().expect(<span class="string">&quot;poisoned&quot;</span>);
+    <span class="kw">if </span>symbols.is_none() {
+        <span class="kw-2">*</span>symbols = <span class="prelude-val">Some</span>(Symbols {
+            active: HashSet::new(),
+            slots: Vec::new(),
+            free_slots: Vec::new(),
         });
     }
 
-    <span class="ident">logic</span>(<span class="ident">symbols</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;always initialized&quot;</span>))
+    logic(symbols.as_mut().expect(<span class="string">&quot;always initialized&quot;</span>))
 }
 
-<span class="kw">struct</span> <span class="ident">Symbols</span> {
-    <span class="ident">active</span>: <span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">SharedData</span><span class="op">&gt;</span>,
-    <span class="ident">slots</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">free_slots</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
+<span class="kw">struct </span>Symbols {
+    active: HashSet&lt;SharedData&gt;,
+    slots: Vec&lt;<span class="prelude-ty">Option</span>&lt;Symbol&gt;&gt;,
+    free_slots: Vec&lt;usize&gt;,
 }
 
-<span class="doccomment">/// A String-like type that ensures only one instance of each Symbol exists per</span>
-<span class="doccomment">/// value, enabling quicker lookups by not requiring string comparisons.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// After all instances of a given Symbol are dropped, the underlying storage is</span>
-<span class="doccomment">/// released.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This type&#39;s [`Hash`] implementation is different than `String`&#39;s hash</span>
-<span class="doccomment">/// implementation. This type avoids implementing `Borrow&lt;str&gt;` to prevent using</span>
-<span class="doccomment">/// strings to look up values in `HashMap`s/`HashSet`s where this type is used</span>
-<span class="doccomment">/// as the key.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Symbol</span>(<span class="ident">SharedData</span>);
+<span class="doccomment">/// A String-like type that ensures only one instance of each Symbol exists per
+/// value, enabling quicker lookups by not requiring string comparisons.
+///
+/// After all instances of a given Symbol are dropped, the underlying storage is
+/// released.
+///
+/// This type&#39;s [`Hash`] implementation is different than `String`&#39;s hash
+/// implementation. This type avoids implementing `Borrow&lt;str&gt;` to prevent using
+/// strings to look up values in `HashMap`s/`HashSet`s where this type is used
+/// as the key.
+</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>Symbol(SharedData);
 
-<span class="kw">impl</span> <span class="ident">Symbol</span> {
-    <span class="doccomment">/// Returns this symbol&#39;s underlying representation.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span> .<span class="number">0</span>.<span class="ident">value</span>
+<span class="kw">impl </span>Symbol {
+    <span class="doccomment">/// Returns this symbol&#39;s underlying representation.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>as_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0 </span>.<span class="number">0</span>.value
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Hash</span> <span class="kw">for</span> <span class="ident">Symbol</span> {
-    <span class="kw">fn</span> <span class="ident">hash</span><span class="op">&lt;</span><span class="ident">H</span>: <span class="ident">std::hash::Hasher</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;mut</span> <span class="ident">H</span>) {
-        <span class="self">self</span>.<span class="number">0</span> .<span class="number">0</span>.<span class="ident">index</span>.<span class="ident">hash</span>(<span class="ident">state</span>);
+<span class="kw">impl </span>Hash <span class="kw">for </span>Symbol {
+    <span class="kw">fn </span>hash&lt;H: std::hash::Hasher&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;mut </span>H) {
+        <span class="self">self</span>.<span class="number">0 </span>.<span class="number">0</span>.index.hash(state);
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Eq</span> <span class="kw">for</span> <span class="ident">Symbol</span> {}
+<span class="kw">impl </span>Eq <span class="kw">for </span>Symbol {}
 
-<span class="kw">impl</span> <span class="ident">PartialEq</span> <span class="kw">for</span> <span class="ident">Symbol</span> {
-    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span> .<span class="number">0</span>.<span class="ident">index</span> <span class="op">==</span> <span class="ident">other</span>.<span class="number">0</span> .<span class="number">0</span>.<span class="ident">index</span>
+<span class="kw">impl </span>PartialEq <span class="kw">for </span>Symbol {
+    <span class="kw">fn </span>eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0 </span>.<span class="number">0</span>.index == other.<span class="number">0 </span>.<span class="number">0</span>.index
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">struct</span> <span class="ident">SharedData</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Data</span><span class="op">&gt;</span>);
+<span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">struct </span>SharedData(Arc&lt;Data&gt;);
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">struct</span> <span class="ident">Data</span> {
-    <span class="ident">index</span>: <span class="ident">usize</span>,
-    <span class="ident">value</span>: <span class="ident">String</span>,
-    <span class="ident">freeing</span>: <span class="ident">AtomicBool</span>,
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">struct </span>Data {
+    index: usize,
+    value: String,
+    freeing: AtomicBool,
 }
 
-<span class="kw">impl</span> <span class="ident">Hash</span> <span class="kw">for</span> <span class="ident">SharedData</span> {
-    <span class="kw">fn</span> <span class="ident">hash</span><span class="op">&lt;</span><span class="ident">H</span>: <span class="ident">std::hash::Hasher</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;mut</span> <span class="ident">H</span>) {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">value</span>.<span class="ident">hash</span>(<span class="ident">state</span>);
+<span class="kw">impl </span>Hash <span class="kw">for </span>SharedData {
+    <span class="kw">fn </span>hash&lt;H: std::hash::Hasher&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;mut </span>H) {
+        <span class="self">self</span>.<span class="number">0</span>.value.hash(state);
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Eq</span> <span class="kw">for</span> <span class="ident">SharedData</span> {}
+<span class="kw">impl </span>Eq <span class="kw">for </span>SharedData {}
 
-<span class="kw">impl</span> <span class="ident">PartialEq</span> <span class="kw">for</span> <span class="ident">SharedData</span> {
-    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">index</span> <span class="op">==</span> <span class="ident">other</span>.<span class="number">0</span>.<span class="ident">index</span>
+<span class="kw">impl </span>PartialEq <span class="kw">for </span>SharedData {
+    <span class="kw">fn </span>eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0</span>.index == other.<span class="number">0</span>.index
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Symbol</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="self">self</span>)
+<span class="kw">impl </span>Display <span class="kw">for </span>Symbol {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        f.write_str(<span class="self">self</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SharedData</span> {
-    <span class="kw">fn</span> <span class="ident">borrow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">value</span>
+<span class="kw">impl </span>Borrow&lt;str&gt; <span class="kw">for </span>SharedData {
+    <span class="kw">fn </span>borrow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.value
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Symbol</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">sym</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">with_active_symbols</span>(<span class="op">|</span><span class="ident">symbols</span><span class="op">|</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">symbol</span>) <span class="op">=</span> <span class="ident">symbols</span>.<span class="ident">active</span>.<span class="ident">get</span>(<span class="ident">sym</span>).<span class="ident">cloned</span>() {
-                <span class="ident">Symbol</span>(<span class="ident">symbol</span>)
-            } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">sym</span>.<span class="ident">to_string</span>();
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; <span class="kw">for </span>Symbol {
+    <span class="kw">fn </span>from(sym: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; <span class="self">Self </span>{
+        with_active_symbols(|symbols| {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(symbol) = symbols.active.get(sym).cloned() {
+                Symbol(symbol)
+            } <span class="kw">else </span>{
+                <span class="kw">let </span>value = sym.to_string();
 
-                <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">free_slot</span>) <span class="op">=</span> <span class="ident">symbols</span>.<span class="ident">free_slots</span>.<span class="ident">pop</span>() {
-                    <span class="ident">free_slot</span>
-                } <span class="kw">else</span> {
-                    <span class="kw">let</span> <span class="ident">slot_id</span> <span class="op">=</span> <span class="ident">symbols</span>.<span class="ident">slots</span>.<span class="ident">len</span>();
-                    <span class="ident">symbols</span>.<span class="ident">slots</span>.<span class="ident">push</span>(<span class="prelude-val">None</span>);
-                    <span class="ident">slot_id</span>
+                <span class="kw">let </span>index = <span class="kw">if let </span><span class="prelude-val">Some</span>(free_slot) = symbols.free_slots.pop() {
+                    free_slot
+                } <span class="kw">else </span>{
+                    <span class="kw">let </span>slot_id = symbols.slots.len();
+                    symbols.slots.push(<span class="prelude-val">None</span>);
+                    slot_id
                 };
 
-                <span class="kw">let</span> <span class="ident">symbol</span> <span class="op">=</span> <span class="ident">Symbol</span>(<span class="ident">SharedData</span>(<span class="ident">Arc::new</span>(<span class="ident">Data</span> {
-                    <span class="ident">index</span>,
-                    <span class="ident">value</span>,
-                    <span class="ident">freeing</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
+                <span class="kw">let </span>symbol = Symbol(SharedData(Arc::new(Data {
+                    index,
+                    value,
+                    freeing: AtomicBool::new(<span class="bool-val">false</span>),
                 })));
-                <span class="ident">symbols</span>.<span class="ident">active</span>.<span class="ident">insert</span>(<span class="ident">symbol</span>.<span class="number">0</span>.<span class="ident">clone</span>());
-                <span class="ident">symbols</span>.<span class="ident">slots</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">symbol</span>.<span class="ident">clone</span>());
-                <span class="ident">symbol</span>
+                symbols.active.insert(symbol.<span class="number">0</span>.clone());
+                symbols.slots[index] = <span class="prelude-val">Some</span>(symbol.clone());
+                symbol
             }
         })
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">Symbol</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">str</span>;
+<span class="kw">impl </span>Deref <span class="kw">for </span>Symbol {
+    <span class="kw">type </span>Target = str;
 
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span> .<span class="number">0</span>.<span class="ident">value</span>
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0 </span>.<span class="number">0</span>.value
     }
 }
 
-<span class="kw">impl</span> <span class="ident">PartialEq</span><span class="op">&lt;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Symbol</span> {
-    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span> <span class="op">==</span> <span class="ident">other</span>
+<span class="kw">impl </span>PartialEq&lt;str&gt; <span class="kw">for </span>Symbol {
+    <span class="kw">fn </span>eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>str) -&gt; bool {
+        <span class="kw-2">&amp;**</span><span class="self">self </span>== other
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">PartialEq</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Symbol</span> {
-    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="op">&amp;&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">other</span>
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; PartialEq&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; <span class="kw">for </span>Symbol {
+    <span class="kw">fn </span>eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: &amp;&amp;<span class="lifetime">&#39;a </span>str) -&gt; bool {
+        <span class="self">self </span>== <span class="kw-2">*</span>other
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">SharedData</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// The main Symbols structure holds two strong references to the same</span>
-        <span class="comment">// Arc we hold. Thus, if we reach 3 strong count (our ref included), we</span>
-        <span class="comment">// need to remove the symbol so it can be freeed.</span>
-        <span class="comment">//</span>
-        <span class="comment">// We can use any form of atomics here because if the strong count is 3,</span>
-        <span class="comment">// we can be guaranteed the only thread able to free our data is this</span>
-        <span class="comment">// thread.</span>
-        <span class="kw">if</span> <span class="ident">Arc::strong_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) <span class="op">==</span> <span class="number">3</span>
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>
-                .<span class="number">0</span>
-                .<span class="ident">freeing</span>
-                .<span class="ident">compare_exchange</span>(
+<span class="kw">impl </span>Drop <span class="kw">for </span>SharedData {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// The main Symbols structure holds two strong references to the same
+        // Arc we hold. Thus, if we reach 3 strong count (our ref included), we
+        // need to remove the symbol so it can be freeed.
+        //
+        // We can use any form of atomics here because if the strong count is 3,
+        // we can be guaranteed the only thread able to free our data is this
+        // thread.
+        </span><span class="kw">if </span>Arc::strong_count(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) == <span class="number">3
+            </span>&amp;&amp; <span class="self">self
+                </span>.<span class="number">0
+                </span>.freeing
+                .compare_exchange(
                     <span class="bool-val">false</span>,
                     <span class="bool-val">true</span>,
-                    <span class="ident">atomic::Ordering::Relaxed</span>,
-                    <span class="ident">atomic::Ordering::Relaxed</span>,
+                    atomic::Ordering::Relaxed,
+                    atomic::Ordering::Relaxed,
                 )
-                .<span class="ident">is_ok</span>()
+                .is_ok()
         {
-            <span class="ident">with_active_symbols</span>(<span class="op">|</span><span class="ident">symbols</span><span class="op">|</span> {
-                <span class="comment">// Check that the strong count hasn&#39;t changed. If it has, we</span>
-                <span class="comment">// need to allow the symbol to stay alive.</span>
-                <span class="kw">if</span> <span class="ident">Arc::strong_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) <span class="op">&gt;</span> <span class="number">3</span> {
-                    <span class="self">self</span>.<span class="number">0</span>.<span class="ident">freeing</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">atomic::Ordering::Relaxed</span>);
-                } <span class="kw">else</span> {
-                    <span class="ident">symbols</span>.<span class="ident">active</span>.<span class="ident">remove</span>(<span class="self">self</span>);
-                    <span class="ident">symbols</span>.<span class="ident">slots</span>[<span class="self">self</span>.<span class="number">0</span>.<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">None</span>;
-                    <span class="ident">symbols</span>.<span class="ident">free_slots</span>.<span class="ident">push</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">index</span>);
+            with_active_symbols(|symbols| {
+                <span class="comment">// Check that the strong count hasn&#39;t changed. If it has, we
+                // need to allow the symbol to stay alive.
+                </span><span class="kw">if </span>Arc::strong_count(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) &gt; <span class="number">3 </span>{
+                    <span class="self">self</span>.<span class="number">0</span>.freeing.store(<span class="bool-val">false</span>, atomic::Ordering::Relaxed);
+                } <span class="kw">else </span>{
+                    symbols.active.remove(<span class="self">self</span>);
+                    symbols.slots[<span class="self">self</span>.<span class="number">0</span>.index] = <span class="prelude-val">None</span>;
+                    symbols.free_slots.push(<span class="self">self</span>.<span class="number">0</span>.index);
                 }
             });
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">test</span>]</span>
-<span class="kw">fn</span> <span class="ident">basics</span>() {
-    <span class="kw">let</span> <span class="ident">first_symbol</span> <span class="op">=</span> <span class="ident">Symbol::from</span>(<span class="string">&quot;basics-test-symbol&quot;</span>);
-    <span class="kw">let</span> <span class="ident">slot</span> <span class="op">=</span> <span class="ident">first_symbol</span>.<span class="number">0</span> .<span class="number">0</span>.<span class="ident">index</span>;
-    <span class="kw">let</span> <span class="ident">first_again</span> <span class="op">=</span> <span class="ident">Symbol::from</span>(<span class="string">&quot;basics-test-symbol&quot;</span>);
-    <span class="macro">assert_eq!</span>(<span class="ident">slot</span>, <span class="ident">first_again</span>.<span class="number">0</span> .<span class="number">0</span>.<span class="ident">index</span>);
-    <span class="macro">assert_eq!</span>(<span class="ident">first_symbol</span>, <span class="ident">first_again</span>);
-    <span class="ident">drop</span>(<span class="ident">first_again</span>);
-    <span class="comment">// Dropping the second copy shouldn&#39;t free the underlying symbol</span>
-    <span class="ident">with_active_symbols</span>(<span class="op">|</span><span class="ident">symbols</span><span class="op">|</span> {
-        <span class="macro">assert!</span>(<span class="ident">symbols</span>.<span class="ident">active</span>.<span class="ident">contains</span>(<span class="string">&quot;basics-test-symbol&quot;</span>));
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">symbols</span>.<span class="ident">slots</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert!</span>(<span class="ident">symbols</span>.<span class="ident">slots</span>[<span class="ident">slot</span>].<span class="ident">is_some</span>());
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">symbols</span>.<span class="ident">free_slots</span>.<span class="ident">iter</span>().<span class="ident">any</span>(<span class="op">|</span><span class="ident">free</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">free</span> <span class="op">==</span> <span class="ident">slot</span>));
+<span class="attribute">#[test]
+</span><span class="kw">fn </span>basics() {
+    <span class="kw">let </span>first_symbol = Symbol::from(<span class="string">&quot;basics-test-symbol&quot;</span>);
+    <span class="kw">let </span>slot = first_symbol.<span class="number">0 </span>.<span class="number">0</span>.index;
+    <span class="kw">let </span>first_again = Symbol::from(<span class="string">&quot;basics-test-symbol&quot;</span>);
+    <span class="macro">assert_eq!</span>(slot, first_again.<span class="number">0 </span>.<span class="number">0</span>.index);
+    <span class="macro">assert_eq!</span>(first_symbol, first_again);
+    drop(first_again);
+    <span class="comment">// Dropping the second copy shouldn&#39;t free the underlying symbol
+    </span>with_active_symbols(|symbols| {
+        <span class="macro">assert!</span>(symbols.active.contains(<span class="string">&quot;basics-test-symbol&quot;</span>));
+        <span class="macro">assert!</span>(!symbols.slots.is_empty());
+        <span class="macro">assert!</span>(symbols.slots[slot].is_some());
+        <span class="macro">assert!</span>(!symbols.free_slots.iter().any(|free| <span class="kw-2">*</span>free == slot));
     });
-    <span class="ident">drop</span>(<span class="ident">first_symbol</span>);
-    <span class="ident">with_active_symbols</span>(<span class="op">|</span><span class="ident">symbols</span><span class="op">|</span> {
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">symbols</span>.<span class="ident">active</span>.<span class="ident">contains</span>(<span class="string">&quot;basics-test-symbol&quot;</span>));
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">symbols</span>.<span class="ident">slots</span>[<span class="ident">slot</span>] {
-            <span class="prelude-val">Some</span>(<span class="ident">new_symbol</span>) =&gt; {
-                <span class="comment">// This test isn&#39;t run in isolation, so other symbols may get</span>
-                <span class="comment">// registered between the drop and this block. Very unlikely,</span>
-                <span class="comment">// but possible.</span>
-                <span class="macro">assert_ne!</span>(<span class="ident">new_symbol</span>, <span class="string">&quot;basics-test-symbol&quot;</span>);
+    drop(first_symbol);
+    with_active_symbols(|symbols| {
+        <span class="macro">assert!</span>(!symbols.active.contains(<span class="string">&quot;basics-test-symbol&quot;</span>));
+        <span class="kw">match </span><span class="kw-2">&amp;</span>symbols.slots[slot] {
+            <span class="prelude-val">Some</span>(new_symbol) =&gt; {
+                <span class="comment">// This test isn&#39;t run in isolation, so other symbols may get
+                // registered between the drop and this block. Very unlikely,
+                // but possible.
+                </span><span class="macro">assert_ne!</span>(new_symbol, <span class="string">&quot;basics-test-symbol&quot;</span>);
             }
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="macro">assert!</span>(<span class="ident">symbols</span>.<span class="ident">free_slots</span>.<span class="ident">iter</span>().<span class="ident">any</span>(<span class="op">|</span><span class="ident">free</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">free</span> <span class="op">==</span> <span class="ident">slot</span>));
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="macro">assert!</span>(symbols.free_slots.iter().any(|free| <span class="kw-2">*</span>free == slot));
             }
         }
     });
 }
 
-<span class="doccomment">/// A type that can be converted into `Option&lt;Symbol&gt;`.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">OptionalSymbol</span> {
-    <span class="doccomment">/// Returns the value as a symbol, if possible.</span>
-    <span class="kw">fn</span> <span class="ident">into_symbol</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>;
+<span class="doccomment">/// A type that can be converted into `Option&lt;Symbol&gt;`.
+</span><span class="kw">pub trait </span>OptionalSymbol {
+    <span class="doccomment">/// Returns the value as a symbol, if possible.
+    </span><span class="kw">fn </span>into_symbol(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Symbol&gt;;
 }
 
-<span class="kw">impl</span> <span class="ident">OptionalSymbol</span> <span class="kw">for</span> <span class="ident">Symbol</span> {
-    <span class="kw">fn</span> <span class="ident">into_symbol</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span> {
+<span class="kw">impl </span>OptionalSymbol <span class="kw">for </span>Symbol {
+    <span class="kw">fn </span>into_symbol(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Symbol&gt; {
         <span class="prelude-val">Some</span>(<span class="self">self</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">OptionalSymbol</span> <span class="kw">for</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">into_symbol</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span> {
-        <span class="self">self</span>
-    }
+<span class="kw">impl </span>OptionalSymbol <span class="kw">for </span><span class="prelude-ty">Option</span>&lt;Symbol&gt; {
+    <span class="kw">fn </span>into_symbol(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Symbol&gt; {
+        <span class="self">self
+    </span>}
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">OptionalSymbol</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span> {
-    <span class="kw">fn</span> <span class="ident">into_symbol</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">Symbol::from</span>(<span class="self">self</span>))
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; OptionalSymbol <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str {
+    <span class="kw">fn </span>into_symbol(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Symbol&gt; {
+        <span class="prelude-val">Some</span>(Symbol::from(<span class="self">self</span>))
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0 (a55dd71d5 2022-09-19)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

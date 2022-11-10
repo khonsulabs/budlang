@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/ir.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ir.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../budlang/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/ir.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ir.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../budlang/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -848,855 +848,1107 @@
 <span id="848">848</span>
 <span id="849">849</span>
 <span id="850">850</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">allow</span>(<span class="ident">missing_docs</span>, <span class="ident">clippy::missing_panics_doc</span>)]</span> <span class="comment">// TODO docs and panics for ir</span>
+<span id="851">851</span>
+<span id="852">852</span>
+<span id="853">853</span>
+<span id="854">854</span>
+<span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
+<span id="859">859</span>
+<span id="860">860</span>
+<span id="861">861</span>
+<span id="862">862</span>
+<span id="863">863</span>
+<span id="864">864</span>
+<span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
+<span id="873">873</span>
+<span id="874">874</span>
+<span id="875">875</span>
+<span id="876">876</span>
+<span id="877">877</span>
+<span id="878">878</span>
+<span id="879">879</span>
+<span id="880">880</span>
+<span id="881">881</span>
+<span id="882">882</span>
+<span id="883">883</span>
+<span id="884">884</span>
+<span id="885">885</span>
+<span id="886">886</span>
+<span id="887">887</span>
+<span id="888">888</span>
+<span id="889">889</span>
+<span id="890">890</span>
+<span id="891">891</span>
+<span id="892">892</span>
+<span id="893">893</span>
+<span id="894">894</span>
+<span id="895">895</span>
+<span id="896">896</span>
+<span id="897">897</span>
+<span id="898">898</span>
+<span id="899">899</span>
+<span id="900">900</span>
+<span id="901">901</span>
+<span id="902">902</span>
+<span id="903">903</span>
+<span id="904">904</span>
+<span id="905">905</span>
+<span id="906">906</span>
+<span id="907">907</span>
+<span id="908">908</span>
+<span id="909">909</span>
+<span id="910">910</span>
+<span id="911">911</span>
+<span id="912">912</span>
+<span id="913">913</span>
+<span id="914">914</span>
+<span id="915">915</span>
+<span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
+<span id="922">922</span>
+<span id="923">923</span>
+<span id="924">924</span>
+<span id="925">925</span>
+<span id="926">926</span>
+<span id="927">927</span>
+<span id="928">928</span>
+<span id="929">929</span>
+<span id="930">930</span>
+<span id="931">931</span>
+<span id="932">932</span>
+<span id="933">933</span>
+<span id="934">934</span>
+<span id="935">935</span>
+<span id="936">936</span>
+<span id="937">937</span>
+<span id="938">938</span>
+<span id="939">939</span>
+<span id="940">940</span>
+<span id="941">941</span>
+<span id="942">942</span>
+<span id="943">943</span>
+<span id="944">944</span>
+<span id="945">945</span>
+<span id="946">946</span>
+<span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
+<span id="950">950</span>
+<span id="951">951</span>
+<span id="952">952</span>
+<span id="953">953</span>
+<span id="954">954</span>
+<span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
+<span id="960">960</span>
+<span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
+<span id="970">970</span>
+<span id="971">971</span>
+<span id="972">972</span>
+<span id="973">973</span>
+<span id="974">974</span>
+<span id="975">975</span>
+<span id="976">976</span>
+</pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)] </span><span class="comment">// TODO docs and panics for ir
 
-<span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">borrow::Cow</span>,
-    <span class="ident">collections::HashMap</span>,
-    <span class="ident">env</span>,
-    <span class="ident">fmt</span>::{<span class="ident">Display</span>, <span class="ident">Write</span>},
+</span><span class="kw">use </span>std::{
+    borrow::{Borrow, BorrowMut, Cow},
+    collections::HashMap,
+    env,
+    fmt::{Display, Write},
+    ops::{Deref, DerefMut},
 };
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">ast</span>::{<span class="ident">CompilationError</span>, <span class="ident">NodeId</span>},
-    <span class="ident">symbol</span>::{<span class="ident">OptionalSymbol</span>, <span class="ident">Symbol</span>},
-    <span class="ident">vm</span>::{
-        <span class="self">self</span>, <span class="ident">Bud</span>, <span class="ident">Comparison</span>, <span class="ident">Environment</span>, <span class="ident">FromStack</span>, <span class="ident">Intrinsic</span>, <span class="ident">StringLiteralDisplay</span>, <span class="ident">Value</span>,
-        <span class="ident">ValueOrSource</span>,
+<span class="kw">use crate</span>::{
+    ast::{CompilationError, NodeId},
+    symbol::{OptionalSymbol, Symbol},
+    vm::{
+        <span class="self">self</span>, Bud, Comparison, Environment, FromStack, Intrinsic, StringLiteralDisplay, Value,
+        ValueOrSource,
     },
-    <span class="ident">Error</span>,
+    Error,
 };
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Label</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">usize</span>);
+<span class="attribute">#[derive(Debug, Clone, Copy)]
+</span><span class="kw">pub struct </span>Label(<span class="kw">pub</span>(<span class="kw">crate</span>) usize);
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Label</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;#{}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="kw">impl </span>Display <span class="kw">for </span>Label {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;#{}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Variable</span>(<span class="ident">usize</span>);
+<span class="attribute">#[derive(Debug, Clone, Copy)]
+</span><span class="kw">pub struct </span>Variable(usize);
 
-<span class="kw">impl</span> <span class="ident">Variable</span> {
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">index</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span>
+<span class="kw">impl </span>Variable {
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>index(<span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
+}
+
+<span class="kw">impl </span>Display <span class="kw">for </span>Variable {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;${}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Variable</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;${}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
-    }
+<span class="kw">pub enum </span>DagNode {
+    Add,
 }
 
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">DagNode</span> {
-    <span class="ident">Add</span>,
-}
-
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Instruction</span> {
-    <span class="ident">Add</span> {
-        <span class="ident">left</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">right</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">destination</span>: <span class="ident">Destination</span>,
+<span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub enum </span>Instruction {
+    Add {
+        left: LiteralOrSource,
+        right: LiteralOrSource,
+        destination: Destination,
     },
-    <span class="ident">Sub</span> {
-        <span class="ident">left</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">right</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">destination</span>: <span class="ident">Destination</span>,
+    Sub {
+        left: LiteralOrSource,
+        right: LiteralOrSource,
+        destination: Destination,
     },
-    <span class="ident">Multiply</span> {
-        <span class="ident">left</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">right</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">destination</span>: <span class="ident">Destination</span>,
+    Multiply {
+        left: LiteralOrSource,
+        right: LiteralOrSource,
+        destination: Destination,
     },
-    <span class="ident">Divide</span> {
-        <span class="ident">left</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">right</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">destination</span>: <span class="ident">Destination</span>,
+    Divide {
+        left: LiteralOrSource,
+        right: LiteralOrSource,
+        destination: Destination,
     },
-    <span class="ident">If</span> {
-        <span class="ident">condition</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">false_jump_to</span>: <span class="ident">Label</span>,
+    If {
+        condition: LiteralOrSource,
+        false_jump_to: Label,
     },
-    <span class="ident">JumpTo</span>(<span class="ident">Label</span>),
-    <span class="ident">Label</span>(<span class="ident">Label</span>),
-    <span class="ident">Compare</span> {
-        <span class="ident">comparison</span>: <span class="ident">Comparison</span>,
-        <span class="ident">left</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">right</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">action</span>: <span class="ident">CompareAction</span>,
+    JumpTo(Label),
+    Label(Label),
+    Compare {
+        comparison: Comparison,
+        left: LiteralOrSource,
+        right: LiteralOrSource,
+        action: CompareAction,
     },
-    <span class="ident">Push</span>(<span class="ident">LiteralOrSource</span>),
-    <span class="ident">PopAndDrop</span>,
-    <span class="ident">Load</span> {
-        <span class="ident">value</span>: <span class="ident">LiteralOrSource</span>,
-        <span class="ident">variable</span>: <span class="ident">Variable</span>,
+    Push(LiteralOrSource),
+    PopAndDrop,
+    Load {
+        value: LiteralOrSource,
+        variable: Variable,
     },
-    <span class="ident">Return</span>(<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">LiteralOrSource</span><span class="op">&gt;</span>),
-    <span class="ident">Call</span> {
-        <span class="ident">function</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>,
-        <span class="ident">arg_count</span>: <span class="ident">usize</span>,
-        <span class="ident">destination</span>: <span class="ident">Destination</span>,
+    Return(<span class="prelude-ty">Option</span>&lt;LiteralOrSource&gt;),
+    Call {
+        function: <span class="prelude-ty">Option</span>&lt;Symbol&gt;,
+        arg_count: usize,
+        destination: Destination,
     },
-    <span class="ident">CallIntrinsic</span> {
-        <span class="ident">intrinsic</span>: <span class="ident">Intrinsic</span>,
-        <span class="ident">arg_count</span>: <span class="ident">usize</span>,
-        <span class="ident">destination</span>: <span class="ident">Destination</span>,
+    CallIntrinsic {
+        intrinsic: Intrinsic,
+        arg_count: usize,
+        destination: Destination,
     },
-    <span class="ident">CallInstance</span> {
-        <span class="ident">target</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">LiteralOrSource</span><span class="op">&gt;</span>,
-        <span class="ident">name</span>: <span class="ident">Symbol</span>,
-        <span class="ident">arg_count</span>: <span class="ident">usize</span>,
-        <span class="ident">destination</span>: <span class="ident">Destination</span>,
+    CallInstance {
+        target: <span class="prelude-ty">Option</span>&lt;LiteralOrSource&gt;,
+        name: Symbol,
+        arg_count: usize,
+        destination: Destination,
     },
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Instruction</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Instruction::Add</span> {
-                <span class="ident">left</span>,
-                <span class="ident">right</span>,
-                <span class="ident">destination</span>,
-            } =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;add {left} {right} {destination}&quot;</span>),
-            <span class="ident">Instruction::Sub</span> {
-                <span class="ident">left</span>,
-                <span class="ident">right</span>,
-                <span class="ident">destination</span>,
-            } =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;sub {left} {right} {destination}&quot;</span>),
-            <span class="ident">Instruction::Multiply</span> {
-                <span class="ident">left</span>,
-                <span class="ident">right</span>,
-                <span class="ident">destination</span>,
-            } =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;mul {left} {right} {destination}&quot;</span>),
-            <span class="ident">Instruction::Divide</span> {
-                <span class="ident">left</span>,
-                <span class="ident">right</span>,
-                <span class="ident">destination</span>,
-            } =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;div {left} {right} {destination}&quot;</span>),
-            <span class="ident">Instruction::If</span> {
-                <span class="ident">condition</span>,
-                <span class="ident">false_jump_to</span>,
-            } =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;if !{condition} jump {false_jump_to}&quot;</span>),
-            <span class="ident">Instruction::JumpTo</span>(<span class="ident">label</span>) =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;jump {label}&quot;</span>),
-            <span class="ident">Instruction::Label</span>(<span class="ident">label</span>) =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;label {label}&quot;</span>),
-            <span class="ident">Instruction::Compare</span> {
-                <span class="ident">comparison</span>,
-                <span class="ident">left</span>,
-                <span class="ident">right</span>,
-                <span class="ident">action</span>,
-            } =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{comparison} {left} {right} {action}&quot;</span>),
-            <span class="ident">Instruction::Push</span>(<span class="ident">value</span>) =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;push {value}&quot;</span>),
-            <span class="ident">Instruction::PopAndDrop</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;pop-and-drop&quot;</span>),
-            <span class="ident">Instruction::Load</span> { <span class="ident">value</span>, <span class="ident">variable</span> } =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;load {value} {variable}&quot;</span>),
-            <span class="ident">Instruction::Return</span>(<span class="ident">opt_value</span>) =&gt; {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="ident">opt_value</span> {
-                    <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;return {value}&quot;</span>)
-                } <span class="kw">else</span> {
-                    <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;return&quot;</span>)
+<span class="kw">impl </span>Display <span class="kw">for </span>Instruction {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">match </span><span class="self">self </span>{
+            Instruction::Add {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;add {left} {right} {destination}&quot;</span>),
+            Instruction::Sub {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;sub {left} {right} {destination}&quot;</span>),
+            Instruction::Multiply {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;mul {left} {right} {destination}&quot;</span>),
+            Instruction::Divide {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;div {left} {right} {destination}&quot;</span>),
+            Instruction::If {
+                condition,
+                false_jump_to,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;if !{condition} jump {false_jump_to}&quot;</span>),
+            Instruction::JumpTo(label) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;jump {label}&quot;</span>),
+            Instruction::Label(label) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;label {label}&quot;</span>),
+            Instruction::Compare {
+                comparison,
+                left,
+                right,
+                action,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;{comparison} {left} {right} {action}&quot;</span>),
+            Instruction::Push(value) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;push {value}&quot;</span>),
+            Instruction::PopAndDrop =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;pop-and-drop&quot;</span>),
+            Instruction::Load { value, variable } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;load {value} {variable}&quot;</span>),
+            Instruction::Return(opt_value) =&gt; {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(value) = opt_value {
+                    <span class="macro">write!</span>(f, <span class="string">&quot;return {value}&quot;</span>)
+                } <span class="kw">else </span>{
+                    f.write_str(<span class="string">&quot;return&quot;</span>)
                 }
             }
-            <span class="ident">Instruction::Call</span> {
-                <span class="ident">function</span>,
-                <span class="ident">arg_count</span>,
-                <span class="ident">destination</span>,
+            Instruction::Call {
+                function,
+                arg_count,
+                destination,
             } =&gt; {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">function</span>) <span class="op">=</span> <span class="ident">function</span> {
-                    <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;call {function} {arg_count} {destination}&quot;</span>)
-                } <span class="kw">else</span> {
-                    <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;recurse-call {arg_count} {destination}&quot;</span>)
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(function) = function {
+                    <span class="macro">write!</span>(f, <span class="string">&quot;call {function} {arg_count} {destination}&quot;</span>)
+                } <span class="kw">else </span>{
+                    <span class="macro">write!</span>(f, <span class="string">&quot;recurse-call {arg_count} {destination}&quot;</span>)
                 }
             }
-            <span class="ident">Instruction::CallIntrinsic</span> {
-                <span class="ident">intrinsic</span>,
-                <span class="ident">arg_count</span>,
-                <span class="ident">destination</span>,
+            Instruction::CallIntrinsic {
+                intrinsic,
+                arg_count,
+                destination,
             } =&gt; {
-                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;intrinsic {intrinsic} {arg_count} {destination}&quot;</span>)
+                <span class="macro">write!</span>(f, <span class="string">&quot;intrinsic {intrinsic} {arg_count} {destination}&quot;</span>)
             }
-            <span class="ident">Instruction::CallInstance</span> {
-                <span class="ident">target</span>,
-                <span class="ident">name</span>,
-                <span class="ident">arg_count</span>,
-                <span class="ident">destination</span>,
+            Instruction::CallInstance {
+                target,
+                name,
+                arg_count,
+                destination,
             } =&gt; {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">target</span>) <span class="op">=</span> <span class="ident">target</span> {
-                    <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;invoke {target} {name} {arg_count} {destination}&quot;</span>)
-                } <span class="kw">else</span> {
-                    <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;invoke stack {name} {arg_count} {destination}&quot;</span>)
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(target) = target {
+                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke {target} {name} {arg_count} {destination}&quot;</span>)
+                } <span class="kw">else </span>{
+                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke stack {name} {arg_count} {destination}&quot;</span>)
                 }
             }
         }
     }
 }
 
-<span class="doccomment">/// A literal value.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Literal</span> {
-    <span class="doccomment">/// A literal that represents [`Value::Void`].</span>
-    <span class="ident">Void</span>,
-    <span class="doccomment">/// A signed 64-bit integer literal value.</span>
-    <span class="ident">Integer</span>(<span class="ident">i64</span>),
-    <span class="doccomment">/// A real number literal value (64-bit floating point).</span>
-    <span class="ident">Real</span>(<span class="ident">f64</span>),
-    <span class="doccomment">/// A boolean literal.</span>
-    <span class="ident">Boolean</span>(<span class="ident">bool</span>),
-    <span class="doccomment">/// A string literal.</span>
-    <span class="ident">String</span>(<span class="ident">String</span>),
+<span class="doccomment">/// A literal value.
+</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub enum </span>Literal {
+    <span class="doccomment">/// A literal that represents [`Value::Void`].
+    </span>Void,
+    <span class="doccomment">/// A signed 64-bit integer literal value.
+    </span>Integer(i64),
+    <span class="doccomment">/// A real number literal value (64-bit floating point).
+    </span>Real(f64),
+    <span class="doccomment">/// A boolean literal.
+    </span>Boolean(bool),
+    <span class="doccomment">/// A string literal.
+    </span>String(String),
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Mapping</span> {
-    <span class="kw">pub</span> <span class="ident">key</span>: <span class="ident">NodeId</span>,
-    <span class="kw">pub</span> <span class="ident">value</span>: <span class="ident">NodeId</span>,
+<span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>Mapping {
+    <span class="kw">pub </span>key: NodeId,
+    <span class="kw">pub </span>value: NodeId,
 }
 
-<span class="kw">impl</span> <span class="ident">Literal</span> {
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">instantiate</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Value</span>
-    <span class="kw">where</span>
-        <span class="ident">Env</span>: <span class="ident">Environment</span>,
+<span class="kw">impl </span>Literal {
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>instantiate&lt;Env&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Value
+    <span class="kw">where
+        </span>Env: Environment,
     {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Literal::Void</span> =&gt; <span class="ident">Value::Void</span>,
-            <span class="ident">Literal::Integer</span>(<span class="ident">value</span>) =&gt; <span class="ident">Value::Integer</span>(<span class="kw-2">*</span><span class="ident">value</span>),
-            <span class="ident">Literal::Real</span>(<span class="ident">value</span>) =&gt; <span class="ident">Value::Real</span>(<span class="kw-2">*</span><span class="ident">value</span>),
-            <span class="ident">Literal::Boolean</span>(<span class="ident">value</span>) =&gt; <span class="ident">Value::Boolean</span>(<span class="kw-2">*</span><span class="ident">value</span>),
-            <span class="ident">Literal::String</span>(<span class="ident">value</span>) =&gt; <span class="ident">Value::dynamic</span>(<span class="op">&lt;</span><span class="ident">Env::String</span> <span class="kw">as</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::from</span>(<span class="ident">value</span>)),
+        <span class="kw">match </span><span class="self">self </span>{
+            Literal::Void =&gt; Value::Void,
+            Literal::Integer(value) =&gt; Value::Integer(<span class="kw-2">*</span>value),
+            Literal::Real(value) =&gt; Value::Real(<span class="kw-2">*</span>value),
+            Literal::Boolean(value) =&gt; Value::Boolean(<span class="kw-2">*</span>value),
+            Literal::String(value) =&gt; Value::dynamic(&lt;Env::String <span class="kw">as </span>From&lt;<span class="kw-2">&amp;</span>str&gt;&gt;::from(value)),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Literal</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident"><span class="self">Self</span>::Integer</span>(<span class="ident">value</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">value</span>, <span class="ident">f</span>),
-            <span class="ident"><span class="self">Self</span>::Real</span>(<span class="ident">value</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">value</span>, <span class="ident">f</span>),
-            <span class="ident"><span class="self">Self</span>::Boolean</span>(<span class="ident">value</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">value</span>, <span class="ident">f</span>),
-            <span class="ident"><span class="self">Self</span>::String</span>(<span class="ident">string</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="kw-2">&amp;</span><span class="ident">StringLiteralDisplay::new</span>(<span class="ident">string</span>), <span class="ident">f</span>),
-            <span class="ident"><span class="self">Self</span>::Void</span> =&gt; <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;Void&quot;</span>),
+<span class="kw">impl </span>Display <span class="kw">for </span>Literal {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Integer(value) =&gt; Display::fmt(value, f),
+            <span class="self">Self</span>::Real(value) =&gt; Display::fmt(value, f),
+            <span class="self">Self</span>::Boolean(value) =&gt; Display::fmt(value, f),
+            <span class="self">Self</span>::String(string) =&gt; Display::fmt(<span class="kw-2">&amp;</span>StringLiteralDisplay::new(string), f),
+            <span class="self">Self</span>::Void =&gt; f.write_str(<span class="string">&quot;Void&quot;</span>),
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ValueSource</span> {
-    <span class="doccomment">/// The value is in an argument at the provided 0-based index.</span>
-    <span class="ident">Argument</span>(<span class="ident">usize</span>),
-    <span class="doccomment">/// The value is in a variable specified.</span>
-    <span class="ident">Variable</span>(<span class="ident">Variable</span>),
+<span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub enum </span>ValueSource {
+    <span class="doccomment">/// The value is in an argument at the provided 0-based index.
+    </span>Argument(usize),
+    <span class="doccomment">/// The value is in a variable specified.
+    </span>Variable(Variable),
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">ValueSource</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">ValueSource::Argument</span>(<span class="ident">index</span>) =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;@{index}&quot;</span>),
-            <span class="ident">ValueSource::Variable</span>(<span class="ident">variable</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">variable</span>, <span class="ident">f</span>),
+<span class="kw">impl </span>Display <span class="kw">for </span>ValueSource {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">match </span><span class="self">self </span>{
+            ValueSource::Argument(index) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;@{index}&quot;</span>),
+            ValueSource::Variable(variable) =&gt; Display::fmt(variable, f),
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">ValueSource</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">vm::ValueSource</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">source</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">ValueSource</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">source</span> {
-            <span class="ident">ValueSource::Argument</span>(<span class="ident">arg</span>) =&gt; <span class="ident"><span class="self">Self</span>::Argument</span>(<span class="kw-2">*</span><span class="ident">arg</span>),
-            <span class="ident">ValueSource::Variable</span>(<span class="ident">var</span>) =&gt; <span class="ident"><span class="self">Self</span>::Variable</span>(<span class="ident">var</span>.<span class="number">0</span>),
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ValueSource&gt; <span class="kw">for </span>vm::ValueSource {
+    <span class="kw">fn </span>from(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ValueSource) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>source {
+            ValueSource::Argument(arg) =&gt; <span class="self">Self</span>::Argument(<span class="kw-2">*</span>arg),
+            ValueSource::Variable(var) =&gt; <span class="self">Self</span>::Variable(var.<span class="number">0</span>),
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">LiteralOrSource</span> {
-    <span class="ident">Literal</span>(<span class="ident">Literal</span>),
-    <span class="doccomment">/// The value is in an argument at the provided 0-based index.</span>
-    <span class="ident">Argument</span>(<span class="ident">usize</span>),
-    <span class="doccomment">/// The value is in a variable specified.</span>
-    <span class="ident">Variable</span>(<span class="ident">Variable</span>),
+<span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub enum </span>LiteralOrSource {
+    Literal(Literal),
+    <span class="doccomment">/// The value is in an argument at the provided 0-based index.
+    </span>Argument(usize),
+    <span class="doccomment">/// The value is in a variable specified.
+    </span>Variable(Variable),
 }
 
-<span class="kw">impl</span> <span class="ident">LiteralOrSource</span> {
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">instantiate</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ValueOrSource</span>
-    <span class="kw">where</span>
-        <span class="ident">Env</span>: <span class="ident">Environment</span>,
+<span class="kw">impl </span>LiteralOrSource {
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>instantiate&lt;Env&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ValueOrSource
+    <span class="kw">where
+        </span>Env: Environment,
     {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">LiteralOrSource::Literal</span>(<span class="ident">literal</span>) =&gt; <span class="ident">ValueOrSource::Value</span>(<span class="ident">literal</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>()),
-            <span class="ident">LiteralOrSource::Argument</span>(<span class="ident">index</span>) =&gt; <span class="ident">ValueOrSource::Argument</span>(<span class="kw-2">*</span><span class="ident">index</span>),
-            <span class="ident">LiteralOrSource::Variable</span>(<span class="ident">index</span>) =&gt; <span class="ident">ValueOrSource::Variable</span>(<span class="ident">index</span>.<span class="number">0</span>),
+        <span class="kw">match </span><span class="self">self </span>{
+            LiteralOrSource::Literal(literal) =&gt; ValueOrSource::Value(literal.instantiate::&lt;Env&gt;()),
+            LiteralOrSource::Argument(index) =&gt; ValueOrSource::Argument(<span class="kw-2">*</span>index),
+            LiteralOrSource::Variable(index) =&gt; ValueOrSource::Variable(index.<span class="number">0</span>),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">LiteralOrSource</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">LiteralOrSource::Literal</span>(<span class="ident">value</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">value</span>, <span class="ident">f</span>),
-            <span class="ident">LiteralOrSource::Argument</span>(<span class="ident">index</span>) =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;@{index}&quot;</span>),
-            <span class="ident">LiteralOrSource::Variable</span>(<span class="ident">variable</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">variable</span>, <span class="ident">f</span>),
+<span class="kw">impl </span>Display <span class="kw">for </span>LiteralOrSource {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">match </span><span class="self">self </span>{
+            LiteralOrSource::Literal(value) =&gt; Display::fmt(value, f),
+            LiteralOrSource::Argument(index) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;@{index}&quot;</span>),
+            LiteralOrSource::Variable(variable) =&gt; Display::fmt(variable, f),
         }
     }
 }
 
-<span class="doccomment">/// A destination for a value.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Destination</span> {
-    <span class="doccomment">/// Store the value in the 0-based variable index provided.</span>
-    <span class="ident">Variable</span>(<span class="ident">Variable</span>),
-    <span class="doccomment">/// Push the value to the stack.</span>
-    <span class="ident">Stack</span>,
-    <span class="doccomment">/// Store the value in the return register.</span>
-    <span class="ident">Return</span>,
+<span class="doccomment">/// A destination for a value.
+</span><span class="attribute">#[derive(Debug, Clone, Copy)]
+</span><span class="kw">pub enum </span>Destination {
+    <span class="doccomment">/// Store the value in the 0-based variable index provided.
+    </span>Variable(Variable),
+    <span class="doccomment">/// Push the value to the stack.
+    </span>Stack,
+    <span class="doccomment">/// Store the value in the return register.
+    </span>Return,
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Destination</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Destination::Variable</span>(<span class="ident">variable</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="kw-2">&amp;</span><span class="ident">variable</span>, <span class="ident">f</span>),
-            <span class="ident">Destination::Stack</span> =&gt; <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;stack&quot;</span>),
-            <span class="ident">Destination::Return</span> =&gt; <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;$$&quot;</span>),
+<span class="kw">impl </span>Display <span class="kw">for </span>Destination {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">match </span><span class="self">self </span>{
+            Destination::Variable(variable) =&gt; Display::fmt(<span class="kw-2">&amp;</span>variable, f),
+            Destination::Stack =&gt; f.write_str(<span class="string">&quot;stack&quot;</span>),
+            Destination::Return =&gt; f.write_str(<span class="string">&quot;$$&quot;</span>),
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Destination</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">vm::Destination</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">source</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Destination</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">source</span> {
-            <span class="ident">Destination::Variable</span>(<span class="ident">variable</span>) =&gt; <span class="ident"><span class="self">Self</span>::Variable</span>(<span class="ident">variable</span>.<span class="number">0</span>),
-            <span class="ident">Destination::Stack</span> =&gt; <span class="ident"><span class="self">Self</span>::Stack</span>,
-            <span class="ident">Destination::Return</span> =&gt; <span class="ident"><span class="self">Self</span>::Return</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Destination&gt; <span class="kw">for </span>vm::Destination {
+    <span class="kw">fn </span>from(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Destination) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>source {
+            Destination::Variable(variable) =&gt; <span class="self">Self</span>::Variable(variable.<span class="number">0</span>),
+            Destination::Stack =&gt; <span class="self">Self</span>::Stack,
+            Destination::Return =&gt; <span class="self">Self</span>::Return,
         }
     }
 }
 
-<span class="doccomment">/// An action to take during an [`Instruction::Compare`].</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CompareAction</span> {
-    <span class="doccomment">/// Store the boolean result in the destination indicated.</span>
-    <span class="ident">Store</span>(<span class="ident">Destination</span>),
-    <span class="doccomment">/// If the comparison is false, jump to the 0-based instruction index</span>
-    <span class="doccomment">/// indicated.</span>
-    <span class="ident">JumpIfFalse</span>(<span class="ident">Label</span>),
+<span class="doccomment">/// An action to take during an [`Instruction::Compare`].
+</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub enum </span>CompareAction {
+    <span class="doccomment">/// Store the boolean result in the destination indicated.
+    </span>Store(Destination),
+    <span class="doccomment">/// If the comparison is false, jump to the 0-based instruction index
+    /// indicated.
+    </span>JumpIfFalse(Label),
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">CompareAction</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">CompareAction::Store</span>(<span class="ident">destination</span>) =&gt; <span class="ident">Display::fmt</span>(<span class="ident">destination</span>, <span class="ident">f</span>),
-            <span class="ident">CompareAction::JumpIfFalse</span>(<span class="ident">label</span>) =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;jump {label}&quot;</span>),
+<span class="kw">impl </span>Display <span class="kw">for </span>CompareAction {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">match </span><span class="self">self </span>{
+            CompareAction::Store(destination) =&gt; Display::fmt(destination, f),
+            CompareAction::JumpIfFalse(label) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;jump {label}&quot;</span>),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">CompareAction</span> {
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">link</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">labels</span>: <span class="kw-2">&amp;</span>[<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>]) -&gt; <span class="ident">vm::CompareAction</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">CompareAction::Store</span>(<span class="ident">destination</span>) =&gt; <span class="ident">vm::CompareAction::Store</span>(<span class="ident">destination</span>.<span class="ident">into</span>()),
-            <span class="ident">CompareAction::JumpIfFalse</span>(<span class="ident">target</span>) =&gt; {
-                <span class="ident">vm::CompareAction::JumpIfFalse</span>(<span class="ident">labels</span>.<span class="ident">get</span>(<span class="ident">target</span>.<span class="number">0</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>())
+<span class="kw">impl </span>CompareAction {
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>link(<span class="kw-2">&amp;</span><span class="self">self</span>, labels: <span class="kw-2">&amp;</span>[<span class="prelude-ty">Option</span>&lt;usize&gt;]) -&gt; vm::CompareAction {
+        <span class="kw">match </span><span class="self">self </span>{
+            CompareAction::Store(destination) =&gt; vm::CompareAction::Store(destination.into()),
+            CompareAction::JumpIfFalse(target) =&gt; {
+                vm::CompareAction::JumpIfFalse(labels.get(target.<span class="number">0</span>).unwrap().unwrap())
             }
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CodeBlockBuilder</span> {
-    <span class="ident">label_counter</span>: <span class="ident">usize</span>,
-    <span class="ident">ops</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Instruction</span><span class="op">&gt;</span>,
-    <span class="ident">args</span>: <span class="ident">usize</span>,
-    <span class="ident">temporary_variables</span>: <span class="ident">usize</span>,
-    <span class="ident">scope</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Symbol</span>, <span class="ident">ScopeSymbol</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">variables</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Symbol</span>, <span class="ident">Variable</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Default)]
+</span><span class="kw">pub struct </span>CodeBlockBuilder {
+    label_counter: usize,
+    ops: Vec&lt;Instruction&gt;,
+    args: usize,
+    temporary_variables: usize,
+    scope: HashMap&lt;Symbol, ScopeSymbol&gt;,
+    labels: CodeLabels,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) variables: HashMap&lt;Symbol, Variable&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">CodeBlockBuilder</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">add_symbol</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">symbol</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>, <span class="ident">value</span>: <span class="ident">ScopeSymbol</span>) {
-        <span class="kw">if</span> <span class="macro">matches!</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>, <span class="ident">ScopeSymbol::Argument</span>(<span class="kw">_</span>)) {
-            <span class="self">self</span>.<span class="ident">args</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+<span class="kw">impl </span>CodeBlockBuilder {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>add_symbol(<span class="kw-2">&amp;mut </span><span class="self">self</span>, symbol: <span class="kw">impl </span>Into&lt;Symbol&gt;, value: ScopeSymbol) {
+        <span class="kw">if </span><span class="macro">matches!</span>(<span class="kw-2">&amp;</span>value, ScopeSymbol::Argument(<span class="kw">_</span>)) {
+            <span class="self">self</span>.args += <span class="number">1</span>;
         }
 
-        <span class="self">self</span>.<span class="ident">scope</span>.<span class="ident">insert</span>(<span class="ident">symbol</span>.<span class="ident">into</span>(), <span class="ident">value</span>);
+        <span class="self">self</span>.scope.insert(symbol.into(), value);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_label</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">Label</span> {
-        <span class="kw">let</span> <span class="ident">label_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">label_counter</span>;
-        <span class="self">self</span>.<span class="ident">label_counter</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="ident">Label</span>(<span class="ident">label_id</span>)
+    <span class="kw">pub fn </span>new_label(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; Label {
+        <span class="kw">let </span>label_id = <span class="self">self</span>.label_counter;
+        <span class="self">self</span>.label_counter += <span class="number">1</span>;
+        Label(label_id)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">operation</span>: <span class="ident">Instruction</span>) {
-        <span class="self">self</span>.<span class="ident">ops</span>.<span class="ident">push</span>(<span class="ident">operation</span>);
+    <span class="kw">pub fn </span>push(<span class="kw-2">&amp;mut </span><span class="self">self</span>, operation: Instruction) {
+        <span class="self">self</span>.ops.push(operation);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">label</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">label</span>: <span class="ident">Label</span>) {
-        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Instruction::Label</span>(<span class="ident">label</span>));
+    <span class="kw">pub fn </span>label(<span class="kw-2">&amp;mut </span><span class="self">self</span>, label: Label) {
+        <span class="self">self</span>.push(Instruction::Label(label));
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push_from_symbol</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">symbol</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>) {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">scope</span>.<span class="ident">get</span>(<span class="ident">symbol</span>).<span class="ident">unwrap</span>() {
-            <span class="ident">ScopeSymbol::Argument</span>(<span class="ident">index</span>) =&gt; {
-                <span class="self">self</span>.<span class="ident">ops</span>
-                    .<span class="ident">push</span>(<span class="ident">Instruction::Push</span>(<span class="ident">LiteralOrSource::Argument</span>(<span class="kw-2">*</span><span class="ident">index</span>)));
+    <span class="kw">pub fn </span>push_from_symbol(<span class="kw-2">&amp;mut </span><span class="self">self</span>, symbol: <span class="kw-2">&amp;</span>Symbol) {
+        <span class="kw">match </span><span class="self">self</span>.scope.get(symbol).unwrap() {
+            ScopeSymbol::Argument(index) =&gt; {
+                <span class="self">self</span>.ops
+                    .push(Instruction::Push(LiteralOrSource::Argument(<span class="kw-2">*</span>index)));
             }
-            <span class="ident">ScopeSymbol::Variable</span>(<span class="ident">variable</span>) =&gt; {
-                <span class="self">self</span>.<span class="ident">ops</span>
-                    .<span class="ident">push</span>(<span class="ident">Instruction::Push</span>(<span class="ident">LiteralOrSource::Variable</span>(<span class="kw-2">*</span><span class="ident">variable</span>)));
+            ScopeSymbol::Variable(variable) =&gt; {
+                <span class="self">self</span>.ops
+                    .push(Instruction::Push(LiteralOrSource::Variable(<span class="kw-2">*</span>variable)));
             }
-            <span class="ident">ScopeSymbol::Function</span> { .. } =&gt; <span class="macro">todo!</span>(<span class="string">&quot;pushing a vtable entry?&quot;</span>),
-        }
-    }
-
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lookup</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">symbol</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">ScopeSymbol</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">scope</span>.<span class="ident">get</span>(<span class="ident">symbol</span>)
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_into_destination</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">LiteralOrSource</span>, <span class="ident">destination</span>: <span class="ident">Destination</span>) {
-        <span class="kw">match</span> <span class="ident">destination</span> {
-            <span class="ident">Destination::Variable</span>(<span class="ident">variable</span>) =&gt; {
-                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Instruction::Load</span> { <span class="ident">value</span>, <span class="ident">variable</span> });
-            }
-            <span class="ident">Destination::Stack</span> =&gt; {
-                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Instruction::Push</span>(<span class="ident">value</span>));
-            }
-            <span class="ident">Destination::Return</span> =&gt; {
-                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">Instruction::Return</span>(<span class="prelude-val">Some</span>(<span class="ident">value</span>)));
-            }
+            ScopeSymbol::Function { .. } =&gt; <span class="macro">todo!</span>(<span class="string">&quot;pushing a vtable entry?&quot;</span>),
         }
     }
 
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">symbol</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">symbol</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">ScopeSymbol</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">scope</span>.<span class="ident">get</span>(<span class="ident">symbol</span>)
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>lookup(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>ScopeSymbol&gt; {
+        <span class="self">self</span>.scope.get(symbol)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_from_symbol</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">symbol</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>,
-        <span class="ident">destination</span>: <span class="ident">Destination</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">CompilationError</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">scope</span>.<span class="ident">get</span>(<span class="ident">symbol</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Argument</span>(<span class="ident">index</span>)) =&gt; {
-                <span class="self">self</span>.<span class="ident">store_into_destination</span>(<span class="ident">LiteralOrSource::Argument</span>(<span class="kw-2">*</span><span class="ident">index</span>), <span class="ident">destination</span>);
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>loop_info(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Symbol&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>LoopInfo&gt; {
+        <span class="self">self</span>.labels.find(name)
+    }
+
+    <span class="kw">pub fn </span>store_into_destination(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: LiteralOrSource, destination: Destination) {
+        <span class="kw">match </span>destination {
+            Destination::Variable(variable) =&gt; {
+                <span class="self">self</span>.push(Instruction::Load { value, variable });
+            }
+            Destination::Stack =&gt; {
+                <span class="self">self</span>.push(Instruction::Push(value));
+            }
+            Destination::Return =&gt; {
+                <span class="self">self</span>.push(Instruction::Return(<span class="prelude-val">Some</span>(value)));
+            }
+        }
+    }
+
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>symbol(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>ScopeSymbol&gt; {
+        <span class="self">self</span>.scope.get(symbol)
+    }
+
+    <span class="kw">pub fn </span>load_from_symbol(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        symbol: <span class="kw-2">&amp;</span>Symbol,
+        destination: Destination,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
+        <span class="kw">match </span><span class="self">self</span>.scope.get(symbol) {
+            <span class="prelude-val">Some</span>(ScopeSymbol::Argument(index)) =&gt; {
+                <span class="self">self</span>.store_into_destination(LiteralOrSource::Argument(<span class="kw-2">*</span>index), destination);
                 <span class="prelude-val">Ok</span>(())
             }
-            <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Variable</span>(<span class="ident">variable</span>)) =&gt; {
-                <span class="self">self</span>.<span class="ident">store_into_destination</span>(<span class="ident">LiteralOrSource::Variable</span>(<span class="kw-2">*</span><span class="ident">variable</span>), <span class="ident">destination</span>);
+            <span class="prelude-val">Some</span>(ScopeSymbol::Variable(variable)) =&gt; {
+                <span class="self">self</span>.store_into_destination(LiteralOrSource::Variable(<span class="kw-2">*</span>variable), destination);
                 <span class="prelude-val">Ok</span>(())
             }
-            <span class="prelude-val">Some</span>(<span class="ident">ScopeSymbol::Function</span> { .. }) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;pushing a vtable entry?&quot;</span>),
-            <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">CompilationError::UndefinedIdentifier</span>(<span class="ident">symbol</span>.<span class="ident">clone</span>())),
+            <span class="prelude-val">Some</span>(ScopeSymbol::Function { .. }) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;pushing a vtable entry?&quot;</span>),
+            <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(CompilationError::UndefinedIdentifier(symbol.clone())),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">variable_index_from_name</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>) -&gt; <span class="ident">Variable</span> {
-        <span class="kw">let</span> <span class="ident">new_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">variables</span>.<span class="ident">len</span>();
-        <span class="kw">let</span> <span class="ident">variable</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>
-            .<span class="ident">variables</span>
-            .<span class="ident">entry</span>(<span class="ident">name</span>.<span class="ident">clone</span>())
-            .<span class="ident">or_insert_with</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Variable</span>(<span class="ident">new_index</span>));
-        <span class="kw">if</span> <span class="ident">variable</span>.<span class="number">0</span> <span class="op">==</span> <span class="ident">new_index</span> {
-            <span class="self">self</span>.<span class="ident">add_symbol</span>(<span class="ident">name</span>.<span class="ident">clone</span>(), <span class="ident">ScopeSymbol::Variable</span>(<span class="ident">variable</span>));
+    <span class="kw">pub fn </span>variable_index_from_name(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol) -&gt; Variable {
+        <span class="kw">let </span>new_index = <span class="self">self</span>.variables.len();
+        <span class="kw">let </span>variable = <span class="kw-2">*</span><span class="self">self
+            </span>.variables
+            .entry(name.clone())
+            .or_insert_with(|| Variable(new_index));
+        <span class="kw">if </span>variable.<span class="number">0 </span>== new_index {
+            <span class="self">self</span>.add_symbol(name.clone(), ScopeSymbol::Variable(variable));
         }
-        <span class="ident">variable</span>
+        variable
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_temporary_variable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">Variable</span> {
-        <span class="self">self</span>.<span class="ident">temporary_variables</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">let</span> <span class="ident">variable</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">variable_index_from_name</span>(<span class="kw-2">&amp;</span><span class="ident">Symbol::from</span>(
-            <span class="macro">format!</span>(<span class="string">&quot;${}&quot;</span>, <span class="self">self</span>.<span class="ident">temporary_variables</span>).<span class="ident">as_str</span>(),
+    <span class="kw">pub fn </span>new_temporary_variable(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; Variable {
+        <span class="self">self</span>.temporary_variables += <span class="number">1</span>;
+        <span class="kw">let </span>variable = <span class="self">self</span>.variable_index_from_name(<span class="kw-2">&amp;</span>Symbol::from(
+            <span class="macro">format!</span>(<span class="string">&quot;${}&quot;</span>, <span class="self">self</span>.temporary_variables).as_str(),
         ));
-        <span class="ident">variable</span>
+        variable
     }
 
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">finish</span>(<span class="self">self</span>) -&gt; <span class="ident">CodeBlock</span> {
-        <span class="ident">CodeBlock</span> {
-            <span class="ident">variables</span>: <span class="self">self</span>.<span class="ident">variables</span>.<span class="ident">len</span>(),
-            <span class="ident">code</span>: <span class="self">self</span>.<span class="ident">ops</span>,
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>finish(<span class="self">self</span>) -&gt; CodeBlock {
+        CodeBlock {
+            variables: <span class="self">self</span>.variables.len(),
+            code: <span class="self">self</span>.ops,
+        }
+    }
+
+    <span class="kw">pub fn </span>begin_loop(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="prelude-ty">Option</span>&lt;Symbol&gt;, result: Destination) -&gt; LoopScope&lt;<span class="lifetime">&#39;_</span>, <span class="self">Self</span>&gt; {
+        <span class="kw">let </span>break_label = <span class="self">self</span>.new_label();
+        <span class="kw">let </span>continue_label = <span class="self">self</span>.new_label();
+        <span class="self">self</span>.labels.begin(LoopInfo {
+            name,
+            break_label,
+            continue_label,
+            loop_result: result,
+        });
+        LoopScope {
+            owner: <span class="self">self</span>,
+            break_label,
+            continue_label,
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CodeBlock</span> {
-    <span class="kw">pub</span> <span class="ident">variables</span>: <span class="ident">usize</span>,
-    <span class="kw">pub</span> <span class="ident">code</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Instruction</span><span class="op">&gt;</span>,
+<span class="kw">pub struct </span>LoopScope&lt;<span class="lifetime">&#39;a</span>, T&gt;
+<span class="kw">where
+    </span>T: BorrowMut&lt;CodeBlockBuilder&gt;,
+{
+    owner: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>T,
+    <span class="kw">pub </span>break_label: Label,
+    <span class="kw">pub </span>continue_label: Label,
 }
 
-<span class="kw">impl</span> <span class="ident">CodeBlock</span> {
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_lines</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">link</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">scope</span>: <span class="kw-2">&amp;</span><span class="ident">S</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">vm::CodeBlock</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">S</span>: <span class="ident">Scope</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T&gt; LoopScope&lt;<span class="lifetime">&#39;a</span>, T&gt;
+<span class="kw">where
+    </span>T: BorrowMut&lt;CodeBlockBuilder&gt;,
+{
+    <span class="kw">pub fn </span>label_break(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.owner.borrow_mut().label(<span class="self">self</span>.break_label);
+    }
+
+    <span class="kw">pub fn </span>label_continue(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.owner.borrow_mut().label(<span class="self">self</span>.continue_label);
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T&gt; Borrow&lt;CodeBlockBuilder&gt; <span class="kw">for </span>LoopScope&lt;<span class="lifetime">&#39;a</span>, T&gt;
+<span class="kw">where
+    </span>T: BorrowMut&lt;CodeBlockBuilder&gt;,
+{
+    <span class="kw">fn </span>borrow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CodeBlockBuilder {
+        (<span class="kw-2">*</span><span class="self">self</span>.owner).borrow()
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T&gt; BorrowMut&lt;CodeBlockBuilder&gt; <span class="kw">for </span>LoopScope&lt;<span class="lifetime">&#39;a</span>, T&gt;
+<span class="kw">where
+    </span>T: BorrowMut&lt;CodeBlockBuilder&gt;,
+{
+    <span class="kw">fn </span>borrow_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CodeBlockBuilder {
+        <span class="self">self</span>.owner.borrow_mut()
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T&gt; Deref <span class="kw">for </span>LoopScope&lt;<span class="lifetime">&#39;a</span>, T&gt;
+<span class="kw">where
+    </span>T: BorrowMut&lt;CodeBlockBuilder&gt;,
+{
+    <span class="kw">type </span>Target = CodeBlockBuilder;
+
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+        <span class="self">self</span>.borrow()
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T&gt; DerefMut <span class="kw">for </span>LoopScope&lt;<span class="lifetime">&#39;a</span>, T&gt;
+<span class="kw">where
+    </span>T: BorrowMut&lt;CodeBlockBuilder&gt;,
+{
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
+        <span class="self">self</span>.owner.borrow_mut()
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T&gt; Drop <span class="kw">for </span>LoopScope&lt;<span class="lifetime">&#39;a</span>, T&gt;
+<span class="kw">where
+    </span>T: BorrowMut&lt;CodeBlockBuilder&gt;,
+{
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.labels.exit_block();
+    }
+}
+
+<span class="attribute">#[derive(Debug, Default)]
+</span><span class="kw">struct </span>CodeLabels {
+    scopes: Vec&lt;LoopInfo&gt;,
+}
+
+<span class="kw">impl </span>CodeLabels {
+    <span class="kw">fn </span>begin(<span class="kw-2">&amp;mut </span><span class="self">self</span>, info: LoopInfo) {
+        <span class="self">self</span>.scopes.push(info);
+    }
+
+    <span class="kw">fn </span>exit_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.scopes.pop();
+    }
+
+    <span class="kw">fn </span>find(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Symbol&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>LoopInfo&gt; {
+        <span class="kw">if </span>name.is_some() {
+            <span class="self">self</span>.scopes
+                .iter()
+                .rev()
+                .find(|info| info.name.as_ref() == name)
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.scopes.last()
+        }
+    }
+}
+
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>LoopInfo {
+    <span class="kw">pub </span>name: <span class="prelude-ty">Option</span>&lt;Symbol&gt;,
+    <span class="kw">pub </span>break_label: Label,
+    <span class="kw">pub </span>continue_label: Label,
+    <span class="kw">pub </span>loop_result: Destination,
+}
+
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>CodeBlock {
+    <span class="kw">pub </span>variables: usize,
+    <span class="kw">pub </span>code: Vec&lt;Instruction&gt;,
+}
+
+<span class="kw">impl </span>CodeBlock {
+    <span class="attribute">#[allow(clippy::too_many_lines)]
+    </span><span class="kw">pub fn </span>link&lt;S&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, scope: <span class="kw-2">&amp;</span>S) -&gt; <span class="prelude-ty">Result</span>&lt;vm::CodeBlock, CompilationError&gt;
+    <span class="kw">where
+        </span>S: Scope,
     {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">labels</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">labels_encountered</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">for</span> (<span class="ident">index</span>, <span class="ident">op</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">code</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Instruction::Label</span>(<span class="ident">label</span>) <span class="op">=</span> <span class="ident">op</span> {
-                <span class="kw">if</span> <span class="ident">labels</span>.<span class="ident">len</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">label</span>.<span class="number">0</span> {
-                    <span class="ident">labels</span>.<span class="ident">resize</span>(<span class="ident">label</span>.<span class="number">0</span> <span class="op">+</span> <span class="number">1</span>, <span class="prelude-val">None</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>labels = Vec::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>labels_encountered = <span class="number">0</span>;
+        <span class="kw">for </span>(index, op) <span class="kw">in </span><span class="self">self</span>.code.iter().enumerate() {
+            <span class="kw">if let </span>Instruction::Label(label) = op {
+                <span class="kw">if </span>labels.len() &lt;= label.<span class="number">0 </span>{
+                    labels.resize(label.<span class="number">0 </span>+ <span class="number">1</span>, <span class="prelude-val">None</span>);
                 }
-                <span class="ident">labels</span>[<span class="ident">label</span>.<span class="number">0</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">index</span> <span class="op">-</span> <span class="ident">labels_encountered</span>);
-                <span class="ident">labels_encountered</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                labels[label.<span class="number">0</span>] = <span class="prelude-val">Some</span>(index - labels_encountered);
+                labels_encountered += <span class="number">1</span>;
             }
         }
-        <span class="self">self</span>.<span class="ident">code</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">op</span><span class="op">|</span> <span class="ident">compile_instruction</span>(<span class="ident">op</span>, <span class="kw-2">&amp;</span><span class="ident">labels</span>, <span class="ident">scope</span>).<span class="ident">transpose</span>())
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">instructions</span><span class="op">|</span> <span class="ident">vm::CodeBlock</span> {
-                <span class="ident">variables</span>: <span class="self">self</span>.<span class="ident">variables</span>,
-                <span class="ident">code</span>: <span class="ident">instructions</span>,
+        <span class="self">self</span>.code
+            .iter()
+            .filter_map(|op| compile_instruction(op, <span class="kw-2">&amp;</span>labels, scope).transpose())
+            .collect::&lt;<span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, CompilationError&gt;&gt;()
+            .map(|instructions| vm::CodeBlock {
+                variables: <span class="self">self</span>.variables,
+                code: instructions,
             })
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">CodeBlock</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">is_first</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">code</span> {
-            <span class="kw">if</span> <span class="ident">is_first</span> {
-                <span class="ident">is_first</span> <span class="op">=</span> <span class="bool-val">false</span>;
-            } <span class="kw">else</span> {
-                <span class="ident">f</span>.<span class="ident">write_char</span>(<span class="string">&#39;\n&#39;</span>)<span class="question-mark">?</span>;
+<span class="kw">impl </span>Display <span class="kw">for </span>CodeBlock {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">let </span><span class="kw-2">mut </span>is_first = <span class="bool-val">true</span>;
+        <span class="kw">for </span>i <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.code {
+            <span class="kw">if </span>is_first {
+                is_first = <span class="bool-val">false</span>;
+            } <span class="kw">else </span>{
+                f.write_char(<span class="string">&#39;\n&#39;</span>)<span class="question-mark">?</span>;
             }
-            <span class="ident">Display::fmt</span>(<span class="ident">i</span>, <span class="ident">f</span>)<span class="question-mark">?</span>;
+            Display::fmt(i, f)<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_lines</span>)]</span> <span class="comment">// Most are straight mappings...</span>
-<span class="kw">fn</span> <span class="ident">compile_instruction</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(
-    <span class="ident">op</span>: <span class="kw-2">&amp;</span><span class="ident">Instruction</span>,
-    <span class="ident">labels</span>: <span class="kw-2">&amp;</span>[<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>],
-    <span class="ident">scope</span>: <span class="kw-2">&amp;</span><span class="ident">S</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">vm::Instruction</span><span class="op">&gt;</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">S</span>: <span class="ident">Scope</span>,
+<span class="attribute">#[allow(clippy::too_many_lines)] </span><span class="comment">// Most are straight mappings...
+</span><span class="kw">fn </span>compile_instruction&lt;S&gt;(
+    op: <span class="kw-2">&amp;</span>Instruction,
+    labels: <span class="kw-2">&amp;</span>[<span class="prelude-ty">Option</span>&lt;usize&gt;],
+    scope: <span class="kw-2">&amp;</span>S,
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;vm::Instruction&gt;, CompilationError&gt;
+<span class="kw">where
+    </span>S: Scope,
 {
-    <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="kw">match</span> <span class="ident">op</span> {
-        <span class="ident">Instruction::Add</span> {
-            <span class="ident">left</span>,
-            <span class="ident">right</span>,
-            <span class="ident">destination</span>,
-        } =&gt; <span class="ident">vm::Instruction::Add</span> {
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
+    <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="kw">match </span>op {
+        Instruction::Add {
+            left,
+            right,
+            destination,
+        } =&gt; vm::Instruction::Add {
+            left: left.instantiate::&lt;S::Environment&gt;(),
+            right: right.instantiate::&lt;S::Environment&gt;(),
+            destination: destination.into(),
         },
-        <span class="ident">Instruction::Sub</span> {
-            <span class="ident">left</span>,
-            <span class="ident">right</span>,
-            <span class="ident">destination</span>,
-        } =&gt; <span class="ident">vm::Instruction::Sub</span> {
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
+        Instruction::Sub {
+            left,
+            right,
+            destination,
+        } =&gt; vm::Instruction::Sub {
+            left: left.instantiate::&lt;S::Environment&gt;(),
+            right: right.instantiate::&lt;S::Environment&gt;(),
+            destination: destination.into(),
         },
-        <span class="ident">Instruction::Multiply</span> {
-            <span class="ident">left</span>,
-            <span class="ident">right</span>,
-            <span class="ident">destination</span>,
-        } =&gt; <span class="ident">vm::Instruction::Multiply</span> {
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
+        Instruction::Multiply {
+            left,
+            right,
+            destination,
+        } =&gt; vm::Instruction::Multiply {
+            left: left.instantiate::&lt;S::Environment&gt;(),
+            right: right.instantiate::&lt;S::Environment&gt;(),
+            destination: destination.into(),
         },
-        <span class="ident">Instruction::Divide</span> {
-            <span class="ident">left</span>,
-            <span class="ident">right</span>,
-            <span class="ident">destination</span>,
-        } =&gt; <span class="ident">vm::Instruction::Divide</span> {
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
+        Instruction::Divide {
+            left,
+            right,
+            destination,
+        } =&gt; vm::Instruction::Divide {
+            left: left.instantiate::&lt;S::Environment&gt;(),
+            right: right.instantiate::&lt;S::Environment&gt;(),
+            destination: destination.into(),
         },
-        <span class="ident">Instruction::If</span> {
-            <span class="ident">condition</span>,
-            <span class="ident">false_jump_to</span>,
-        } =&gt; <span class="ident">vm::Instruction::If</span> {
-            <span class="ident">condition</span>: <span class="ident">condition</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">false_jump_to</span>: <span class="ident">labels</span>[<span class="ident">false_jump_to</span>.<span class="number">0</span>].<span class="ident">expect</span>(<span class="string">&quot;label not inserted&quot;</span>),
+        Instruction::If {
+            condition,
+            false_jump_to,
+        } =&gt; vm::Instruction::If {
+            condition: condition.instantiate::&lt;S::Environment&gt;(),
+            false_jump_to: labels[false_jump_to.<span class="number">0</span>].expect(<span class="string">&quot;label not inserted&quot;</span>),
         },
-        <span class="ident">Instruction::JumpTo</span>(<span class="ident">label</span>) =&gt; {
-            <span class="ident">vm::Instruction::JumpTo</span>(<span class="ident">labels</span>[<span class="ident">label</span>.<span class="number">0</span>].<span class="ident">expect</span>(<span class="string">&quot;label not inserted&quot;</span>))
+        Instruction::JumpTo(label) =&gt; {
+            vm::Instruction::JumpTo(labels[label.<span class="number">0</span>].expect(<span class="string">&quot;label not inserted&quot;</span>))
         }
-        <span class="ident">Instruction::Label</span>(<span class="ident">_label</span>) =&gt; <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>), <span class="comment">// Labels are no-ops</span>
-        <span class="ident">Instruction::Compare</span> {
-            <span class="ident">comparison</span>,
-            <span class="ident">left</span>,
-            <span class="ident">right</span>,
-            <span class="ident">action</span>,
-        } =&gt; <span class="ident">vm::Instruction::Compare</span> {
-            <span class="ident">comparison</span>: <span class="kw-2">*</span><span class="ident">comparison</span>,
-            <span class="ident">left</span>: <span class="ident">left</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">right</span>: <span class="ident">right</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
-            <span class="ident">action</span>: <span class="ident">action</span>.<span class="ident">link</span>(<span class="ident">labels</span>),
+        Instruction::Label(_label) =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>), <span class="comment">// Labels are no-ops
+        </span>Instruction::Compare {
+            comparison,
+            left,
+            right,
+            action,
+        } =&gt; vm::Instruction::Compare {
+            comparison: <span class="kw-2">*</span>comparison,
+            left: left.instantiate::&lt;S::Environment&gt;(),
+            right: right.instantiate::&lt;S::Environment&gt;(),
+            action: action.link(labels),
         },
-        <span class="ident">Instruction::Push</span>(<span class="ident">value</span>) =&gt; <span class="ident">vm::Instruction::Push</span>(<span class="ident">value</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>()),
-        <span class="ident">Instruction::PopAndDrop</span> =&gt; <span class="ident">vm::Instruction::PopAndDrop</span>,
-        <span class="ident">Instruction::Return</span>(<span class="ident">value</span>) =&gt; <span class="ident">vm::Instruction::Return</span>(
-            <span class="ident">value</span>
-                .<span class="ident">as_ref</span>()
-                .<span class="ident">map</span>(<span class="ident">LiteralOrSource::instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>),
+        Instruction::Push(value) =&gt; vm::Instruction::Push(value.instantiate::&lt;S::Environment&gt;()),
+        Instruction::PopAndDrop =&gt; vm::Instruction::PopAndDrop,
+        Instruction::Return(value) =&gt; vm::Instruction::Return(
+            value
+                .as_ref()
+                .map(LiteralOrSource::instantiate::&lt;S::Environment&gt;),
         ),
-        <span class="ident">Instruction::Load</span> { <span class="ident">value</span>, <span class="ident">variable</span> } =&gt; <span class="ident">vm::Instruction::Load</span> {
-            <span class="ident">variable_index</span>: <span class="ident">variable</span>.<span class="number">0</span>,
-            <span class="ident">value</span>: <span class="ident">value</span>.<span class="ident">instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>(),
+        Instruction::Load { value, variable } =&gt; vm::Instruction::Load {
+            variable_index: variable.<span class="number">0</span>,
+            value: value.instantiate::&lt;S::Environment&gt;(),
         },
-        <span class="ident">Instruction::Call</span> {
-            <span class="ident">function</span>,
-            <span class="ident">arg_count</span>,
-            <span class="ident">destination</span>,
+        Instruction::Call {
+            function,
+            arg_count,
+            destination,
         } =&gt; {
-            <span class="kw">let</span> <span class="ident">vtable_index</span> <span class="op">=</span> <span class="ident">function</span>
-                .<span class="ident">as_ref</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">symbol</span><span class="op">|</span> {
-                    <span class="ident">scope</span>
-                        .<span class="ident">resolve_function_vtable_index</span>(<span class="ident">symbol</span>)
-                        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">CompilationError::UndefinedFunction</span>(<span class="ident">symbol</span>.<span class="ident">clone</span>()))
+            <span class="kw">let </span>vtable_index = function
+                .as_ref()
+                .map(|symbol| {
+                    scope
+                        .resolve_function_vtable_index(symbol)
+                        .ok_or_else(|| CompilationError::UndefinedFunction(symbol.clone()))
                 })
-                .<span class="ident">transpose</span>()<span class="question-mark">?</span>;
-            <span class="ident">vm::Instruction::Call</span> {
-                <span class="ident">vtable_index</span>,
-                <span class="ident">arg_count</span>: <span class="kw-2">*</span><span class="ident">arg_count</span>,
-                <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
+                .transpose()<span class="question-mark">?</span>;
+            vm::Instruction::Call {
+                vtable_index,
+                arg_count: <span class="kw-2">*</span>arg_count,
+                destination: destination.into(),
             }
         }
-        <span class="ident">Instruction::CallInstance</span> {
-            <span class="ident">target</span>,
-            <span class="ident">name</span>,
-            <span class="ident">arg_count</span>,
-            <span class="ident">destination</span>,
-        } =&gt; <span class="ident">vm::Instruction::CallInstance</span> {
-            <span class="ident">target</span>: <span class="ident">target</span>
-                .<span class="ident">as_ref</span>()
-                .<span class="ident">map</span>(<span class="ident">LiteralOrSource::instantiate</span>::<span class="op">&lt;</span><span class="ident">S::Environment</span><span class="op">&gt;</span>),
-            <span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">clone</span>(),
-            <span class="ident">arg_count</span>: <span class="kw-2">*</span><span class="ident">arg_count</span>,
-            <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
+        Instruction::CallInstance {
+            target,
+            name,
+            arg_count,
+            destination,
+        } =&gt; vm::Instruction::CallInstance {
+            target: target
+                .as_ref()
+                .map(LiteralOrSource::instantiate::&lt;S::Environment&gt;),
+            name: name.clone(),
+            arg_count: <span class="kw-2">*</span>arg_count,
+            destination: destination.into(),
         },
-        <span class="ident">Instruction::CallIntrinsic</span> {
-            <span class="ident">intrinsic</span>,
-            <span class="ident">arg_count</span>,
-            <span class="ident">destination</span>,
-        } =&gt; <span class="ident">vm::Instruction::CallIntrinsic</span> {
-            <span class="ident">intrinsic</span>: <span class="kw-2">*</span><span class="ident">intrinsic</span>,
-            <span class="ident">arg_count</span>: <span class="kw-2">*</span><span class="ident">arg_count</span>,
-            <span class="ident">destination</span>: <span class="ident">destination</span>.<span class="ident">into</span>(),
+        Instruction::CallIntrinsic {
+            intrinsic,
+            arg_count,
+            destination,
+        } =&gt; vm::Instruction::CallIntrinsic {
+            intrinsic: <span class="kw-2">*</span>intrinsic,
+            arg_count: <span class="kw-2">*</span>arg_count,
+            destination: destination.into(),
         },
     }))
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ScopeSymbolKind</span> {
-    <span class="ident">Argument</span>,
-    <span class="ident">Variable</span>,
-    <span class="ident">Function</span>,
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub enum </span>ScopeSymbolKind {
+    Argument,
+    Variable,
+    Function,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ScopeSymbol</span> {
-    <span class="ident">Argument</span>(<span class="ident">usize</span>),
-    <span class="ident">Variable</span>(<span class="ident">Variable</span>),
-    <span class="ident">Function</span> { <span class="ident">function</span>: <span class="ident">Symbol</span> },
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub enum </span>ScopeSymbol {
+    Argument(usize),
+    Variable(Variable),
+    Function { function: Symbol },
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Function</span> {
-    <span class="kw">pub</span> <span class="ident">name</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">args</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">body</span>: <span class="ident">CodeBlock</span>,
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>Function {
+    <span class="kw">pub </span>name: <span class="prelude-ty">Option</span>&lt;Symbol&gt;,
+    <span class="kw">pub </span>args: Vec&lt;Symbol&gt;,
+    <span class="kw">pub </span>body: CodeBlock,
 }
 
-<span class="kw">impl</span> <span class="ident">Function</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">name</span>: <span class="kw">impl</span> <span class="ident">OptionalSymbol</span>, <span class="ident">args</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Symbol</span><span class="op">&gt;</span>, <span class="ident">body</span>: <span class="ident">CodeBlock</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">into_symbol</span>(),
-            <span class="ident">args</span>,
-            <span class="ident">body</span>,
+<span class="kw">impl </span>Function {
+    <span class="kw">pub fn </span>new(name: <span class="kw">impl </span>OptionalSymbol, args: Vec&lt;Symbol&gt;, body: CodeBlock) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            name: name.into_symbol(),
+            args,
+            body,
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compile</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">S</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">vm::Function</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">S</span>: <span class="ident">Scope</span>,
+    <span class="kw">pub fn </span>compile&lt;S&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, context: <span class="kw-2">&amp;mut </span>S) -&gt; <span class="prelude-ty">Result</span>&lt;vm::Function, CompilationError&gt;
+    <span class="kw">where
+        </span>S: Scope,
     {
-        <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">name</span>
-            .<span class="ident">clone</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;compiling an unnamed function into a context isn&#39;t allowed&quot;</span>);
-        <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">body</span>.<span class="ident">link</span>(<span class="ident">context</span>)<span class="question-mark">?</span>;
-        <span class="kw">if</span> <span class="ident">env::var</span>(<span class="string">&quot;PRINT_IR&quot;</span>).<span class="ident">is_ok</span>() {
-            <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">block</span>.<span class="ident">display_indented</span>(<span class="string">&quot;  &quot;</span>));
+        <span class="kw">let </span>name = <span class="self">self
+            </span>.name
+            .clone()
+            .expect(<span class="string">&quot;compiling an unnamed function into a context isn&#39;t allowed&quot;</span>);
+        <span class="kw">let </span>block = <span class="self">self</span>.body.link(context)<span class="question-mark">?</span>;
+        <span class="kw">if </span>env::var(<span class="string">&quot;PRINT_IR&quot;</span>).is_ok() {
+            <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, block.display_indented(<span class="string">&quot;  &quot;</span>));
         }
-        <span class="kw">let</span> <span class="ident">function</span> <span class="op">=</span> <span class="ident">vm::Function</span> {
-            <span class="ident">name</span>,
-            <span class="ident">arg_count</span>: <span class="self">self</span>.<span class="ident">args</span>.<span class="ident">len</span>(),
-            <span class="ident">code</span>: <span class="ident">block</span>.<span class="ident">code</span>,
-            <span class="ident">variable_count</span>: <span class="ident">block</span>.<span class="ident">variables</span>,
+        <span class="kw">let </span>function = vm::Function {
+            name,
+            arg_count: <span class="self">self</span>.args.len(),
+            code: block.code,
+            variable_count: block.variables,
         };
-        <span class="prelude-val">Ok</span>(<span class="ident">function</span>)
+        <span class="prelude-val">Ok</span>(function)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compile_into</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">S</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">CompilationError</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">S</span>: <span class="ident">Scope</span>,
+    <span class="kw">pub fn </span>compile_into&lt;S&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, context: <span class="kw-2">&amp;mut </span>S) -&gt; <span class="prelude-ty">Result</span>&lt;usize, CompilationError&gt;
+    <span class="kw">where
+        </span>S: Scope,
     {
-        <span class="kw">let</span> <span class="ident">function</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">compile</span>(<span class="ident">context</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>function = <span class="self">self</span>.compile(context)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">vtable_index</span> <span class="op">=</span> <span class="ident">context</span>
-            .<span class="ident">define_function</span>(<span class="ident">function</span>)
-            .<span class="ident">ok_or</span>(<span class="ident">CompilationError::InvalidScope</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">vtable_index</span>)
+        <span class="kw">let </span>vtable_index = context
+            .define_function(function)
+            .ok_or(CompilationError::InvalidScope)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(vtable_index)
     }
 
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Symbol</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">name</span>.<span class="ident">as_ref</span>()
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Symbol&gt; {
+        <span class="self">self</span>.name.as_ref()
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnlinkedCodeUnit</span> {
-    <span class="kw">pub</span> <span class="ident">vtable</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Function</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">modules</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">UnlinkedCodeUnit</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">init</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Function</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>UnlinkedCodeUnit {
+    <span class="kw">pub </span>vtable: Vec&lt;Function&gt;,
+    <span class="kw">pub </span>modules: Vec&lt;UnlinkedCodeUnit&gt;,
+    <span class="kw">pub </span>init: <span class="prelude-ty">Option</span>&lt;Function&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">UnlinkedCodeUnit</span> {
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">vtable</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Function</span><span class="op">&gt;</span>,
-        <span class="ident">modules</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">UnlinkedCodeUnit</span><span class="op">&gt;</span>,
-        <span class="ident">init</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Function</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">vtable</span>,
-            <span class="ident">modules</span>,
-            <span class="ident">init</span>,
+<span class="kw">impl </span>UnlinkedCodeUnit {
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>new(
+        vtable: Vec&lt;Function&gt;,
+        modules: Vec&lt;UnlinkedCodeUnit&gt;,
+        init: <span class="prelude-ty">Option</span>&lt;Function&gt;,
+    ) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            vtable,
+            modules,
+            init,
         }
     }
 
-    <span class="doccomment">/// Runs all code in this unit in the passed context.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">execute_in</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Output</span>: <span class="ident">FromStack</span>, <span class="ident">Env</span><span class="op">&gt;</span>(
+    <span class="doccomment">/// Runs all code in this unit in the passed context.
+    </span><span class="kw">pub fn </span>execute_in&lt;<span class="lifetime">&#39;a</span>, Output: FromStack, Env&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Bud</span><span class="op">&lt;</span><span class="ident">Env</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Output</span>, <span class="ident">Error</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Env</span>, <span class="ident">Output</span><span class="op">&gt;</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">Env</span>: <span class="ident">Environment</span>,
+        context: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>Bud&lt;Env&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Output, Error&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;&gt;
+    <span class="kw">where
+        </span>Env: Environment,
     {
-        <span class="comment">// Process all modules first</span>
-        <span class="kw">for</span> <span class="ident">_module</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">modules</span> {
+        <span class="comment">// Process all modules first
+        </span><span class="kw">for </span>_module <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.modules {
             <span class="macro">todo!</span>()
         }
 
-        <span class="comment">// Compile each function</span>
-        <span class="kw">for</span> (<span class="ident">index</span>, <span class="ident">function</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">vtable</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-            <span class="kw">if</span> <span class="ident">env::var</span>(<span class="string">&quot;PRINT_IR&quot;</span>).<span class="ident">is_ok</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">name</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">function</span>.<span class="ident">name</span> {
+        <span class="comment">// Compile each function
+        </span><span class="kw">for </span>(index, function) <span class="kw">in </span><span class="self">self</span>.vtable.iter().enumerate() {
+            <span class="kw">if </span>env::var(<span class="string">&quot;PRINT_IR&quot;</span>).is_ok() {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(name) = <span class="kw-2">&amp;</span>function.name {
                     <span class="macro">println!</span>(
                         <span class="string">&quot;function #{index} - {name}({})&quot;</span>,
-                        <span class="ident">function</span>
-                            .<span class="ident">args</span>
-                            .<span class="ident">iter</span>()
-                            .<span class="ident">map</span>(<span class="ident">Symbol::as_str</span>)
-                            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                            .<span class="ident">join</span>(<span class="string">&quot;, &quot;</span>)
+                        function
+                            .args
+                            .iter()
+                            .map(Symbol::as_str)
+                            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+                            .join(<span class="string">&quot;, &quot;</span>)
                     );
-                } <span class="kw">else</span> {
+                } <span class="kw">else </span>{
                     <span class="macro">println!</span>(
                         <span class="string">&quot;function #{index}({})&quot;</span>,
-                        <span class="ident">function</span>
-                            .<span class="ident">args</span>
-                            .<span class="ident">iter</span>()
-                            .<span class="ident">map</span>(<span class="ident">Symbol::as_str</span>)
-                            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                            .<span class="ident">join</span>(<span class="string">&quot;, &quot;</span>)
+                        function
+                            .args
+                            .iter()
+                            .map(Symbol::as_str)
+                            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+                            .join(<span class="string">&quot;, &quot;</span>)
                     );
                 }
             }
-            <span class="ident">function</span>.<span class="ident">compile_into</span>(<span class="ident">context</span>)<span class="question-mark">?</span>;
+            function.compile_into(context)<span class="question-mark">?</span>;
         }
 
-        <span class="comment">// Execute the module initializer if it exists</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">init</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">init</span> {
-            <span class="kw">if</span> <span class="ident">env::var</span>(<span class="string">&quot;PRINT_IR&quot;</span>).<span class="ident">is_ok</span>() {
+        <span class="comment">// Execute the module initializer if it exists
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(init) = <span class="kw-2">&amp;</span><span class="self">self</span>.init {
+            <span class="kw">if </span>env::var(<span class="string">&quot;PRINT_IR&quot;</span>).is_ok() {
                 <span class="macro">println!</span>(<span class="string">&quot;function init&quot;</span>);
             }
-            <span class="kw">let</span> <span class="ident">vtable_index</span> <span class="op">=</span> <span class="ident">init</span>.<span class="ident">compile_into</span>(<span class="ident">context</span>)<span class="question-mark">?</span>;
-            <span class="ident">context</span>
-                .<span class="ident">run</span>(
-                    <span class="ident">Cow::Owned</span>(<span class="macro">vec!</span>[<span class="ident">vm::Instruction::Call</span> {
-                        <span class="ident">vtable_index</span>: <span class="prelude-val">Some</span>(<span class="ident">vtable_index</span>),
-                        <span class="ident">arg_count</span>: <span class="number">0</span>,
-                        <span class="ident">destination</span>: <span class="ident">vm::Destination::Stack</span>,
+            <span class="kw">let </span>vtable_index = init.compile_into(context)<span class="question-mark">?</span>;
+            context
+                .run(
+                    Cow::Owned(<span class="macro">vec!</span>[vm::Instruction::Call {
+                        vtable_index: <span class="prelude-val">Some</span>(vtable_index),
+                        arg_count: <span class="number">0</span>,
+                        destination: vm::Destination::Stack,
                     }]),
                     <span class="number">0</span>,
                 )
-                .<span class="ident">map_err</span>(<span class="ident">Error::from</span>)
-        } <span class="kw">else</span> {
-            <span class="ident">Output::from_value</span>(<span class="ident">Value::Void</span>).<span class="ident">map_err</span>(<span class="ident">Error::from</span>)
+                .map_err(Error::from)
+        } <span class="kw">else </span>{
+            Output::from_value(Value::Void).map_err(Error::from)
         }
     }
 }
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Scope</span> {
-    <span class="kw">type</span> <span class="ident">Environment</span>: <span class="ident">Environment</span>;
+<span class="kw">pub trait </span>Scope {
+    <span class="kw">type </span>Environment: Environment;
 
-    <span class="doccomment">/// Returns the vtable index of a function with the provided name.</span>
-    <span class="kw">fn</span> <span class="ident">resolve_function_vtable_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">map_each_symbol</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">callback</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="ident">Symbol</span>, <span class="ident">ScopeSymbolKind</span>));
+    <span class="doccomment">/// Returns the vtable index of a function with the provided name.
+    </span><span class="kw">fn </span>resolve_function_vtable_index(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt;;
+    <span class="kw">fn </span>map_each_symbol(<span class="kw-2">&amp;</span><span class="self">self</span>, callback: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(Symbol, ScopeSymbolKind));
 
-    <span class="doccomment">/// Defines a function with the provided name.</span>
-    <span class="kw">fn</span> <span class="ident">define_function</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">function</span>: <span class="ident">vm::Function</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">define_variable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="ident">Symbol</span>, <span class="ident">variable</span>: <span class="ident">Variable</span>);
+    <span class="doccomment">/// Defines a function with the provided name.
+    </span><span class="kw">fn </span>define_function(<span class="kw-2">&amp;mut </span><span class="self">self</span>, function: vm::Function) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt;;
+    <span class="kw">fn </span>define_variable(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: Symbol, variable: Variable);
 }
 
-<span class="kw">impl</span> <span class="ident">Scope</span> <span class="kw">for</span> () {
-    <span class="kw">type</span> <span class="ident">Environment</span> <span class="op">=</span> ();
+<span class="kw">impl </span>Scope <span class="kw">for </span>() {
+    <span class="kw">type </span>Environment = ();
 
-    <span class="kw">fn</span> <span class="ident">resolve_function_vtable_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="kw">fn </span>resolve_function_vtable_index(<span class="kw-2">&amp;</span><span class="self">self</span>, _name: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="kw">fn</span> <span class="ident">map_each_symbol</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_callback</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="ident">Symbol</span>, <span class="ident">ScopeSymbolKind</span>)) {}
+    <span class="kw">fn </span>map_each_symbol(<span class="kw-2">&amp;</span><span class="self">self</span>, _callback: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(Symbol, ScopeSymbolKind)) {}
 
-    <span class="kw">fn</span> <span class="ident">define_function</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_function</span>: <span class="ident">vm::Function</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="kw">fn </span>define_function(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _function: vm::Function) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="kw">fn</span> <span class="ident">define_variable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_name</span>: <span class="ident">Symbol</span>, <span class="ident">_variable</span>: <span class="ident">Variable</span>) {}
+    <span class="kw">fn </span>define_variable(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _name: Symbol, _variable: Variable) {}
 }
 
-<span class="comment">// #[test]</span>
-<span class="comment">// fn optimizations() {</span>
-<span class="comment">//     let unit = crate::parser::parse(</span>
-<span class="comment">//         r#&quot;function fibonacci(n)</span>
-<span class="comment">//             if n &lt;= 2</span>
-<span class="comment">//                 1</span>
-<span class="comment">//             else</span>
-<span class="comment">//                 this(n - 1) + this(n - 2)</span>
-<span class="comment">//             end</span>
-<span class="comment">//         end</span>
-<span class="comment">//         &quot;#,</span>
-<span class="comment">//     )</span>
-<span class="comment">//     .unwrap()</span>
-<span class="comment">//     .compile();</span>
-<span class="comment">//     println!(&quot;Unoptimized code:\n{}&quot;, unit.vtable[0].body);</span>
-<span class="comment">//     println!(&quot;Unoptimized length: {}&quot;, unit.vtable[0].body.code.len());</span>
-<span class="comment">//     let mut graph = crate::optimizer::CodeGraph::new(&amp;unit.vtable[0].body.code);</span>
-<span class="comment">//     println!(&quot;Graph:\n {graph}&quot;);</span>
-<span class="comment">//     let dag = graph.dags();</span>
-<span class="comment">//     println!(&quot;Dag:\n {dag:?}&quot;);</span>
-<span class="comment">//     // dag.optimize(&amp;mut graph);</span>
-<span class="comment">// }</span>
-</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0 (a55dd71d5 2022-09-19)" ></div></body></html>
+<span class="comment">// #[test]
+// fn optimizations() {
+//     let unit = crate::parser::parse(
+//         r#&quot;function fibonacci(n)
+//             if n &lt;= 2
+//                 1
+//             else
+//                 this(n - 1) + this(n - 2)
+//             end
+//         end
+//         &quot;#,
+//     )
+//     .unwrap()
+//     .compile();
+//     println!(&quot;Unoptimized code:\n{}&quot;, unit.vtable[0].body);
+//     println!(&quot;Unoptimized length: {}&quot;, unit.vtable[0].body.code.len());
+//     let mut graph = crate::optimizer::CodeGraph::new(&amp;unit.vtable[0].body.code);
+//     println!(&quot;Graph:\n {graph}&quot;);
+//     let dag = graph.dags();
+//     println!(&quot;Dag:\n {dag:?}&quot;);
+//     // dag.optimize(&amp;mut graph);
+// }
+</span></code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

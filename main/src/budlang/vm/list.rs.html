@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/vm/list.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>list.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../budlang/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/vm/list.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>list.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../budlang/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -193,200 +193,200 @@
 <span id="193">193</span>
 <span id="194">194</span>
 <span id="195">195</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">cmp::Ordering</span>,
-    <span class="ident">collections::VecDeque</span>,
-    <span class="ident">sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>, <span class="ident">PoisonError</span>},
+</pre><pre class="rust"><code><span class="kw">use </span>std::{
+    cmp::Ordering,
+    collections::VecDeque,
+    sync::{Mutex, MutexGuard, PoisonError},
 };
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">symbol::Symbol</span>,
-    <span class="ident">vm</span>::{<span class="ident">DynamicValue</span>, <span class="ident">FaultKind</span>, <span class="ident">PoppedValues</span>, <span class="ident">Value</span>},
+<span class="kw">use crate</span>::{
+    symbol::Symbol,
+    vm::{DynamicValue, FaultKind, PoppedValues, Value},
 };
 
-<span class="doccomment">/// A List type for Bud, which wraps a [`VecDeque&lt;Value&gt;`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This type uses a [`Mutex`] for interior mutability, allowing lists to be</span>
-<span class="doccomment">/// cheaply moved around by reference. Each interaction with this type locks the</span>
-<span class="doccomment">/// Mutex.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// [`VecDeque`] was chosen to allow users ultimate flexibility in</span>
-<span class="doccomment">/// pushing/popping without worry about performance concerns.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">List</span>(<span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span><span class="op">&gt;</span>);
+<span class="doccomment">/// A List type for Bud, which wraps a [`VecDeque&lt;Value&gt;`].
+///
+/// This type uses a [`Mutex`] for interior mutability, allowing lists to be
+/// cheaply moved around by reference. Each interaction with this type locks the
+/// Mutex.
+///
+/// [`VecDeque`] was chosen to allow users ultimate flexibility in
+/// pushing/popping without worry about performance concerns.
+</span><span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>List(Mutex&lt;VecDeque&lt;Value&gt;&gt;);
 
-<span class="kw">impl</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">List</span> {
-    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="self">self</span>.<span class="ident">list</span>().<span class="ident">clone</span>()))
+<span class="kw">impl </span>Clone <span class="kw">for </span>List {
+    <span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(Mutex::new(<span class="self">self</span>.list().clone()))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">List</span> {
-    <span class="kw">fn</span> <span class="ident">list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">PoisonError::into_inner</span>)
+<span class="kw">impl </span>List {
+    <span class="kw">fn </span>list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MutexGuard&lt;<span class="lifetime">&#39;_</span>, VecDeque&lt;Value&gt;&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    <span class="doccomment">/// Extracts the contained collection type.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">into_inner</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">PoisonError::into_inner</span>)
+    <span class="doccomment">/// Extracts the contained collection type.
+    </span><span class="kw">pub fn </span>into_inner(<span class="self">self</span>) -&gt; VecDeque&lt;Value&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.into_inner().unwrap_or_else(PoisonError::into_inner)
     }
 
-    <span class="doccomment">/// Pushes `value` to the front of the list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push_front</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">value</span>: <span class="ident">Value</span>) {
-        <span class="self">self</span>.<span class="ident">list</span>().<span class="ident">push_front</span>(<span class="ident">value</span>);
+    <span class="doccomment">/// Pushes `value` to the front of the list.
+    </span><span class="kw">pub fn </span>push_front(<span class="kw-2">&amp;</span><span class="self">self</span>, value: Value) {
+        <span class="self">self</span>.list().push_front(value);
     }
 
-    <span class="doccomment">/// Pushes `value` to the back of the list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push_back</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">value</span>: <span class="ident">Value</span>) {
-        <span class="self">self</span>.<span class="ident">list</span>().<span class="ident">push_back</span>(<span class="ident">value</span>);
+    <span class="doccomment">/// Pushes `value` to the back of the list.
+    </span><span class="kw">pub fn </span>push_back(<span class="kw-2">&amp;</span><span class="self">self</span>, value: Value) {
+        <span class="self">self</span>.list().push_back(value);
     }
 
-    <span class="doccomment">/// Removes the first value in the list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop_front</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">list</span>().<span class="ident">pop_front</span>()
+    <span class="doccomment">/// Removes the first value in the list.
+    </span><span class="kw">pub fn </span>pop_front(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
+        <span class="self">self</span>.list().pop_front()
     }
 
-    <span class="doccomment">/// Removes the last value in the list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop_back</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">list</span>().<span class="ident">pop_back</span>()
+    <span class="doccomment">/// Removes the last value in the list.
+    </span><span class="kw">pub fn </span>pop_back(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
+        <span class="self">self</span>.list().pop_back()
     }
 
-    <span class="doccomment">/// Returns the number of values contained in the list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">list</span>().<span class="ident">len</span>()
+    <span class="doccomment">/// Returns the number of values contained in the list.
+    </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.list().len()
     }
 
-    <span class="doccomment">/// Returns true if this list contains no values.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">list</span>().<span class="ident">is_empty</span>()
+    <span class="doccomment">/// Returns true if this list contains no values.
+    </span><span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.list().is_empty()
     }
 
-    <span class="doccomment">/// Returns the value contained at `index`, or `None` if `index` is outside</span>
-    <span class="doccomment">/// of the bounds of this list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">index</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">list</span>().<span class="ident">get</span>(<span class="ident">index</span>).<span class="ident">cloned</span>()
+    <span class="doccomment">/// Returns the value contained at `index`, or `None` if `index` is outside
+    /// of the bounds of this list.
+    </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
+        <span class="self">self</span>.list().get(index).cloned()
     }
 
-    <span class="doccomment">/// Removes the value contained at `index`, or `None` if `index` is outside</span>
-    <span class="doccomment">/// of the bounds of this list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">index</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">list</span>();
-        <span class="ident">list</span>.<span class="ident">remove</span>(<span class="ident">index</span>)
+    <span class="doccomment">/// Removes the value contained at `index`, or `None` if `index` is outside
+    /// of the bounds of this list.
+    </span><span class="kw">pub fn </span>remove(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>list = <span class="self">self</span>.list();
+        list.remove(index)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">DynamicValue</span> <span class="kw">for</span> <span class="ident">List</span> {
-    <span class="kw">fn</span> <span class="ident">is_truthy</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="op">!</span><span class="self">self</span>.<span class="ident">list</span>().<span class="ident">is_empty</span>()
+<span class="kw">impl </span>DynamicValue <span class="kw">for </span>List {
+    <span class="kw">fn </span>is_truthy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.list().is_empty()
     }
 
-    <span class="kw">fn</span> <span class="ident">kind</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-        <span class="string">&quot;List&quot;</span>
+    <span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+        <span class="string">&quot;List&quot;
+    </span>}
+
+    <span class="kw">fn </span>partial_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt; {
+        <span class="kw">let </span>other = other.as_dynamic::&lt;<span class="self">Self</span>&gt;()<span class="question-mark">?</span>;
+        <span class="kw">let </span>lhs = <span class="self">self</span>.list();
+        <span class="kw">let </span>rhs = other.list();
+
+        <span class="prelude-val">Some</span>(<span class="kw-2">*</span>lhs == <span class="kw-2">*</span>rhs)
     }
 
-    <span class="kw">fn</span> <span class="ident">partial_eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">other</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">as_dynamic</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">lhs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">list</span>();
-        <span class="kw">let</span> <span class="ident">rhs</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">list</span>();
+    <span class="kw">fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt; {
+        <span class="kw">let </span>other = other.as_dynamic::&lt;<span class="self">Self</span>&gt;()<span class="question-mark">?</span>;
+        <span class="kw">let </span>other = other.list();
+        <span class="kw">let </span><span class="kw-2">mut </span>other = other.iter();
 
-        <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">rhs</span>)
-    }
-
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">other</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">as_dynamic</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">other</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">list</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">other</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">iter</span>();
-
-        <span class="kw">let</span> <span class="ident">rhs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">list</span>();
-        <span class="kw">for</span> <span class="ident">lhs</span> <span class="kw">in</span> <span class="ident">rhs</span>.<span class="ident">iter</span>() {
-            <span class="kw">let</span> <span class="ident">rhs</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">other</span>.<span class="ident">next</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">rhs</span>) =&gt; <span class="ident">rhs</span>,
-                <span class="prelude-val">None</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">Ordering::Greater</span>),
+        <span class="kw">let </span>rhs = <span class="self">self</span>.list();
+        <span class="kw">for </span>lhs <span class="kw">in </span>rhs.iter() {
+            <span class="kw">let </span>rhs = <span class="kw">match </span>other.next() {
+                <span class="prelude-val">Some</span>(rhs) =&gt; rhs,
+                <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">Some</span>(Ordering::Greater),
             };
-            <span class="kw">match</span> <span class="ident">lhs</span>.<span class="ident">partial_cmp</span>(<span class="ident">rhs</span>) {
-                <span class="prelude-val">Some</span>(<span class="ident">Ordering::Equal</span>) =&gt; <span class="kw">continue</span>,
-                <span class="ident">non_equal</span> =&gt; <span class="kw">return</span> <span class="ident">non_equal</span>,
+            <span class="kw">match </span>lhs.partial_cmp(rhs) {
+                <span class="prelude-val">Some</span>(Ordering::Equal) =&gt; <span class="kw">continue</span>,
+                non_equal =&gt; <span class="kw">return </span>non_equal,
             }
         }
-        <span class="prelude-val">Some</span>(<span class="kw">if</span> <span class="ident">other</span>.<span class="ident">next</span>().<span class="ident">is_some</span>() {
-            <span class="ident">Ordering::Less</span>
-        } <span class="kw">else</span> {
-            <span class="ident">Ordering::Equal</span>
+        <span class="prelude-val">Some</span>(<span class="kw">if </span>other.next().is_some() {
+            Ordering::Less
+        } <span class="kw">else </span>{
+            Ordering::Equal
         })
     }
 
-    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>, <span class="ident">args</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PoppedValues</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">name</span>.<span class="ident">as_str</span>() {
-            <span class="string">&quot;count&quot;</span> =&gt; {
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">i64::try_from</span>(<span class="self">self</span>.<span class="ident">list</span>().<span class="ident">len</span>())
-                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">FaultKind::ValueOutOfRange</span>(<span class="string">&quot;count&quot;</span>))<span class="question-mark">?</span>;
-                <span class="prelude-val">Ok</span>(<span class="ident">Value::Integer</span>(<span class="ident">len</span>))
+    <span class="kw">fn </span>call(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol, args: <span class="kw-2">&amp;mut </span>PoppedValues&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt; {
+        <span class="kw">match </span>name.as_str() {
+            <span class="string">&quot;count&quot; </span>=&gt; {
+                args.verify_empty()<span class="question-mark">?</span>;
+                <span class="kw">let </span>len = i64::try_from(<span class="self">self</span>.list().len())
+                    .map_err(|<span class="kw">_</span>| FaultKind::ValueOutOfRange(<span class="string">&quot;count&quot;</span>))<span class="question-mark">?</span>;
+                <span class="prelude-val">Ok</span>(Value::Integer(len))
             }
-            <span class="string">&quot;push&quot;</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">next_argument</span>(<span class="string">&quot;value&quot;</span>)<span class="question-mark">?</span>;
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">list</span>();
-                <span class="ident">list</span>.<span class="ident">push_back</span>(<span class="ident">arg</span>.<span class="ident">clone</span>());
-                <span class="prelude-val">Ok</span>(<span class="ident">arg</span>)
+            <span class="string">&quot;push&quot; </span>=&gt; {
+                <span class="kw">let </span>arg = args.next_argument(<span class="string">&quot;value&quot;</span>)<span class="question-mark">?</span>;
+                args.verify_empty()<span class="question-mark">?</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>list = <span class="self">self</span>.list();
+                list.push_back(arg.clone());
+                <span class="prelude-val">Ok</span>(arg)
             }
-            <span class="string">&quot;pop&quot;</span> =&gt; {
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">list</span>();
-                <span class="prelude-val">Ok</span>(<span class="ident">list</span>.<span class="ident">pop_back</span>().<span class="ident">unwrap_or_default</span>())
+            <span class="string">&quot;pop&quot; </span>=&gt; {
+                args.verify_empty()<span class="question-mark">?</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>list = <span class="self">self</span>.list();
+                <span class="prelude-val">Ok</span>(list.pop_back().unwrap_or_default())
             }
-            <span class="string">&quot;push_front&quot;</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">next_argument</span>(<span class="string">&quot;value&quot;</span>)<span class="question-mark">?</span>;
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">list</span>();
-                <span class="ident">list</span>.<span class="ident">push_front</span>(<span class="ident">arg</span>.<span class="ident">clone</span>());
-                <span class="prelude-val">Ok</span>(<span class="ident">arg</span>)
+            <span class="string">&quot;push_front&quot; </span>=&gt; {
+                <span class="kw">let </span>arg = args.next_argument(<span class="string">&quot;value&quot;</span>)<span class="question-mark">?</span>;
+                args.verify_empty()<span class="question-mark">?</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>list = <span class="self">self</span>.list();
+                list.push_front(arg.clone());
+                <span class="prelude-val">Ok</span>(arg)
             }
-            <span class="string">&quot;pop_front&quot;</span> =&gt; {
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">list</span>();
-                <span class="prelude-val">Ok</span>(<span class="ident">list</span>.<span class="ident">pop_front</span>().<span class="ident">unwrap_or_default</span>())
+            <span class="string">&quot;pop_front&quot; </span>=&gt; {
+                args.verify_empty()<span class="question-mark">?</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>list = <span class="self">self</span>.list();
+                <span class="prelude-val">Ok</span>(list.pop_front().unwrap_or_default())
             }
-            <span class="string">&quot;remove&quot;</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">next_argument</span>(<span class="string">&quot;value&quot;</span>)<span class="question-mark">?</span>;
-                <span class="ident">args</span>.<span class="ident">verify_empty</span>()<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">index</span>.<span class="ident">as_i64</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">FaultKind::invalid_type</span>(<span class="string">&quot;index must be an integer&quot;</span>, <span class="ident">index</span>.<span class="ident">clone</span>())
+            <span class="string">&quot;remove&quot; </span>=&gt; {
+                <span class="kw">let </span>index = args.next_argument(<span class="string">&quot;value&quot;</span>)<span class="question-mark">?</span>;
+                args.verify_empty()<span class="question-mark">?</span>;
+                <span class="kw">let </span>index = index.as_i64().ok_or_else(|| {
+                    FaultKind::invalid_type(<span class="string">&quot;index must be an integer&quot;</span>, index.clone())
                 })<span class="question-mark">?</span>;
-                <span class="prelude-val">Ok</span>(<span class="self">self</span>
-                    .<span class="ident">remove</span>(<span class="ident">usize::try_from</span>(<span class="ident">index</span>).<span class="ident">unwrap_or</span>(<span class="ident">usize::MAX</span>))
-                    .<span class="ident">unwrap_or_default</span>())
+                <span class="prelude-val">Ok</span>(<span class="self">self
+                    </span>.remove(usize::try_from(index).unwrap_or(usize::MAX))
+                    .unwrap_or_default())
             }
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">FaultKind::UnknownFunction</span> {
-                <span class="ident">kind</span>: <span class="ident"><span class="kw">super</span>::ValueKind::Dynamic</span>(<span class="self">self</span>.<span class="ident">kind</span>()),
-                <span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">clone</span>(),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(FaultKind::UnknownFunction {
+                kind: <span class="kw">super</span>::ValueKind::Dynamic(<span class="self">self</span>.kind()),
+                name: name.clone(),
             }),
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">to_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="kw">fn </span>to_source(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="kw">fn</span> <span class="ident">hash</span><span class="op">&lt;</span><span class="ident">H</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;mut</span> <span class="ident">H</span>) -&gt; <span class="ident">bool</span>
-    <span class="kw">where</span>
-        <span class="ident">H</span>: <span class="ident">std::hash::Hasher</span>,
+    <span class="kw">fn </span>hash&lt;H&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;mut </span>H) -&gt; bool
+    <span class="kw">where
+        </span>H: std::hash::Hasher,
     {
-        <span class="kw">let</span> <span class="ident">list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">list</span>();
-        <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="ident">list</span>.<span class="ident">iter</span>() {
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">value</span>.<span class="ident">try_hash</span>(<span class="ident">state</span>) {
-                <span class="kw">return</span> <span class="bool-val">false</span>;
+        <span class="kw">let </span>list = <span class="self">self</span>.list();
+        <span class="kw">for </span>value <span class="kw">in </span>list.iter() {
+            <span class="kw">if </span>!value.try_hash(state) {
+                <span class="kw">return </span><span class="bool-val">false</span>;
             }
         }
 
-        <span class="bool-val">true</span>
-    }
+        <span class="bool-val">true
+    </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">FromIterator</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">List</span> {
-    <span class="kw">fn</span> <span class="ident">from_iter</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">Value</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">iter</span>: <span class="ident">T</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Mutex::new</span>(<span class="ident">VecDeque::from_iter</span>(<span class="ident">iter</span>)))
+<span class="kw">impl </span>FromIterator&lt;Value&gt; <span class="kw">for </span>List {
+    <span class="kw">fn </span>from_iter&lt;T: IntoIterator&lt;Item = Value&gt;&gt;(iter: T) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(Mutex::new(VecDeque::from_iter(iter)))
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0 (a55dd71d5 2022-09-19)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

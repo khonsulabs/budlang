@@ -1,3 +1,3 @@
-(function() {var implementors = {};
-implementors["bud"] = [{"text":"impl Cache&lt;<a class=\"enum\" href=\"bud/enum.SourceId.html\" title=\"enum bud::SourceId\">SourceId</a>&gt; for <a class=\"struct\" href=\"bud/struct.SourceCache.html\" title=\"struct bud::SourceCache\">SourceCache</a>","synthetic":false,"types":["bud::SourceCache"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
+(function() {var implementors = {
+"bud":[["impl Cache&lt;<a class=\"enum\" href=\"bud/enum.SourceId.html\" title=\"enum bud::SourceId\">SourceId</a>&gt; for <a class=\"struct\" href=\"bud/struct.SourceCache.html\" title=\"struct bud::SourceCache\">SourceCache</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

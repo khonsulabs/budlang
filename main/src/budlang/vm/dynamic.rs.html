@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/vm/dynamic.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>dynamic.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../budlang/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budlang/src/vm/dynamic.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>dynamic.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../budlang/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../budlang/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -451,458 +451,458 @@
 <span id="451">451</span>
 <span id="452">452</span>
 <span id="453">453</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">any</span>::{<span class="ident">Any</span>, <span class="ident">TypeId</span>},
-    <span class="ident">cmp::Ordering</span>,
-    <span class="ident">fmt</span>::{<span class="ident">Debug</span>, <span class="ident">Display</span>},
-    <span class="ident">hash::Hasher</span>,
-    <span class="ident">sync::Arc</span>,
+</pre><pre class="rust"><code><span class="kw">use </span>std::{
+    any::{Any, TypeId},
+    cmp::Ordering,
+    fmt::{Debug, Display},
+    hash::Hasher,
+    sync::Arc,
 };
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">symbol::Symbol</span>,
-    <span class="ident">vm</span>::{<span class="ident">FaultKind</span>, <span class="ident">PoppedValues</span>, <span class="ident">Value</span>, <span class="ident">ValueKind</span>},
+<span class="kw">use crate</span>::{
+    symbol::Symbol,
+    vm::{FaultKind, PoppedValues, Value, ValueKind},
 };
 
-<span class="doccomment">/// A type that can be used in the virtual machine using [`Value::dynamic`].</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">DynamicValue</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Debug</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
-    <span class="doccomment">/// Returns true if the value contained is truthy. See</span>
-    <span class="doccomment">/// [`Value::is_truthy()`] for examples of what this means for primitive</span>
-    <span class="doccomment">/// types.</span>
-    <span class="kw">fn</span> <span class="ident">is_truthy</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
+<span class="doccomment">/// A type that can be used in the virtual machine using [`Value::dynamic`].
+</span><span class="kw">pub trait </span>DynamicValue: Send + Sync + Debug + <span class="lifetime">&#39;static </span>{
+    <span class="doccomment">/// Returns true if the value contained is truthy. See
+    /// [`Value::is_truthy()`] for examples of what this means for primitive
+    /// types.
+    </span><span class="kw">fn </span>is_truthy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
 
-    <span class="doccomment">/// Returns a unique string identifying this type. This returned string will</span>
-    <span class="doccomment">/// be wrapped in [`ValueKind::Dynamic`] when [`Value::kind()`] is invoked</span>
-    <span class="doccomment">/// on a dynamic value.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This value does not influence the virtual machine&#39;s behavior. The</span>
-    <span class="doccomment">/// virtual machine uses this string only when creating error messages.</span>
-    <span class="kw">fn</span> <span class="ident">kind</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>;
+    <span class="doccomment">/// Returns a unique string identifying this type. This returned string will
+    /// be wrapped in [`ValueKind::Dynamic`] when [`Value::kind()`] is invoked
+    /// on a dynamic value.
+    ///
+    /// This value does not influence the virtual machine&#39;s behavior. The
+    /// virtual machine uses this string only when creating error messages.
+    </span><span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str;
 
-    <span class="doccomment">/// Returns true if self and other are considered equal. Returns false if</span>
-    <span class="doccomment">/// self and other are able to be compared but are not equal. Returns None</span>
-    <span class="doccomment">/// if the values are unable to be compared.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// When evaluating `left = right` with dynamic values, if</span>
-    <span class="doccomment">/// `left.partial_eq(right)` returns None, `right.partial_eq(left)` will be</span>
-    <span class="doccomment">/// attempted before returning false.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">partial_eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="doccomment">/// Returns true if self and other are considered equal. Returns false if
+    /// self and other are able to be compared but are not equal. Returns None
+    /// if the values are unable to be compared.
+    ///
+    /// When evaluating `left = right` with dynamic values, if
+    /// `left.partial_eq(right)` returns None, `right.partial_eq(left)` will be
+    /// attempted before returning false.
+    </span><span class="attribute">#[allow(unused_variables)]
+    </span><span class="kw">fn </span>partial_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt; {
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="doccomment">/// Returns the relative ordering of `self` and `other`, if a comparison is</span>
-    <span class="doccomment">/// able to be made. If the types cannot be compared, this function should</span>
-    <span class="doccomment">/// return None.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// When evaluating a comparison such as `left &lt; right` with dynamic values,</span>
-    <span class="doccomment">/// if `left.partial_cmp(right)` returns None,</span>
-    <span class="doccomment">/// `right.partial_cmp(left).map(Ordering::reverse)` will be attempted</span>
-    <span class="doccomment">/// before returning false.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="doccomment">/// Returns the relative ordering of `self` and `other`, if a comparison is
+    /// able to be made. If the types cannot be compared, this function should
+    /// return None.
+    ///
+    /// When evaluating a comparison such as `left &lt; right` with dynamic values,
+    /// if `left.partial_cmp(right)` returns None,
+    /// `right.partial_cmp(left).map(Ordering::reverse)` will be attempted
+    /// before returning false.
+    </span><span class="attribute">#[allow(unused_variables)]
+    </span><span class="kw">fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt; {
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="doccomment">/// Attempts to compute the result adding self and other.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// While addition is normally an associative operation, `is_reverse` allows</span>
-    <span class="doccomment">/// determining if `self` is the left operand or the right operand to the</span>
-    <span class="doccomment">/// operation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If `is_reverse` is false, the operation being requested is `self` +</span>
-    <span class="doccomment">/// `other`. If `is_reverse` is true, the operation being requested is</span>
-    <span class="doccomment">/// `other` + `self`.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">checked_add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Attempts to compute the result adding self and other.
+    ///
+    /// While addition is normally an associative operation, `is_reverse` allows
+    /// determining if `self` is the left operand or the right operand to the
+    /// operation.
+    ///
+    /// If `is_reverse` is false, the operation being requested is `self` +
+    /// `other`. If `is_reverse` is true, the operation being requested is
+    /// `other` + `self`.
+    </span><span class="attribute">#[allow(unused_variables)]
+    </span><span class="kw">fn </span>checked_add(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
 
-    <span class="doccomment">/// Attempts to compute the result subtracting self and other.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If `is_reverse` is false, the operation being requested is `self` -</span>
-    <span class="doccomment">/// `other`. If `is_reverse` is true, the operation being requested is</span>
-    <span class="doccomment">/// `other` - `self`.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">checked_sub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Attempts to compute the result subtracting self and other.
+    ///
+    /// If `is_reverse` is false, the operation being requested is `self` -
+    /// `other`. If `is_reverse` is true, the operation being requested is
+    /// `other` - `self`.
+    </span><span class="attribute">#[allow(unused_variables)]
+    </span><span class="kw">fn </span>checked_sub(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
 
-    <span class="doccomment">/// Attempts to compute the result multiplying self and other.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// While multiplication is normally an associative operation, `is_reverse`</span>
-    <span class="doccomment">/// allows</span>
-    <span class="doccomment">/// determining if `self` is the left operand or the right operand to the</span>
-    <span class="doccomment">/// operation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If `is_reverse` is false, the operation being requested is `self` *</span>
-    <span class="doccomment">/// `other`. If `is_reverse` is true, the operation being requested is</span>
-    <span class="doccomment">/// `other` * `self`.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">checked_mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Attempts to compute the result multiplying self and other.
+    ///
+    /// While multiplication is normally an associative operation, `is_reverse`
+    /// allows
+    /// determining if `self` is the left operand or the right operand to the
+    /// operation.
+    ///
+    /// If `is_reverse` is false, the operation being requested is `self` *
+    /// `other`. If `is_reverse` is true, the operation being requested is
+    /// `other` * `self`.
+    </span><span class="attribute">#[allow(unused_variables)]
+    </span><span class="kw">fn </span>checked_mul(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
 
-    <span class="doccomment">/// Attempts to compute the result dividing self and other.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If `is_reverse` is false, the operation being requested is `self` /</span>
-    <span class="doccomment">/// `other`. If `is_reverse` is true, the operation being requested is</span>
-    <span class="doccomment">/// `other` / `self`.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">checked_div</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Attempts to compute the result dividing self and other.
+    ///
+    /// If `is_reverse` is false, the operation being requested is `self` /
+    /// `other`. If `is_reverse` is true, the operation being requested is
+    /// `other` / `self`.
+    </span><span class="attribute">#[allow(unused_variables)]
+    </span><span class="kw">fn </span>checked_div(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
 
-    <span class="doccomment">/// Calls a function by `name` with `args`.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>, <span class="ident">args</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PoppedValues</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Err</span>(<span class="ident">FaultKind::UnknownFunction</span> {
-            <span class="ident">kind</span>: <span class="ident">ValueKind::Dynamic</span>(<span class="self">self</span>.<span class="ident">kind</span>()),
-            <span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">clone</span>(),
+    <span class="doccomment">/// Calls a function by `name` with `args`.
+    </span><span class="attribute">#[allow(unused_variables)]
+    </span><span class="kw">fn </span>call(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol, args: <span class="kw-2">&amp;mut </span>PoppedValues&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt; {
+        <span class="prelude-val">Err</span>(FaultKind::UnknownFunction {
+            kind: ValueKind::Dynamic(<span class="self">self</span>.kind()),
+            name: name.clone(),
         })
     }
 
-    <span class="doccomment">/// Returns this value as represented in source, if possible.</span>
-    <span class="kw">fn</span> <span class="ident">to_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="doccomment">/// Returns this value as represented in source, if possible.
+    </span><span class="kw">fn </span>to_source(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="doccomment">/// Hashes the contents of this value. Returns true if this operation is</span>
-    <span class="doccomment">/// supported.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// To allow the [`Value`] type to implement [`Hash`] but contain values</span>
-    <span class="doccomment">/// that don&#39;t implement [`Hash`], this is not a trait that is required to</span>
-    <span class="doccomment">/// implement.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This allows safe collection types to be written, which check before key</span>
-    <span class="doccomment">/// insertion that the value can be hashed and returns an error rather than</span>
-    <span class="doccomment">/// panicking in the call to hash.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">hash</span><span class="op">&lt;</span><span class="ident">H</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;mut</span> <span class="ident">H</span>) -&gt; <span class="ident">bool</span>
-    <span class="kw">where</span>
-        <span class="ident">H</span>: <span class="ident">std::hash::Hasher</span>,
+    <span class="doccomment">/// Hashes the contents of this value. Returns true if this operation is
+    /// supported.
+    ///
+    /// To allow the [`Value`] type to implement [`Hash`] but contain values
+    /// that don&#39;t implement [`Hash`], this is not a trait that is required to
+    /// implement.
+    ///
+    /// This allows safe collection types to be written, which check before key
+    /// insertion that the value can be hashed and returns an error rather than
+    /// panicking in the call to hash.
+    </span><span class="attribute">#[allow(unused_variables)]
+    </span><span class="kw">fn </span>hash&lt;H&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;mut </span>H) -&gt; bool
+    <span class="kw">where
+        </span>H: std::hash::Hasher,
     {
-        <span class="bool-val">false</span>
-    }
+        <span class="bool-val">false
+    </span>}
 }
 
-<span class="doccomment">/// A Rust value that has been wrapped for use in the virtual machine.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Dynamic</span>(
-    <span class="comment">// The reason for `Arc&lt;Box&lt;dyn UnboxableDynamicValue&gt;&gt;` instead of `Arc&lt;dyn</span>
-    <span class="comment">// UnboxableDynamicValue&gt;` is the size. `Arc&lt;dyn&gt;` uses a fat pointer which</span>
-    <span class="comment">// results in 16-bytes being used. By boxing the `dyn` value first, the Arc</span>
-    <span class="comment">// pointer becomes a normal pointer resulting in this type being only 8</span>
-    <span class="comment">// bytes.</span>
-    <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">UnboxableDynamicValue</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A Rust value that has been wrapped for use in the virtual machine.
+</span><span class="attribute">#[derive(Clone, Debug)]
+</span><span class="kw">pub struct </span>Dynamic(
+    <span class="comment">// The reason for `Arc&lt;Box&lt;dyn UnboxableDynamicValue&gt;&gt;` instead of `Arc&lt;dyn
+    // UnboxableDynamicValue&gt;` is the size. `Arc&lt;dyn&gt;` uses a fat pointer which
+    // results in 16-bytes being used. By boxing the `dyn` value first, the Arc
+    // pointer becomes a normal pointer resulting in this type being only 8
+    // bytes.
+    </span>Arc&lt;Box&lt;<span class="kw">dyn </span>UnboxableDynamicValue&gt;&gt;,
 );
 
-<span class="kw">impl</span> <span class="ident">Dynamic</span> {
-    <span class="doccomment">/// Returns a new instance, wrapping `value`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function causes two allocations: [`Arc::new()`] and [`Box::new()`].</span>
-    <span class="doccomment">/// While `Arc&lt;dyn T&gt;` could be used for only one allocation, it uses a &quot;fat</span>
-    <span class="doccomment">/// pointer&quot; which is double the size of a standard pointer. By using</span>
-    <span class="doccomment">/// `Arc&lt;Box&lt;dyn T&gt;&gt;`, the `Box&lt;dyn T&gt;` becomes the fat pointer and the</span>
-    <span class="doccomment">/// `Arc` remains a normal pointer. The net effect is that the [`Value`]</span>
-    <span class="doccomment">/// enum is able to stay smaller due to this extra allocation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">DynamicValue</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(<span class="ident">value</span>: <span class="ident">T</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Arc::new</span>(<span class="ident">Box::new</span>(<span class="ident">DynamicValueData</span> { <span class="ident">value</span>: <span class="prelude-val">Some</span>(<span class="ident">value</span>) })))
+<span class="kw">impl </span>Dynamic {
+    <span class="doccomment">/// Returns a new instance, wrapping `value`.
+    ///
+    /// This function causes two allocations: [`Arc::new()`] and [`Box::new()`].
+    /// While `Arc&lt;dyn T&gt;` could be used for only one allocation, it uses a &quot;fat
+    /// pointer&quot; which is double the size of a standard pointer. By using
+    /// `Arc&lt;Box&lt;dyn T&gt;&gt;`, the `Box&lt;dyn T&gt;` becomes the fat pointer and the
+    /// `Arc` remains a normal pointer. The net effect is that the [`Value`]
+    /// enum is able to stay smaller due to this extra allocation.
+    </span><span class="kw">pub fn </span>new&lt;T: DynamicValue + <span class="lifetime">&#39;static</span>&gt;(value: T) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(Arc::new(Box::new(DynamicValueData { value: <span class="prelude-val">Some</span>(value) })))
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::kind()`] for the wrapped value.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">kind</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">kind</span>()
+    <span class="doccomment">/// Returns the result of [`DynamicValue::kind()`] for the wrapped value.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+        <span class="self">self</span>.<span class="number">0</span>.kind()
     }
 
-    <span class="doccomment">/// Returns the [`TypeId`] of the wrapped type.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">type_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">TypeId</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">type_id</span>()
+    <span class="doccomment">/// Returns the [`TypeId`] of the wrapped type.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>type_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; TypeId {
+        <span class="self">self</span>.<span class="number">0</span>.type_id()
     }
 
-    <span class="doccomment">/// Returns a reference to the contained value, if the contained type is</span>
-    <span class="doccomment">/// `T`.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inner</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">DynamicValue</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">as_any</span>().<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
+    <span class="doccomment">/// Returns a reference to the contained value, if the contained type is
+    /// `T`.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>inner&lt;T: DynamicValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>T&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.as_any().downcast_ref::&lt;T&gt;()
     }
 
-    <span class="doccomment">/// Attempts to unwrap the value. If there is more than one reference to</span>
-    <span class="doccomment">/// this value, or `T` does not match the contained type, `Err(self)` will</span>
-    <span class="doccomment">/// be returned.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_into_inner</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">DynamicValue</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="comment">// Before we consume the value, verify we have the correct type.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>().<span class="ident">is_some</span>() {
-            <span class="comment">// We can now destruct self safely without worrying about needing to</span>
-            <span class="comment">// return an error.</span>
-            <span class="kw">match</span> <span class="ident">Arc::try_unwrap</span>(<span class="self">self</span>.<span class="number">0</span>) {
-                <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">boxed_value</span>) =&gt; {
-                    <span class="kw">let</span> <span class="ident">opt_value</span> <span class="op">=</span> <span class="ident">boxed_value</span>
-                        .<span class="ident">as_opt_any_mut</span>()
-                        .<span class="ident">downcast_mut</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                        .<span class="ident">expect</span>(<span class="string">&quot;type already checked&quot;</span>);
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">value</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-                    <span class="ident">std::mem::swap</span>(<span class="ident">opt_value</span>, <span class="kw-2">&amp;mut</span> <span class="ident">value</span>);
-                    <span class="prelude-val">Ok</span>(<span class="ident">value</span>.<span class="ident">expect</span>(<span class="string">&quot;value already taken&quot;</span>))
+    <span class="doccomment">/// Attempts to unwrap the value. If there is more than one reference to
+    /// this value, or `T` does not match the contained type, `Err(self)` will
+    /// be returned.
+    </span><span class="kw">pub fn </span>try_into_inner&lt;T: DynamicValue&gt;(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;T, <span class="self">Self</span>&gt; {
+        <span class="comment">// Before we consume the value, verify we have the correct type.
+        </span><span class="kw">if </span><span class="self">self</span>.inner::&lt;T&gt;().is_some() {
+            <span class="comment">// We can now destruct self safely without worrying about needing to
+            // return an error.
+            </span><span class="kw">match </span>Arc::try_unwrap(<span class="self">self</span>.<span class="number">0</span>) {
+                <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>boxed_value) =&gt; {
+                    <span class="kw">let </span>opt_value = boxed_value
+                        .as_opt_any_mut()
+                        .downcast_mut::&lt;<span class="prelude-ty">Option</span>&lt;T&gt;&gt;()
+                        .expect(<span class="string">&quot;type already checked&quot;</span>);
+                    <span class="kw">let </span><span class="kw-2">mut </span>value = <span class="prelude-val">None</span>;
+                    std::mem::swap(opt_value, <span class="kw-2">&amp;mut </span>value);
+                    <span class="prelude-val">Ok</span>(value.expect(<span class="string">&quot;value already taken&quot;</span>))
                 }
-                <span class="prelude-val">Err</span>(<span class="ident">arc_value</span>) =&gt; <span class="prelude-val">Err</span>(<span class="self">Self</span>(<span class="ident">arc_value</span>)),
+                <span class="prelude-val">Err</span>(arc_value) =&gt; <span class="prelude-val">Err</span>(<span class="self">Self</span>(arc_value)),
             }
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(<span class="self">self</span>)
         }
     }
 
-    <span class="doccomment">/// Returns the contained value if `T` is the contained type. If the value</span>
-    <span class="doccomment">/// contains another type, `Err(self)` will be returned. Otherwise, the</span>
-    <span class="doccomment">/// inner value will be returned.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Because dynamic values are cheaply cloned by wrapping the value in an</span>
-    <span class="doccomment">/// [`Arc`], this method will return a clone if there are any other</span>
-    <span class="doccomment">/// instances that point to the same contained value. If this is the final</span>
-    <span class="doccomment">/// instance of this value, the contained value will be returned without</span>
-    <span class="doccomment">/// additional allocations.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">DynamicValue</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="comment">// Before we consume the value, verify we have the correct type.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>().<span class="ident">is_some</span>() {
-            <span class="comment">// We can now destruct self safely without worrying about needing to</span>
-            <span class="comment">// return an error.</span>
-            <span class="kw">match</span> <span class="ident">Arc::try_unwrap</span>(<span class="self">self</span>.<span class="number">0</span>) {
-                <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">boxed_value</span>) =&gt; {
-                    <span class="kw">let</span> <span class="ident">opt_value</span> <span class="op">=</span> <span class="ident">boxed_value</span>
-                        .<span class="ident">as_opt_any_mut</span>()
-                        .<span class="ident">downcast_mut</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                        .<span class="ident">expect</span>(<span class="string">&quot;type already checked&quot;</span>);
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">value</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-                    <span class="ident">std::mem::swap</span>(<span class="ident">opt_value</span>, <span class="kw-2">&amp;mut</span> <span class="ident">value</span>);
-                    <span class="prelude-val">Ok</span>(<span class="ident">value</span>.<span class="ident">expect</span>(<span class="string">&quot;value already taken&quot;</span>))
+    <span class="doccomment">/// Returns the contained value if `T` is the contained type. If the value
+    /// contains another type, `Err(self)` will be returned. Otherwise, the
+    /// inner value will be returned.
+    ///
+    /// Because dynamic values are cheaply cloned by wrapping the value in an
+    /// [`Arc`], this method will return a clone if there are any other
+    /// instances that point to the same contained value. If this is the final
+    /// instance of this value, the contained value will be returned without
+    /// additional allocations.
+    </span><span class="kw">pub fn </span>into_inner&lt;T: DynamicValue + Clone&gt;(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;T, <span class="self">Self</span>&gt; {
+        <span class="comment">// Before we consume the value, verify we have the correct type.
+        </span><span class="kw">if </span><span class="self">self</span>.inner::&lt;T&gt;().is_some() {
+            <span class="comment">// We can now destruct self safely without worrying about needing to
+            // return an error.
+            </span><span class="kw">match </span>Arc::try_unwrap(<span class="self">self</span>.<span class="number">0</span>) {
+                <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>boxed_value) =&gt; {
+                    <span class="kw">let </span>opt_value = boxed_value
+                        .as_opt_any_mut()
+                        .downcast_mut::&lt;<span class="prelude-ty">Option</span>&lt;T&gt;&gt;()
+                        .expect(<span class="string">&quot;type already checked&quot;</span>);
+                    <span class="kw">let </span><span class="kw-2">mut </span>value = <span class="prelude-val">None</span>;
+                    std::mem::swap(opt_value, <span class="kw-2">&amp;mut </span>value);
+                    <span class="prelude-val">Ok</span>(value.expect(<span class="string">&quot;value already taken&quot;</span>))
                 }
-                <span class="prelude-val">Err</span>(<span class="ident">arc_value</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">arc_value</span>
-                    .<span class="ident">as_any</span>()
-                    .<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
-                    .<span class="ident">expect</span>(<span class="string">&quot;type already checked&quot;</span>)
-                    .<span class="ident">clone</span>()),
+                <span class="prelude-val">Err</span>(arc_value) =&gt; <span class="prelude-val">Ok</span>(arc_value
+                    .as_any()
+                    .downcast_ref::&lt;T&gt;()
+                    .expect(<span class="string">&quot;type already checked&quot;</span>)
+                    .clone()),
             }
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(<span class="self">self</span>)
         }
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::is_truthy()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_truthy</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">is_truthy</span>()
+    <span class="doccomment">/// Returns the result of [`DynamicValue::is_truthy()`] for the wrapped
+    /// value.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>is_truthy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0</span>.is_truthy()
     }
 
-    <span class="doccomment">/// Returns the inverse of [`DynamicValue::is_truthy()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_falsey</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="op">!</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">is_truthy</span>()
+    <span class="doccomment">/// Returns the inverse of [`DynamicValue::is_truthy()`] for the wrapped
+    /// value.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>is_falsey(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.<span class="number">0</span>.is_truthy()
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::partial_eq()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">partial_eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">partial_eq</span>(<span class="ident">other</span>)
+    <span class="doccomment">/// Returns the result of [`DynamicValue::partial_eq()`] for the wrapped
+    /// value.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>partial_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.partial_eq(other)
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::partial_cmp()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">partial_cmp</span>(<span class="ident">other</span>)
+    <span class="doccomment">/// Returns the result of [`DynamicValue::partial_cmp()`] for the wrapped
+    /// value.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.partial_cmp(other)
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::checked_add()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">checked_add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">checked_add</span>(<span class="ident">other</span>, <span class="ident">is_reverse</span>)
+    <span class="doccomment">/// Returns the result of [`DynamicValue::checked_add()`] for the wrapped
+    /// value.
+    </span><span class="kw">pub fn </span>checked_add(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.checked_add(other, is_reverse)
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::checked_sub()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">checked_sub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">checked_sub</span>(<span class="ident">other</span>, <span class="ident">is_reverse</span>)
+    <span class="doccomment">/// Returns the result of [`DynamicValue::checked_sub()`] for the wrapped
+    /// value.
+    </span><span class="kw">pub fn </span>checked_sub(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.checked_sub(other, is_reverse)
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::checked_mul()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">checked_mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">checked_mul</span>(<span class="ident">other</span>, <span class="ident">is_reverse</span>)
+    <span class="doccomment">/// Returns the result of [`DynamicValue::checked_mul()`] for the wrapped
+    /// value.
+    </span><span class="kw">pub fn </span>checked_mul(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.checked_mul(other, is_reverse)
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::checked_div()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">checked_div</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">checked_div</span>(<span class="ident">other</span>, <span class="ident">is_reverse</span>)
+    <span class="doccomment">/// Returns the result of [`DynamicValue::checked_div()`] for the wrapped
+    /// value.
+    </span><span class="kw">pub fn </span>checked_div(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.checked_div(other, is_reverse)
     }
 
-    <span class="doccomment">/// Invokes [`DynamicValue::call`] with the given parameters.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>, <span class="ident">args</span>: <span class="ident">PoppedValues</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">call</span>(<span class="ident">name</span>, <span class="ident">args</span>)
+    <span class="doccomment">/// Invokes [`DynamicValue::call`] with the given parameters.
+    </span><span class="kw">pub fn </span>call(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol, args: PoppedValues&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.call(name, args)
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::to_source()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_source</span>()
+    <span class="doccomment">/// Returns the result of [`DynamicValue::to_source()`] for the wrapped
+    /// value.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>to_source(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.to_source()
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::hash()`] for the wrapped</span>
-    <span class="doccomment">/// value.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">hash</span><span class="op">&lt;</span><span class="ident">H</span>: <span class="ident">Hasher</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;mut</span> <span class="ident">H</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">hash</span>(<span class="ident">state</span>)
+    <span class="doccomment">/// Returns the result of [`DynamicValue::hash()`] for the wrapped
+    /// value.
+    </span><span class="kw">pub fn </span>hash&lt;H: Hasher&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;mut </span>H) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0</span>.hash(state)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Dynamic</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_source</span>() {
-            <span class="prelude-val">Some</span>(<span class="ident">value</span>) =&gt; <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>),
-            <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Ok</span>(()),
+<span class="kw">impl </span>Display <span class="kw">for </span>Dynamic {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">match </span><span class="self">self</span>.<span class="number">0</span>.to_source() {
+            <span class="prelude-val">Some</span>(value) =&gt; f.write_str(<span class="kw-2">&amp;</span>value),
+            <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Ok</span>(()),
         }
     }
 }
 
-<span class="kw">trait</span> <span class="ident">UnboxableDynamicValue</span>: <span class="ident">Debug</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> {
-    <span class="kw">fn</span> <span class="ident">type_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">TypeId</span>;
-    <span class="kw">fn</span> <span class="ident">as_any</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Any</span>;
-    <span class="kw">fn</span> <span class="ident">as_any_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Any</span>;
-    <span class="kw">fn</span> <span class="ident">as_opt_any_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Any</span>;
+<span class="kw">trait </span>UnboxableDynamicValue: Debug + Send + Sync {
+    <span class="kw">fn </span>type_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; TypeId;
+    <span class="kw">fn </span>as_any(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Any;
+    <span class="kw">fn </span>as_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Any;
+    <span class="kw">fn </span>as_opt_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Any;
 
-    <span class="kw">fn</span> <span class="ident">is_truthy</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
-    <span class="kw">fn</span> <span class="ident">kind</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>;
-    <span class="kw">fn</span> <span class="ident">partial_eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">checked_add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">checked_sub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">checked_mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">checked_div</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">to_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Hasher</span>) -&gt; <span class="ident">bool</span>;
-    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>, <span class="ident">arguments</span>: <span class="ident">PoppedValues</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span>;
+    <span class="kw">fn </span>is_truthy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
+    <span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str;
+    <span class="kw">fn </span>partial_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt;;
+    <span class="kw">fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt;;
+    <span class="kw">fn </span>checked_add(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt;;
+    <span class="kw">fn </span>checked_sub(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt;;
+    <span class="kw">fn </span>checked_mul(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt;;
+    <span class="kw">fn </span>checked_div(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt;;
+    <span class="kw">fn </span>to_source(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt;;
+    <span class="kw">fn </span>hash(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Hasher) -&gt; bool;
+    <span class="kw">fn </span>call(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol, arguments: PoppedValues&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt;;
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">struct</span> <span class="ident">DynamicValueData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="ident">value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Clone)]
+</span><span class="kw">struct </span>DynamicValueData&lt;T&gt; {
+    value: <span class="prelude-ty">Option</span>&lt;T&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">DynamicValueData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
-        <span class="self">self</span>.<span class="ident">value</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;value taken&quot;</span>)
+<span class="kw">impl</span>&lt;T&gt; DynamicValueData&lt;T&gt; {
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T {
+        <span class="self">self</span>.value.as_ref().expect(<span class="string">&quot;value taken&quot;</span>)
     }
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">value_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> {
-        <span class="self">self</span>.<span class="ident">value</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;value taken&quot;</span>)
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>value_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>T {
+        <span class="self">self</span>.value.as_mut().expect(<span class="string">&quot;value taken&quot;</span>)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">UnboxableDynamicValue</span> <span class="kw">for</span> <span class="ident">DynamicValueData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">DynamicValue</span> <span class="op">+</span> <span class="ident">Any</span> <span class="op">+</span> <span class="ident">Debug</span>,
+<span class="kw">impl</span>&lt;T&gt; UnboxableDynamicValue <span class="kw">for </span>DynamicValueData&lt;T&gt;
+<span class="kw">where
+    </span>T: DynamicValue + Any + Debug,
 {
-    <span class="kw">fn</span> <span class="ident">as_any</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Any</span> {
-        <span class="self">self</span>.<span class="ident">value</span>()
+    <span class="kw">fn </span>as_any(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Any {
+        <span class="self">self</span>.value()
     }
 
-    <span class="kw">fn</span> <span class="ident">as_any_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Any</span> {
-        <span class="self">self</span>.<span class="ident">value_mut</span>()
+    <span class="kw">fn </span>as_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Any {
+        <span class="self">self</span>.value_mut()
     }
 
-    <span class="kw">fn</span> <span class="ident">as_opt_any_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Any</span> {
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">value</span>
+    <span class="kw">fn </span>as_opt_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Any {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.value
     }
 
-    <span class="kw">fn</span> <span class="ident">is_truthy</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">is_truthy</span>()
+    <span class="kw">fn </span>is_truthy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.value().is_truthy()
     }
 
-    <span class="kw">fn</span> <span class="ident">kind</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">kind</span>()
+    <span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+        <span class="self">self</span>.value().kind()
     }
 
-    <span class="kw">fn</span> <span class="ident">partial_eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">partial_eq</span>(<span class="ident">other</span>)
+    <span class="kw">fn </span>partial_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt; {
+        <span class="self">self</span>.value().partial_eq(other)
     }
 
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">partial_cmp</span>(<span class="ident">other</span>)
+    <span class="kw">fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt; {
+        <span class="self">self</span>.value().partial_cmp(other)
     }
 
-    <span class="kw">fn</span> <span class="ident">to_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">to_source</span>()
+    <span class="kw">fn </span>to_source(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+        <span class="self">self</span>.value().to_source()
     }
 
-    <span class="kw">fn</span> <span class="ident">checked_add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">checked_add</span>(<span class="ident">other</span>, <span class="ident">is_reverse</span>)
+    <span class="kw">fn </span>checked_add(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
+        <span class="self">self</span>.value().checked_add(other, is_reverse)
     }
 
-    <span class="kw">fn</span> <span class="ident">checked_sub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">checked_sub</span>(<span class="ident">other</span>, <span class="ident">is_reverse</span>)
+    <span class="kw">fn </span>checked_sub(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
+        <span class="self">self</span>.value().checked_sub(other, is_reverse)
     }
 
-    <span class="kw">fn</span> <span class="ident">checked_mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">checked_mul</span>(<span class="ident">other</span>, <span class="ident">is_reverse</span>)
+    <span class="kw">fn </span>checked_mul(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
+        <span class="self">self</span>.value().checked_mul(other, is_reverse)
     }
 
-    <span class="kw">fn</span> <span class="ident">checked_div</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">is_reverse</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">checked_div</span>(<span class="ident">other</span>, <span class="ident">is_reverse</span>)
+    <span class="kw">fn </span>checked_div(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
+        <span class="self">self</span>.value().checked_div(other, is_reverse)
     }
 
-    <span class="kw">fn</span> <span class="ident">hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">state</span>: <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Hasher</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">hash</span>(<span class="kw-2">&amp;mut</span> <span class="ident">state</span>)
+    <span class="kw">fn </span>hash(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>state: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Hasher) -&gt; bool {
+        <span class="self">self</span>.value().hash(<span class="kw-2">&amp;mut </span>state)
     }
 
-    <span class="kw">fn</span> <span class="ident">type_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">TypeId</span> {
-        <span class="ident">TypeId::of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
+    <span class="kw">fn </span>type_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; TypeId {
+        TypeId::of::&lt;T&gt;()
     }
 
-    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">Symbol</span>, <span class="kw-2">mut</span> <span class="ident">arguments</span>: <span class="ident">PoppedValues</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">FaultKind</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">value</span>().<span class="ident">call</span>(<span class="ident">name</span>, <span class="kw-2">&amp;mut</span> <span class="ident">arguments</span>)
+    <span class="kw">fn </span>call(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol, <span class="kw-2">mut </span>arguments: PoppedValues&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt; {
+        <span class="self">self</span>.value().call(name, <span class="kw-2">&amp;mut </span>arguments)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">DynamicValueData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">Debug</span>,
+<span class="kw">impl</span>&lt;T&gt; Debug <span class="kw">for </span>DynamicValueData&lt;T&gt;
+<span class="kw">where
+    </span>T: Debug,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">value</span>.<span class="ident">as_ref</span>() {
-            <span class="ident">Debug::fmt</span>(<span class="ident">value</span>, <span class="ident">f</span>)
-        } <span class="kw">else</span> {
-            <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;DynamicValueData&quot;</span>).<span class="ident">finish_non_exhaustive</span>()
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(value) = <span class="self">self</span>.value.as_ref() {
+            Debug::fmt(value, f)
+        } <span class="kw">else </span>{
+            f.debug_struct(<span class="string">&quot;DynamicValueData&quot;</span>).finish_non_exhaustive()
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">DynamicValueData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">Display</span>,
+<span class="kw">impl</span>&lt;T&gt; Display <span class="kw">for </span>DynamicValueData&lt;T&gt;
+<span class="kw">where
+    </span>T: Display,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">value</span>.<span class="ident">as_ref</span>() {
-            <span class="ident">Display::fmt</span>(<span class="ident">value</span>, <span class="ident">f</span>)
-        } <span class="kw">else</span> {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(value) = <span class="self">self</span>.value.as_ref() {
+            Display::fmt(value, f)
+        } <span class="kw">else </span>{
             <span class="prelude-val">Ok</span>(())
         }
     }
 }
 
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">cmp</span>(<span class="ident">left</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>, <span class="ident">left_dynamic</span>: <span class="kw-2">&amp;</span><span class="ident">Dynamic</span>, <span class="ident">right</span>: <span class="kw-2">&amp;</span><span class="ident">Value</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
-    <span class="kw">match</span> <span class="ident">left_dynamic</span>.<span class="ident">partial_cmp</span>(<span class="ident">right</span>) {
-        <span class="prelude-val">Some</span>(<span class="ident">ordering</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">ordering</span>),
-        <span class="prelude-val">None</span> =&gt; <span class="kw">match</span> <span class="ident">right</span> {
-            <span class="ident">Value::Dynamic</span>(<span class="ident">right</span>) =&gt; <span class="ident">right</span>.<span class="ident">partial_cmp</span>(<span class="ident">left</span>).<span class="ident">map</span>(<span class="ident">Ordering::reverse</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>cmp(left: <span class="kw-2">&amp;</span>Value, left_dynamic: <span class="kw-2">&amp;</span>Dynamic, right: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt; {
+    <span class="kw">match </span>left_dynamic.partial_cmp(right) {
+        <span class="prelude-val">Some</span>(ordering) =&gt; <span class="prelude-val">Some</span>(ordering),
+        <span class="prelude-val">None </span>=&gt; <span class="kw">match </span>right {
+            Value::Dynamic(right) =&gt; right.partial_cmp(left).map(Ordering::reverse),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         },
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0 (a55dd71d5 2022-09-19)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>
