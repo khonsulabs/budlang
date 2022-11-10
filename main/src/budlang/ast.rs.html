@@ -959,6 +959,48 @@
 <span id="959">959</span>
 <span id="960">960</span>
 <span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
+<span id="970">970</span>
+<span id="971">971</span>
+<span id="972">972</span>
+<span id="973">973</span>
+<span id="974">974</span>
+<span id="975">975</span>
+<span id="976">976</span>
+<span id="977">977</span>
+<span id="978">978</span>
+<span id="979">979</span>
+<span id="980">980</span>
+<span id="981">981</span>
+<span id="982">982</span>
+<span id="983">983</span>
+<span id="984">984</span>
+<span id="985">985</span>
+<span id="986">986</span>
+<span id="987">987</span>
+<span id="988">988</span>
+<span id="989">989</span>
+<span id="990">990</span>
+<span id="991">991</span>
+<span id="992">992</span>
+<span id="993">993</span>
+<span id="994">994</span>
+<span id="995">995</span>
+<span id="996">996</span>
+<span id="997">997</span>
+<span id="998">998</span>
+<span id="999">999</span>
+<span id="1000">1000</span>
+<span id="1001">1001</span>
+<span id="1002">1002</span>
+<span id="1003">1003</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)] </span><span class="comment">// TODO docs and panics for ast
 
 </span><span class="kw">use </span>std::{
@@ -1578,6 +1620,7 @@
 <span class="attribute">#[derive(Debug)]
 </span><span class="kw">pub struct </span>Loop {
     <span class="kw">pub </span>name: <span class="prelude-ty">Option</span>&lt;Symbol&gt;,
+    <span class="kw">pub </span>parameters: <span class="prelude-ty">Option</span>&lt;LoopParameters&gt;,
     <span class="kw">pub </span>body: NodeId,
 }
 
@@ -1591,7 +1634,42 @@
         <span class="kw">let </span><span class="kw-2">mut </span>scope = operations.begin_loop(<span class="self">self</span>.name.clone(), result);
 
         <span class="kw">let </span>continue_label = scope.continue_label;
+        <span class="kw">let </span>break_label = scope.break_label;
+
         scope.label_continue();
+
+        <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.parameters {
+            <span class="prelude-val">Some</span>(LoopParameters::Until(expr)) =&gt; {
+                <span class="kw">let </span>condition_result = scope.new_temporary_variable();
+                <span class="kw">let </span>continue_evaluation = scope.new_label();
+                tree.node(<span class="kw-2">*</span>expr).generate_code(
+                    Destination::Variable(condition_result),
+                    <span class="kw-2">&amp;mut </span>scope,
+                    tree,
+                )<span class="question-mark">?</span>;
+                scope.push(Instruction::If {
+                    condition: LiteralOrSource::Variable(condition_result),
+                    false_jump_to: continue_evaluation,
+                });
+                scope.push(Instruction::JumpTo(break_label));
+
+                scope.label(continue_evaluation);
+            }
+            <span class="prelude-val">Some</span>(LoopParameters::While(expr)) =&gt; {
+                <span class="kw">let </span>condition_result = scope.new_temporary_variable();
+                tree.node(<span class="kw-2">*</span>expr).generate_code(
+                    Destination::Variable(condition_result),
+                    <span class="kw-2">&amp;mut </span>scope,
+                    tree,
+                )<span class="question-mark">?</span>;
+                scope.push(Instruction::If {
+                    condition: LiteralOrSource::Variable(condition_result),
+                    false_jump_to: break_label,
+                });
+            }
+            <span class="prelude-val">None </span>=&gt; {}
+        }
+
         <span class="kw">let </span>body = tree.node(<span class="self">self</span>.body);
         body.generate_code(result, <span class="kw-2">&amp;mut </span>scope, tree)<span class="question-mark">?</span>;
         scope.push(Instruction::JumpTo(continue_label));
@@ -1599,6 +1677,12 @@
 
         <span class="prelude-val">Ok</span>(())
     }
+}
+
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub enum </span>LoopParameters {
+    Until(NodeId),
+    While(NodeId),
 }
 
 <span class="attribute">#[derive(Clone, Debug)]
