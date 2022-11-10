@@ -1196,6 +1196,89 @@
 <span id="1196">1196</span>
 <span id="1197">1197</span>
 <span id="1198">1198</span>
+<span id="1199">1199</span>
+<span id="1200">1200</span>
+<span id="1201">1201</span>
+<span id="1202">1202</span>
+<span id="1203">1203</span>
+<span id="1204">1204</span>
+<span id="1205">1205</span>
+<span id="1206">1206</span>
+<span id="1207">1207</span>
+<span id="1208">1208</span>
+<span id="1209">1209</span>
+<span id="1210">1210</span>
+<span id="1211">1211</span>
+<span id="1212">1212</span>
+<span id="1213">1213</span>
+<span id="1214">1214</span>
+<span id="1215">1215</span>
+<span id="1216">1216</span>
+<span id="1217">1217</span>
+<span id="1218">1218</span>
+<span id="1219">1219</span>
+<span id="1220">1220</span>
+<span id="1221">1221</span>
+<span id="1222">1222</span>
+<span id="1223">1223</span>
+<span id="1224">1224</span>
+<span id="1225">1225</span>
+<span id="1226">1226</span>
+<span id="1227">1227</span>
+<span id="1228">1228</span>
+<span id="1229">1229</span>
+<span id="1230">1230</span>
+<span id="1231">1231</span>
+<span id="1232">1232</span>
+<span id="1233">1233</span>
+<span id="1234">1234</span>
+<span id="1235">1235</span>
+<span id="1236">1236</span>
+<span id="1237">1237</span>
+<span id="1238">1238</span>
+<span id="1239">1239</span>
+<span id="1240">1240</span>
+<span id="1241">1241</span>
+<span id="1242">1242</span>
+<span id="1243">1243</span>
+<span id="1244">1244</span>
+<span id="1245">1245</span>
+<span id="1246">1246</span>
+<span id="1247">1247</span>
+<span id="1248">1248</span>
+<span id="1249">1249</span>
+<span id="1250">1250</span>
+<span id="1251">1251</span>
+<span id="1252">1252</span>
+<span id="1253">1253</span>
+<span id="1254">1254</span>
+<span id="1255">1255</span>
+<span id="1256">1256</span>
+<span id="1257">1257</span>
+<span id="1258">1258</span>
+<span id="1259">1259</span>
+<span id="1260">1260</span>
+<span id="1261">1261</span>
+<span id="1262">1262</span>
+<span id="1263">1263</span>
+<span id="1264">1264</span>
+<span id="1265">1265</span>
+<span id="1266">1266</span>
+<span id="1267">1267</span>
+<span id="1268">1268</span>
+<span id="1269">1269</span>
+<span id="1270">1270</span>
+<span id="1271">1271</span>
+<span id="1272">1272</span>
+<span id="1273">1273</span>
+<span id="1274">1274</span>
+<span id="1275">1275</span>
+<span id="1276">1276</span>
+<span id="1277">1277</span>
+<span id="1278">1278</span>
+<span id="1279">1279</span>
+<span id="1280">1280</span>
+<span id="1281">1281</span>
 </pre><pre class="rust"><code><span class="comment">// TODO docs for parser
 </span><span class="attribute">#![allow(missing_docs)]
 </span><span class="comment">// We use the Range type which doesn&#39;t allow this, and it&#39;s not worth making a
@@ -1919,72 +2002,153 @@
             <span class="prelude-val">Ok</span>(tree.if_node(if_op))
         }
         TokenKind::Identifier(symbol) <span class="kw">if </span>symbol == <span class="string">&quot;loop&quot; </span>=&gt; {
-            <span class="comment">// loop [#label] while &lt;expr&gt;
-            // loop [#label] until &lt;expr&gt;
-            // loop [#label] for x := &lt;initial&gt; [down] to &lt;break when equal&gt; [step &lt;amount&gt;]
-            // loop [#label]
-            // break [#label] [expr]
-            // continue [#label]
-
-            </span><span class="kw">let </span>name = <span class="kw">if let </span><span class="prelude-val">Some</span>(TokenKind::Hash) = tokens.peek_token_kind() {
-                tokens.next();
-                <span class="kw">let </span>name = tokens.expect_next(<span class="string">&quot;loop name&quot;</span>)<span class="question-mark">?</span>;
-                <span class="kw">match </span>name.kind {
-                    TokenKind::Identifier(name) =&gt; <span class="prelude-val">Some</span>(name),
-                    other =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(ParseError::Unexpected(Token {
-                            range: name.range,
-                            kind: other,
-                        }))
-                    }
-                }
-            } <span class="kw">else </span>{
-                <span class="prelude-val">None
-            </span>};
-
-            <span class="kw">let </span>next_token = tokens.expect_next(<span class="string">&quot;loop condition or end of line&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span>parameters = <span class="kw">match </span><span class="kw-2">&amp;</span>next_token.kind {
-                TokenKind::Identifier(sym) <span class="kw">if </span>sym == <span class="string">&quot;while&quot; </span>=&gt; {
-                    <span class="kw">let </span>first_token = tokens.expect_next(<span class="string">&quot;loop condition&quot;</span>)<span class="question-mark">?</span>;
-                    <span class="prelude-val">Some</span>(LoopParameters::While(parse_expression(
-                        first_token,
-                        tree,
-                        tokens,
-                        owning_function_name,
-                    )<span class="question-mark">?</span>))
-                }
-                TokenKind::Identifier(sym) <span class="kw">if </span>sym == <span class="string">&quot;until&quot; </span>=&gt; {
-                    <span class="kw">let </span>first_token = tokens.expect_next(<span class="string">&quot;loop condition&quot;</span>)<span class="question-mark">?</span>;
-                    <span class="prelude-val">Some</span>(LoopParameters::Until(parse_expression(
-                        first_token,
-                        tree,
-                        tokens,
-                        owning_function_name,
-                    )<span class="question-mark">?</span>))
-                }
-                TokenKind::Identifier(sym) <span class="kw">if </span>sym == <span class="string">&quot;for&quot; </span>=&gt; <span class="macro">todo!</span>(<span class="string">&quot;for loop&quot;</span>),
-                TokenKind::EndOfLine =&gt; <span class="prelude-val">None</span>,
-                <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(ParseError::Unexpected(next_token)),
-            };
-
-            <span class="kw">let </span>body = parse_statements(tree, tokens, owning_function_name)<span class="question-mark">?</span>;
-            <span class="kw">match </span>tokens.expect_next(<span class="string">&quot;end&quot;</span>)<span class="question-mark">?</span>.kind {
-                TokenKind::Identifier(end) <span class="kw">if </span>end == <span class="string">&quot;end&quot; </span>=&gt; {}
-                other =&gt; <span class="macro">todo!</span>(<span class="string">&quot;unexpected {other:?}&quot;</span>),
-            }
-            tokens.expect_end_of_line_or_eof()<span class="question-mark">?</span>;
-
-            <span class="prelude-val">Ok</span>(tree.loop_node(Loop {
-                name,
-                parameters,
-                body,
-            }))
+            parse_loop(tree, tokens, owning_function_name)
         }
         TokenKind::Identifier(symbol) <span class="kw">if </span>symbol == <span class="string">&quot;break&quot; </span>|| symbol == <span class="string">&quot;continue&quot; </span>=&gt; {
             parse_loop_keyword(symbol, tree, tokens, owning_function_name)
         }
         <span class="kw">_ </span>=&gt; parse_assign_expression(first_token, tree, tokens, owning_function_name),
     }
+}
+
+<span class="kw">fn </span>parse_loop(
+    tree: <span class="kw-2">&amp;</span>SyntaxTreeBuilder,
+    tokens: <span class="kw-2">&amp;mut </span>Lexer&lt;<span class="lifetime">&#39;_</span>&gt;,
+    owning_function_name: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;NodeId, ParseError&gt; {
+    <span class="kw">let </span>name = <span class="kw">if let </span><span class="prelude-val">Some</span>(TokenKind::Hash) = tokens.peek_token_kind() {
+        tokens.next();
+        <span class="kw">let </span>name = tokens.expect_next(<span class="string">&quot;loop name&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">match </span>name.kind {
+            TokenKind::Identifier(name) =&gt; <span class="prelude-val">Some</span>(name),
+            other =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(ParseError::Unexpected(Token {
+                    range: name.range,
+                    kind: other,
+                }))
+            }
+        }
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>};
+
+    <span class="kw">let </span>next_token = tokens.expect_next(<span class="string">&quot;loop condition or end of line&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>parameters = <span class="kw">match </span><span class="kw-2">&amp;</span>next_token.kind {
+        TokenKind::Identifier(sym) <span class="kw">if </span>sym == <span class="string">&quot;while&quot; </span>=&gt; {
+            <span class="comment">// loop [#label] while &lt;expr&gt;
+            </span><span class="prelude-val">Some</span>(LoopParameters::While(parse_expression(
+                tokens.expect_next(<span class="string">&quot;loop condition&quot;</span>)<span class="question-mark">?</span>,
+                tree,
+                tokens,
+                owning_function_name,
+            )<span class="question-mark">?</span>))
+        }
+        TokenKind::Identifier(sym) <span class="kw">if </span>sym == <span class="string">&quot;until&quot; </span>=&gt; {
+            <span class="comment">// loop [#label] until &lt;expr&gt;
+            </span><span class="prelude-val">Some</span>(LoopParameters::Until(parse_expression(
+                tokens.expect_next(<span class="string">&quot;loop condition&quot;</span>)<span class="question-mark">?</span>,
+                tree,
+                tokens,
+                owning_function_name,
+            )<span class="question-mark">?</span>))
+        }
+        TokenKind::Identifier(sym) <span class="kw">if </span>sym == <span class="string">&quot;for&quot; </span>=&gt; {
+            <span class="prelude-val">Some</span>(parse_for_loop(tree, tokens, owning_function_name)<span class="question-mark">?</span>)
+        }
+        TokenKind::EndOfLine =&gt; {
+            <span class="comment">// loop [#label]
+            </span><span class="prelude-val">None
+        </span>}
+        <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(ParseError::Unexpected(next_token)),
+    };
+
+    <span class="kw">let </span>body = parse_statements(tree, tokens, owning_function_name)<span class="question-mark">?</span>;
+    <span class="kw">match </span>tokens.expect_next(<span class="string">&quot;end&quot;</span>)<span class="question-mark">?</span>.kind {
+        TokenKind::Identifier(end) <span class="kw">if </span>end == <span class="string">&quot;end&quot; </span>=&gt; {}
+        other =&gt; <span class="macro">todo!</span>(<span class="string">&quot;unexpected {other:?}&quot;</span>),
+    }
+    tokens.expect_end_of_line_or_eof()<span class="question-mark">?</span>;
+
+    <span class="prelude-val">Ok</span>(tree.loop_node(Loop {
+        name,
+        parameters,
+        body,
+    }))
+}
+
+<span class="kw">fn </span>parse_for_loop(
+    tree: <span class="kw-2">&amp;</span>SyntaxTreeBuilder,
+    tokens: <span class="kw-2">&amp;mut </span>Lexer&lt;<span class="lifetime">&#39;_</span>&gt;,
+    owning_function_name: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;LoopParameters, ParseError&gt; {
+    <span class="comment">// loop [#label] for x := &lt;initial&gt; [down] to &lt;break when equal&gt; [step &lt;amount&gt;]
+    </span><span class="kw">let </span>var_name = tokens.expect_next(<span class="string">&quot;variable name&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>var_name = <span class="kw">match </span><span class="kw-2">&amp;</span>var_name.kind {
+        TokenKind::Identifier(name) =&gt; name.clone(),
+        <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(ParseError::Unexpected(var_name)),
+    };
+
+    <span class="kw">let </span><span class="kw-2">mut </span>first_token = tokens.expect_next(<span class="string">&quot;assigment or keyword&quot;</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>initial_value = <span class="kw">if let </span>TokenKind::Assign = <span class="kw-2">&amp;</span>first_token.kind {
+        first_token = tokens.expect_next(<span class="string">&quot;expression&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>expression = parse_expression(first_token, tree, tokens, owning_function_name)<span class="question-mark">?</span>;
+
+        first_token = tokens.expect_next(<span class="string">&quot;to or down to&quot;</span>)<span class="question-mark">?</span>;
+
+        <span class="prelude-val">Some</span>(expression)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>};
+
+    <span class="kw">let </span>ascending = <span class="kw">match </span><span class="kw-2">&amp;</span>first_token.kind {
+        TokenKind::Identifier(keyword) <span class="kw">if </span>keyword == <span class="string">&quot;to&quot; </span>=&gt; <span class="bool-val">true</span>,
+        TokenKind::Identifier(keyword) <span class="kw">if </span>keyword == <span class="string">&quot;down&quot; </span>=&gt; {
+            first_token = tokens.expect_next(<span class="string">&quot;to&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">match </span><span class="kw-2">&amp;</span>first_token.kind {
+                TokenKind::Identifier(keyword) <span class="kw">if </span>keyword == <span class="string">&quot;to&quot; </span>=&gt; <span class="bool-val">false</span>,
+                <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(ParseError::Unexpected(first_token)),
+            }
+        }
+        <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(ParseError::Unexpected(first_token)),
+    };
+
+    <span class="kw">let </span>stop_value = parse_expression(
+        tokens.expect_next(<span class="string">&quot;loop end value&quot;</span>)<span class="question-mark">?</span>,
+        tree,
+        tokens,
+        owning_function_name,
+    )<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>inclusive = <span class="kw">match </span>tokens.peek_token_kind() {
+        <span class="prelude-val">Some</span>(TokenKind::Identifier(symbol)) <span class="kw">if </span>symbol == <span class="string">&quot;inclusive&quot; </span>=&gt; {
+            tokens.next();
+            <span class="bool-val">true
+        </span>}
+        <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+    };
+
+    <span class="kw">let </span>step = <span class="kw">match </span>tokens.peek_token_kind() {
+        <span class="prelude-val">Some</span>(TokenKind::Identifier(symbol)) <span class="kw">if </span>symbol == <span class="string">&quot;step&quot; </span>=&gt; {
+            tokens.next();
+            <span class="prelude-val">Some</span>(parse_expression(
+                tokens.expect_next(<span class="string">&quot;expression&quot;</span>)<span class="question-mark">?</span>,
+                tree,
+                tokens,
+                owning_function_name,
+            )<span class="question-mark">?</span>)
+        }
+        <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
+    };
+
+    <span class="prelude-val">Ok</span>(LoopParameters::For {
+        var_name,
+        initial_value,
+        ascending,
+        inclusive,
+        stop_value,
+        step,
+    })
 }
 
 <span class="kw">fn </span>parse_loop_keyword(
@@ -2005,7 +2169,8 @@
     </span>};
 
     <span class="kw">if </span>keyword == <span class="string">&quot;break&quot; </span>{
-        <span class="kw">let </span>value = <span class="kw">if let </span><span class="prelude-val">Some</span>(TokenKind::EndOfLine) = tokens.peek_token_kind() {
+        <span class="comment">// break [#label] [expr]
+        </span><span class="kw">let </span>value = <span class="kw">if let </span><span class="prelude-val">Some</span>(TokenKind::EndOfLine) = tokens.peek_token_kind() {
             <span class="prelude-val">None
         </span>} <span class="kw">else </span>{
             <span class="kw">let </span>first_token = tokens.expect_next(<span class="string">&quot;end of line or expression&quot;</span>)<span class="question-mark">?</span>;
@@ -2019,7 +2184,8 @@
         tokens.expect_end_of_line_or_eof()<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(tree.break_node(Break { name, value }))
     } <span class="kw">else </span>{
-        <span class="macro">assert_eq!</span>(keyword, <span class="string">&quot;continue&quot;</span>);
+        <span class="comment">// continue [#label]
+        </span><span class="macro">assert_eq!</span>(keyword, <span class="string">&quot;continue&quot;</span>);
         tokens.expect_end_of_line_or_eof()<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(tree.continue_node(Continue { name }))
     }
