@@ -21,8 +21,8 @@ use crate::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
-    kind: TokenKind,
-    range: Range<usize>,
+    pub kind: TokenKind,
+    pub range: Range<usize>,
 }
 
 impl Token {
@@ -42,12 +42,13 @@ impl Display for Token {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum TokenKind {
+pub enum TokenKind {
     Identifier(Symbol),
     Integer(i64),
     Real(f64),
     String(String),
     Assign,
+    Comment(String),
     Comparison(Comparison),
     Not,
     Add,
@@ -63,6 +64,7 @@ enum TokenKind {
     Hash,
     Unknown(char),
 }
+
 impl Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -93,12 +95,13 @@ impl Display for TokenKind {
             TokenKind::Colon => f.write_char(':'),
             TokenKind::Hash => f.write_char('#'),
             TokenKind::Unknown(token) => Display::fmt(token, f),
+            TokenKind::Comment(value) => write!(f, "// {value}"),
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-enum BracketType {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BracketType {
     Paren,
     Square,
     Curly,
@@ -217,14 +220,15 @@ impl<T> Iterator for Peeked<T> {
     }
 }
 
-struct Lexer<'a> {
+pub struct Lexer<'a> {
     source: &'a str,
     chars: DoublePeekable<CharIndices<'a>>,
     peeked_token: Option<Result<Token, ParseError>>,
 }
 
 impl<'a> Lexer<'a> {
-    fn new(source: &'a str) -> Self {
+    #[must_use]
+    pub fn new(source: &'a str) -> Self {
         Self {
             source,
             chars: DoublePeekable {
@@ -335,7 +339,26 @@ impl<'a> Lexer<'a> {
                     Some(Ok(Token::at_offset(TokenKind::Multiply, offset)))
                 }
                 Some((offset, char)) if char == '/' => {
-                    Some(Ok(Token::at_offset(TokenKind::Divide, offset)))
+                    if matches!(self.chars.peek().map(|(_, ch)| *ch), Some('/')) {
+                        // Comment
+                        let (mut end, _) = self.chars.next().expect("just peeked");
+
+                        // Read until end of line
+                        while self
+                            .chars
+                            .peek()
+                            .map_or(false, |(_, char)| *char != '\n' && *char != '\r')
+                        {
+                            end = self.chars.next().expect("just peeked").0;
+                        }
+
+                        Some(Ok(Token::new(
+                            TokenKind::Comment(self.source[offset..=end].to_string()),
+                            offset..end + 1,
+                        )))
+                    } else {
+                        Some(Ok(Token::at_offset(TokenKind::Divide, offset)))
+                    }
                 }
                 Some((offset, char)) if char == '=' => Some(Ok(Token::at_offset(
                     TokenKind::Comparison(Comparison::Equal),
@@ -447,16 +470,34 @@ impl<'a> Lexer<'a> {
             offset: self.source.len(),
             found: None,
         })??;
-        assert!(matches!(end_of_line.kind, TokenKind::EndOfLine)); // TODO error trailing stuff
-        Ok(())
+        match &end_of_line.kind {
+            TokenKind::Comment(_) => self.expect_end_of_line(),
+            TokenKind::EndOfLine | TokenKind::Close(_) => Ok(()),
+            _ => Err(ParseError::ExpectedEndOfLine {
+                offset: end_of_line.range.start,
+                found: Some(end_of_line),
+            }),
+        }
     }
 
     fn expect_end_of_line_or_eof(&mut self) -> Result<(), ParseError> {
-        let end_of_line = match self.next().transpose()? {
-            Some(token) => token,
-            None => return Ok(()),
-        };
-        assert!(matches!(end_of_line.kind, TokenKind::EndOfLine)); // TODO error trailing stuff
+        match self.peek_token_kind() {
+            Some(TokenKind::Comment(_)) => {
+                self.next();
+                self.expect_end_of_line_or_eof()?;
+            }
+            Some(TokenKind::EndOfLine) => {
+                self.next();
+            }
+            Some(TokenKind::Close(_)) | None => {}
+            _ => {
+                let token = self.next().expect("just peeked")?;
+                return Err(ParseError::ExpectedEndOfLine {
+                    offset: token.range.start,
+                    found: Some(token),
+                });
+            }
+        }
         Ok(())
     }
 
@@ -581,7 +622,7 @@ pub fn parse(source: &str) -> Result<CodeUnit, ParseError> {
                 functions.push(function);
             }
 
-            TokenKind::EndOfLine => {}
+            TokenKind::Comment(_) | TokenKind::EndOfLine => {}
             _ => {
                 let expression = parse_expression(token, &init_tree, &mut tokens, None)?;
                 statements.push(expression);
@@ -670,7 +711,7 @@ fn parse_statements(
                 // end of function
                 break;
             }
-            TokenKind::EndOfLine => {
+            TokenKind::Comment(_) | TokenKind::EndOfLine => {
                 tokens.next();
             }
             _ => {
@@ -702,21 +743,35 @@ fn parse_expression(
             let if_true = parse_statements(tree, tokens, owning_function_name)?;
 
             let mut if_op = If::new(condition, if_true);
+            let mut expect_end = true;
 
             match tokens.peek_token_kind() {
                 Some(TokenKind::Identifier(sym)) if sym == "else" => {
                     let _else_token = tokens.next();
-                    tokens.expect_end_of_line()?;
-                    let else_block = parse_statements(tree, tokens, owning_function_name)?;
+                    let else_block = match tokens.peek_token_kind() {
+                        Some(TokenKind::Identifier(sym)) if sym == "if" => {
+                            let if_token =
+                                tokens.next().expect("just peeked").expect("just matched");
+                            expect_end = false;
+                            parse_expression(if_token, tree, tokens, owning_function_name)?
+                        }
+                        _ => {
+                            tokens.expect_end_of_line()?;
+                            parse_statements(tree, tokens, owning_function_name)?
+                        }
+                    };
                     if_op = if_op.with_else(else_block);
                 }
                 _ => {}
             }
-            match tokens.expect_next("end")?.kind {
-                TokenKind::Identifier(end) if end == "end" => {}
-                other => todo!("unexpected {other:?}"),
+
+            if expect_end {
+                match tokens.expect_next("end")?.kind {
+                    TokenKind::Identifier(end) if end == "end" => {}
+                    other => todo!("unexpected {other:?}"),
+                }
+                tokens.expect_end_of_line_or_eof()?;
             }
-            tokens.expect_end_of_line_or_eof()?;
 
             Ok(tree.if_node(if_op))
         }
@@ -774,7 +829,7 @@ fn parse_loop(
         TokenKind::Identifier(sym) if sym == "for" => {
             Some(parse_for_loop(tree, tokens, owning_function_name)?)
         }
-        TokenKind::EndOfLine => {
+        TokenKind::Comment(_) | TokenKind::EndOfLine => {
             // loop [#label]
             None
         }
@@ -889,7 +944,10 @@ fn parse_loop_keyword(
 
     if keyword == "break" {
         // break [#label] [expr]
-        let value = if let Some(TokenKind::EndOfLine) = tokens.peek_token_kind() {
+        let value = if matches!(
+            tokens.peek_token_kind(),
+            Some(TokenKind::EndOfLine | TokenKind::Comment(_))
+        ) {
             None
         } else {
             let first_token = tokens.expect_next("end of line or expression")?;

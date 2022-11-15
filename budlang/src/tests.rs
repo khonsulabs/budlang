@@ -1,6 +1,7 @@
 use std::{fmt::Display, vec};
 
 use crate::{
+    parser::{Lexer, TokenKind},
     symbol::Symbol,
     vm::{
         self, Bud, DynamicFault, DynamicValue, Fault, FaultKind, FaultOrPause, HashMap,
@@ -467,4 +468,85 @@ fn for_loops() {
         )
         .unwrap();
     assert_eq!(result, 5 + 4 + 3 + 2 + 1);
+}
+
+#[test]
+fn nesting_if() {
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                if (if 1
+                        true
+                    end)
+                    42
+                end
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 42);
+}
+
+#[test]
+fn comments() {
+    let parsed = Lexer::new("// test")
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    assert_eq!(parsed.len(), 1);
+    match &parsed[0].kind {
+        TokenKind::Comment(comment) => {
+            assert_eq!(comment, "// test");
+        }
+        _ => unreachable!("unexpected token kind"),
+    }
+
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                // comment alone on line
+                if true // comment after if line
+                    a := 2 // comment after expression
+                    loop // comment after loop
+                        break // comment after break
+                    end
+                    1
+                end // comment after end
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 1);
+}
+
+#[test]
+fn nested_assignments() {
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                a := b := 4
+                a * b
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 16);
+}
+
+#[test]
+fn if_else_if() {
+    let result = Bud::empty()
+        .run_source::<i64>(
+            r#"
+                function test(a)
+                    if a = 0
+                        2
+                    else if a = 1
+                        3
+                    else
+                        4
+                    end
+                end
+
+                test(0) + test(1) + test(2)
+            "#,
+        )
+        .unwrap();
+    assert_eq!(result, 9);
 }
