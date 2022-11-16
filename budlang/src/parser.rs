@@ -5,6 +5,7 @@
 #![allow(clippy::range_plus_one)]
 
 use std::{
+    borrow::Cow,
     fmt::{Display, Write},
     ops::Range,
     str::CharIndices,
@@ -292,7 +293,7 @@ impl<'a> Lexer<'a> {
                     while self
                         .chars
                         .peek()
-                        .map_or(false, |(_, char)| char.is_numeric())
+                        .map_or(false, |(_, char)| char.is_numeric() || *char == '_')
                     {
                         end = self.chars.next().expect("just peeked").0;
                     }
@@ -309,12 +310,19 @@ impl<'a> Lexer<'a> {
                         while self
                             .chars
                             .peek()
-                            .map_or(false, |(_, char)| char.is_numeric())
+                            .map_or(false, |(_, char)| char.is_numeric() || *char == '_')
                         {
                             end = self.chars.next().expect("just peeked").0;
                         }
 
-                        let value = self.source[offset..=end].parse::<f64>().unwrap();
+                        let source = &self.source[offset..=end];
+                        let source = if source.find('_').is_some() {
+                            Cow::Owned(source.replace('_', ""))
+                        } else {
+                            Cow::Borrowed(source)
+                        };
+
+                        let value = source.parse::<f64>().unwrap();
 
                         return Some(Ok(Token {
                             kind: TokenKind::Real(value),
@@ -322,8 +330,13 @@ impl<'a> Lexer<'a> {
                         }));
                     }
 
-                    let value = self.source[offset..=end].parse::<i64>().unwrap();
-
+                    let source = &self.source[offset..=end];
+                    let source = if source.find('_').is_some() {
+                        Cow::Owned(source.replace('_', ""))
+                    } else {
+                        Cow::Borrowed(source)
+                    };
+                    let value = source.parse::<i64>().unwrap();
                     Some(Ok(Token {
                         kind: TokenKind::Integer(value),
                         range: offset..end + 1,
@@ -1336,4 +1349,19 @@ fn string_parsing() {
             .unwrap_err(),
         ParseError::UnexpectedEof(_)
     ));
+}
+
+#[test]
+fn number_parsing() {
+    let tokens = Lexer::new(r#"0 0.0 -1 -1.0 1_000 -1_000.000_1"#)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    assert_eq!(tokens.len(), 6);
+    assert_eq!(tokens[0].kind, TokenKind::Integer(0));
+    assert_eq!(tokens[1].kind, TokenKind::Real(0.0));
+    assert_eq!(tokens[2].kind, TokenKind::Integer(-1));
+    assert_eq!(tokens[3].kind, TokenKind::Real(-1.0));
+    assert_eq!(tokens[4].kind, TokenKind::Integer(1_000));
+    assert_eq!(tokens[5].kind, TokenKind::Real(-1_000.000_1));
 }
