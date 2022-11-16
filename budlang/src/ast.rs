@@ -6,13 +6,12 @@ use std::{
     fmt::{Debug, Display},
 };
 
-use crate::{
+use budvm::{
     ir::{
-        self, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, Literal,
-        LiteralOrSource, LoopScope, Scope, ScopeSymbol, ScopeSymbolKind, UnlinkedCodeUnit,
+        self, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, LinkError, Literal,
+        LiteralOrSource, LoopScope, Module, Scope, ScopeSymbol, ScopeSymbolKind,
     },
-    symbol::{OptionalSymbol, Symbol},
-    vm::{Comparison, Intrinsic},
+    Comparison, Intrinsic, OptionalSymbol, Symbol,
 };
 
 pub struct ExpressionTree {
@@ -212,7 +211,9 @@ impl Node {
                     .store_into_destination(LiteralOrSource::Literal(literal.clone()), result);
                 Ok(())
             }
-            Node::Identifier(identifier) => operations.load_from_symbol(identifier, result),
+            Node::Identifier(identifier) => operations
+                .load_from_symbol(identifier, result)
+                .map_err(CompilationError::from),
             Node::Map(map) => map.generate_code(result, operations, tree),
             Node::List(list) => list.generate_code(result, operations, tree),
             // Node::Lookup(lookup) => lookup.generate_code(operations, tree),
@@ -997,7 +998,7 @@ impl CodeUnit {
     pub fn compile<InitScope: Scope>(
         self,
         scope: &mut InitScope,
-    ) -> Result<UnlinkedCodeUnit, CompilationError> {
+    ) -> Result<Module, CompilationError> {
         let init = match self.init_statements.len() {
             0 => None,
             1 => Some(self.init_statements[0]),
@@ -1026,8 +1027,8 @@ impl CodeUnit {
                 ScopeSymbolKind::Function | ScopeSymbolKind::Argument => {}
             });
             self.init_tree.finish(body).generate_code(&mut block)?;
-            for (symbol, variable) in &block.variables {
-                scope.define_variable(symbol.clone(), *variable);
+            for (symbol, variable) in block.variables() {
+                scope.define_persistent_variable(symbol.clone(), *variable);
             }
 
             Some(ir::Function::new("__init", Vec::new(), block.finish()))
@@ -1035,7 +1036,7 @@ impl CodeUnit {
             None
         };
 
-        Ok(UnlinkedCodeUnit::new(
+        Ok(Module::new(
             vtable,
             self.modules
                 .into_iter()
@@ -1097,6 +1098,16 @@ pub enum CompilationError {
     UndefinedFunction(Symbol),
     UndefinedIdentifier(Symbol),
     InvalidScope,
+}
+
+impl From<LinkError> for CompilationError {
+    fn from(err: LinkError) -> Self {
+        match err {
+            LinkError::UndefinedFunction(name) => CompilationError::UndefinedFunction(name),
+            LinkError::UndefinedIdentifier(name) => CompilationError::UndefinedIdentifier(name),
+            LinkError::InvalidScopeOperation => CompilationError::InvalidScope,
+        }
+    }
 }
 
 impl std::error::Error for CompilationError {}

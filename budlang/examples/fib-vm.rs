@@ -1,10 +1,8 @@
 use std::borrow::Cow;
 
-use budlang::{
-    symbol::Symbol,
-    vm::{
-        Bud, CompareAction, Comparison, Destination, Function, Instruction, Value, ValueOrSource,
-    },
+use budlang::vm::{
+    CompareAction, Comparison, Destination, Function, Instruction, Symbol, Value, ValueOrSource,
+    VirtualMachine,
 };
 
 fn main() {
@@ -52,7 +50,7 @@ fn main() {
             },
         ],
     };
-    let mut context = Bud::empty().with_function(fib);
+    let mut context = VirtualMachine::empty().with_function(fib);
     let result: i64 = context
         .run(
             Cow::Borrowed(&[

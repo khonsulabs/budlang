@@ -1,8 +1,8 @@
 use std::io::{stdout, Write};
 
 use budlang::{
-    symbol::Symbol,
-    vm::{Bud, DynamicValue, FaultKind, PoppedValues, Value, ValueKind},
+    vm::{DynamicValue, FaultKind, PoppedValues, Symbol, Value, ValueKind},
+    Bud,
 };
 
 fn main() {

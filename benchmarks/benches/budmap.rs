@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hash::BuildHasher};
 
-use budlang::map::BudMap;
+use budlang::vm::budmap::BudMap;
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
     Criterion,

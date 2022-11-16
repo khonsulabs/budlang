@@ -5,11 +5,7 @@ use std::{
     sync::{Mutex, MutexGuard, PoisonError},
 };
 
-use crate::{
-    map::BudMap,
-    symbol::Symbol,
-    vm::{DynamicValue, Value},
-};
+use crate::{budmap::BudMap, symbol::Symbol, DynamicValue, Value};
 
 use super::{FaultKind, PoppedValues};
 

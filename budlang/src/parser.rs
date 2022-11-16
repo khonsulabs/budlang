@@ -11,14 +11,12 @@ use std::{
     str::CharIndices,
 };
 
-use crate::{
-    ast::{
-        BinOpKind, Break, Call, CodeUnit, Continue, Function, If, Loop, LoopParameters, Mapping,
-        NodeId, SyntaxTreeBuilder,
-    },
-    symbol::Symbol,
-    vm::Comparison,
+use crate::ast::{
+    BinOpKind, Break, Call, CodeUnit, Continue, Function, If, Loop, LoopParameters, Mapping,
+    NodeId, SyntaxTreeBuilder,
 };
+
+use budvm::{Comparison, Symbol};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
@@ -1317,7 +1315,7 @@ impl Display for ParseError {
 
 #[test]
 fn string_parsing() {
-    use crate::vm::DynamicValue;
+    use budvm::DynamicValue;
     assert_eq!(
         Lexer::new(r#""hello""#)
             .collect::<Result<Vec<_>, _>>()

@@ -6,10 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    symbol::Symbol,
-    vm::{FaultKind, PoppedValues, Value, ValueKind},
-};
+use crate::{symbol::Symbol, FaultKind, PoppedValues, Value, ValueKind};
 
 /// A type that can be used in the virtual machine using [`Value::dynamic`].
 pub trait DynamicValue: Send + Sync + Debug + 'static {

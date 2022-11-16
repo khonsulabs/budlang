@@ -1,7 +1,7 @@
 [package]
-name = "budlang"
-version = "0.0.0"
-description = "A safe, fast, lightweight embeddable scripting language written in Rust."
+name = "budvm"
+version = "0.1.0"
+description = "A safe, fast, lightweight virtual machine written in Rust."
 repository = "https://github.com/khonsulabs/budlang"
 
 # Important information for consumers of this crate.
@@ -10,9 +10,6 @@ rust-version = "1.62.0"
 edition = "2021"
 
 # Additional metadata
-keywords = ["scripting", "language"]
+keywords = ["virtual-machine", "vm"]
 categories = ["compilers"]
 readme = "./README.md"
-
-[dependencies]
-budvm = { path = "../budvm" }

@@ -4,10 +4,7 @@ use std::{
     sync::{Mutex, MutexGuard, PoisonError},
 };
 
-use crate::{
-    symbol::Symbol,
-    vm::{DynamicValue, FaultKind, PoppedValues, Value},
-};
+use crate::{symbol::Symbol, DynamicValue, FaultKind, PoppedValues, Value};
 
 /// A List type for Bud, which wraps a [`VecDeque<Value>`].
 ///

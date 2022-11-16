@@ -1,9 +1,23 @@
+//! Test
+#![forbid(unsafe_code)]
+#![warn(
+    clippy::cargo,
+    missing_docs,
+    clippy::pedantic,
+    future_incompatible,
+    rust_2018_idioms
+)]
+#![allow(
+    clippy::option_if_let_else,
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc
+)]
+
 use std::{
     any::{type_name, Any},
     borrow::Cow,
     cmp::Ordering,
     collections::{HashMap as StdHashMap, VecDeque},
-    env,
     fmt::{Debug, Display, Write},
     hash::{Hash, Hasher},
     marker::PhantomData,
@@ -12,24 +26,23 @@ use std::{
     vec,
 };
 
-use crate::{
-    ast::CompilationError,
-    ir::{Scope, ScopeSymbolKind},
-    parser::parse,
-    symbol::Symbol,
-    Error,
-};
-
+/// A `HashMap` implementation that provides a defined iteration order.
+pub mod budmap;
 mod dynamic;
+pub mod ir;
 mod list;
 mod map;
 mod string;
+mod symbol;
+
+use crate::ir::{Scope, ScopeSymbolKind};
 
 pub use self::{
     dynamic::{Dynamic, DynamicValue},
     list::List,
     map::HashMap,
     string::StringLiteralDisplay,
+    symbol::{OptionalSymbol, Symbol},
 };
 
 /// A virtual machine instruction.
@@ -908,14 +921,16 @@ enum ModuleItem {
 /// space, function declarations, and [`Environment`] are unique from all other
 /// instances of Bud with the exception that [`Symbol`]s are tracked globally.
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct Bud<Env> {
-    stack: Stack,
-    init_variables: Vec<Symbol>,
+pub struct VirtualMachine<Env> {
+    /// The stack for this virtual machine. Take care when manually manipulating
+    /// the stack.
+    pub stack: Stack,
+    persistent_variables: Vec<Symbol>,
     local_module: Module,
     environment: Env,
 }
 
-impl Bud<()> {
+impl VirtualMachine<()> {
     /// Returns a default instance of Bud with no custom [`Environment`]
     #[must_use]
     pub fn empty() -> Self {
@@ -923,7 +938,7 @@ impl Bud<()> {
     }
 }
 
-impl<Env> Bud<Env>
+impl<Env> VirtualMachine<Env>
 where
     Env: Environment,
 {
@@ -937,7 +952,7 @@ where
             environment,
             stack: Stack::new(initial_stack_capacity, maximum_stack_capacity),
             local_module: Module::default(),
-            init_variables: Vec::new(),
+            persistent_variables: Vec::new(),
         }
     }
 
@@ -954,6 +969,12 @@ where
     /// Returns a mutable refernce to the environment for this instance.
     pub fn environment_mut(&mut self) -> &mut Env {
         &mut self.environment
+    }
+
+    /// Returns a list of persistent variables defined with
+    /// [`Scope::define_persistent_variable()`]
+    pub fn persistent_variables(&self) -> &[Symbol] {
+        &self.persistent_variables
     }
 
     /// Registers a function with the provided name and returns self. This is a
@@ -990,7 +1011,7 @@ where
         &'a mut self,
         function: &Symbol,
         arguments: Args,
-    ) -> Result<Output, Error<'_, Env, Output>>
+    ) -> Result<Output, Fault<'_, Env, Output>>
     where
         Args: IntoIterator<Item = Value, IntoIter = ArgsIter>,
         ArgsIter: Iterator<Item = Value> + ExactSizeIterator + DoubleEndedIterator,
@@ -1007,11 +1028,11 @@ where
                     }]),
                     0,
                 )
-                .map_err(Error::from)
             }
-            None => Err(Error::from(CompilationError::UndefinedFunction(
-                function.clone(),
-            ))),
+            None => Err(Fault::from(FaultKind::UnknownFunction {
+                kind: ValueKind::Void,
+                name: function.clone(),
+            })),
         }
     }
 
@@ -1027,51 +1048,51 @@ where
         self.run_interactive(operations, variable_count, true)
     }
 
-    /// Evaluates `source` interactively and returns the provided result.
-    ///
-    /// Bud is a compiled language. When compiling a chunk of source code, it is
-    /// organized into a series of declarations. If any non-declaration
-    /// statements are encountered, they are gathered into an initialization
-    /// function.
-    ///
-    /// The difference between this function and [`Bud::run_source()`] is that
-    /// the initialization function will be compiled with existing knowledge of
-    /// any local variables defined in previous code evaluated on this instance.
-    /// [`Bud::run_source()`] always executes the initialization code in its own
-    /// environment, preventing persisting variables across invoations.
-    pub fn evaluate<'a, ReturnType: FromStack>(
-        &'a mut self,
-        source: &str,
-    ) -> Result<ReturnType, Error<'a, Env, ReturnType>> {
-        let previous_variable_count = self.init_variables.len();
-        let unit = parse(source)?.compile(self)?;
-        for function in unit.vtable {
-            if let (Some(name), Ok(_)) = (&function.name, env::var("PRINT_IR")) {
-                println!("function {}", name);
-            }
-            function.compile_into(self)?;
-        }
+    // /// Evaluates `source` interactively and returns the provided result.
+    // ///
+    // /// Bud is a compiled language. When compiling a chunk of source code, it is
+    // /// organized into a series of declarations. If any non-declaration
+    // /// statements are encountered, they are gathered into an initialization
+    // /// function.
+    // ///
+    // /// The difference between this function and [`Bud::run_source()`] is that
+    // /// the initialization function will be compiled with existing knowledge of
+    // /// any local variables defined in previous code evaluated on this instance.
+    // /// [`Bud::run_source()`] always executes the initialization code in its own
+    // /// environment, preventing persisting variables across invoations.
+    // pub fn evaluate<'a, ReturnType: FromStack>(
+    //     &'a mut self,
+    //     source: &str,
+    // ) -> Result<ReturnType, Error<'a, Env, ReturnType>> {
+    //     let previous_variable_count = self.init_variables.len();
+    //     let unit = parse(source)?.compile(self)?;
+    //     for function in unit.vtable {
+    //         if let (Some(name), Ok(_)) = (&function.name, env::var("PRINT_IR")) {
+    //             println!("function {}", name);
+    //         }
+    //         function.compile_into(self)?;
+    //     }
 
-        if let Some(init) = &unit.init {
-            if env::var("PRINT_IR").is_ok() {
-                println!("function init");
-            }
+    //     if let Some(init) = &unit.init {
+    //         if env::var("PRINT_IR").is_ok() {
+    //             println!("function init");
+    //         }
 
-            let function = init.compile(self)?;
-            let new_variables = self.init_variables.len() - previous_variable_count;
-            if new_variables > 0 {
-                self.stack.grow_by(new_variables)?;
-            }
+    //         let function = init.compile(self)?;
+    //         let new_variables = self.init_variables.len() - previous_variable_count;
+    //         if new_variables > 0 {
+    //             self.stack.grow_by(new_variables)?;
+    //         }
 
-            self.run_interactive(Cow::Owned(function.code), self.init_variables.len(), false)
-                .map_err(Error::from)
-        } else {
-            ReturnType::from_value(Value::Void).map_err(Error::from)
-        }
-    }
+    //         self.run_interactive(Cow::Owned(function.code), self.init_variables.len(), false)
+    //             .map_err(Error::from)
+    //     } else {
+    //         ReturnType::from_value(Value::Void).map_err(Error::from)
+    //     }
+    // }
 
     /// Runs a set of instructions without modifying the stack before executing.
-    fn run_interactive<'a, Output: FromStack>(
+    pub fn run_interactive<'a, Output: FromStack>(
         &'a mut self,
         operations: Cow<'a, [Instruction]>,
         variable_count: usize,
@@ -1163,21 +1184,21 @@ where
         Output::from_value(value).map_err(Fault::from)
     }
 
-    /// Compiles `source` and executes it in this context. Any declarations will
-    /// persist in the virtual machine, but all local variables will be removed
-    /// from the stack upon completion.
-    ///
-    /// To enable persisting of local variables, use [`Bud::evaluate()`].
-    pub fn run_source<Output: FromStack>(
-        &mut self,
-        source: &str,
-    ) -> Result<Output, Error<'_, Env, Output>> {
-        let unit = parse(source)?;
-        unit.compile(self)?.execute_in(self)
-    }
+    // /// Compiles `source` and executes it in this context. Any declarations will
+    // /// persist in the virtual machine, but all local variables will be removed
+    // /// from the stack upon completion.
+    // ///
+    // /// To enable persisting of local variables, use [`Bud::evaluate()`].
+    // pub fn run_source<Output: FromStack>(
+    //     &mut self,
+    //     source: &str,
+    // ) -> Result<Output, Fault<'_, Env, Output>> {
+    //     let unit = parse(source)?;
+    //     unit.compile(self)?.execute_in(self)
+    // }
 }
 
-impl<Env> Scope for Bud<Env>
+impl<Env> Scope for VirtualMachine<Env>
 where
     Env: Environment,
 {
@@ -1209,7 +1230,7 @@ where
             callback(symbol, ScopeSymbolKind::Function);
         }
 
-        for variable in &self.init_variables {
+        for variable in &self.persistent_variables {
             callback(variable.clone(), ScopeSymbolKind::Variable);
         }
     }
@@ -1218,13 +1239,13 @@ where
         Some(self.local_module.define_function(function))
     }
 
-    fn define_variable(&mut self, name: Symbol, variable: crate::ir::Variable) {
-        if variable.index() >= self.init_variables.len() {
-            self.init_variables
+    fn define_persistent_variable(&mut self, name: Symbol, variable: crate::ir::Variable) {
+        if variable.index() >= self.persistent_variables.len() {
+            self.persistent_variables
                 .resize_with(variable.index() + 1, || Symbol::from(""));
         }
 
-        self.init_variables[variable.index()] = name;
+        self.persistent_variables[variable.index()] = name;
     }
 }
 
@@ -2230,7 +2251,8 @@ impl Display for FaultKind {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct FaultStackFrame {
     /// The vtable index of the function being executed. If None, the
-    /// instructions being executed were passed directly into [`Bud::run()`].
+    /// instructions being executed were passed directly into
+    /// [`VirtualMachine::run()`].
     pub vtable_index: Option<usize>,
     /// The index of the instruction that was executing when this fault was
     /// raised.
@@ -2240,7 +2262,7 @@ pub struct FaultStackFrame {
 /// A paused code execution.
 #[derive(Debug, PartialEq)]
 pub struct PausedExecution<'a, Env, ReturnType> {
-    context: Option<&'a mut Bud<Env>>,
+    context: Option<&'a mut VirtualMachine<Env>>,
     operations: Option<Cow<'a, [Instruction]>>,
     stack: VecDeque<PausedFrame>,
     _return: PhantomData<ReturnType>,
@@ -2459,7 +2481,7 @@ pub enum ExecutionBehavior {
 
 #[test]
 fn budget() {
-    let mut context = Bud::default_for(Budgeted::new(0));
+    let mut context = VirtualMachine::default_for(Budgeted::new(0));
     let mut pause_count = 0;
     let mut fault = context
         .run::<i64>(
@@ -2564,7 +2586,7 @@ fn budget_with_frames() {
             Instruction::Push(ValueOrSource::Variable(0)),
         ],
     };
-    let mut context = Bud::default_for(Budgeted::new(0)).with_function(test);
+    let mut context = VirtualMachine::default_for(Budgeted::new(0)).with_function(test);
     let mut fault = context
         .run::<i64>(
             Cow::Borrowed(&[
@@ -3069,7 +3091,7 @@ fn invalid_variables() {
         variable_count: 0,
         code: vec![Instruction::Push(ValueOrSource::Variable(0))],
     };
-    let mut context = Bud::empty().with_function(test);
+    let mut context = VirtualMachine::empty().with_function(test);
     assert!(matches!(
         context
             .run::<i64>(
@@ -3094,7 +3116,7 @@ fn invalid_argument() {
         variable_count: 0,
         code: vec![Instruction::Push(ValueOrSource::Argument(0))],
     };
-    let mut context = Bud::empty().with_function(test);
+    let mut context = VirtualMachine::empty().with_function(test);
     assert!(matches!(
         context
             .run::<i64>(
@@ -3113,7 +3135,7 @@ fn invalid_argument() {
 
 #[test]
 fn invalid_vtable_index() {
-    let mut context = Bud::empty();
+    let mut context = VirtualMachine::empty();
     assert!(matches!(
         context
             .run::<i64>(
@@ -3138,7 +3160,7 @@ fn function_without_return_value() {
         variable_count: 0,
         code: vec![],
     };
-    let mut context = Bud::empty().with_function(test);
+    let mut context = VirtualMachine::empty().with_function(test);
     assert_eq!(
         context
             .call::<Value, _, _>(&Symbol::from("test"), [])
@@ -3158,7 +3180,7 @@ fn function_needs_extra_cleanup() {
             Instruction::Push(ValueOrSource::Value(Value::Integer(2))),
         ],
     };
-    let mut context = Bud::empty().with_function(test);
+    let mut context = VirtualMachine::empty().with_function(test);
     assert_eq!(
         context
             .run::<Value>(
@@ -3174,4 +3196,80 @@ fn function_needs_extra_cleanup() {
     );
 
     assert!(context.stack.is_empty());
+}
+
+/// All errors that can be encountered executing Bud code.
+#[derive(Debug, PartialEq)]
+pub enum Error<'a, Env, ReturnType> {
+    /// An error occurred while linking an [`Module`](ir::Module).
+    Link(ir::LinkError),
+    /// A fault occurred while running the virtual machine.
+    Fault(Fault<'a, Env, ReturnType>),
+}
+
+impl<Env, ReturnType> Clone for Error<'static, Env, ReturnType> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Link(arg0) => Self::Link(arg0.clone()),
+            Self::Fault(arg0) => Self::Fault(arg0.clone()),
+        }
+    }
+}
+
+impl<'a, Env, ReturnType> Error<'a, Env, ReturnType> {
+    /// Asserts that this error does not contain a paused execution. Returns an
+    /// [`Error`] instance with a `'static` lifetime.
+    ///
+    /// # Panics
+    ///
+    /// If this contains [`Error::Fault`] with a kind of
+    /// [`FaultOrPause::Pause`], this function will panic. Paused execution
+    /// mutably borrows the virtual machine's state.
+    #[must_use]
+    pub fn expect_no_pause(self) -> Error<'static, Env, ReturnType> {
+        match self {
+            Error::Link(compilation) => Error::Link(compilation),
+            Error::Fault(Fault {
+                kind: FaultOrPause::Fault(fault),
+                stack,
+            }) => Error::Fault(Fault {
+                kind: FaultOrPause::Fault(fault),
+                stack,
+            }),
+            Error::Fault(_) => unreachable!("paused execution"),
+        }
+    }
+}
+
+impl<'a, Env, ReturnType> std::error::Error for Error<'a, Env, ReturnType>
+where
+    Env: std::fmt::Debug,
+    ReturnType: std::fmt::Debug,
+{
+}
+
+impl<'a, Env, ReturnType> Display for Error<'a, Env, ReturnType> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Link(err) => write!(f, "link error: {err}"),
+            Error::Fault(err) => write!(f, "vm fault: {err}"),
+        }
+    }
+}
+impl<'a, Env, ReturnType> From<ir::LinkError> for Error<'a, Env, ReturnType> {
+    fn from(err: ir::LinkError) -> Self {
+        Self::Link(err)
+    }
+}
+
+impl<'a, Env, ReturnType> From<Fault<'a, Env, ReturnType>> for Error<'a, Env, ReturnType> {
+    fn from(fault: Fault<'a, Env, ReturnType>) -> Self {
+        Self::Fault(fault)
+    }
+}
+
+impl<'a, Env, ReturnType> From<FaultKind> for Error<'a, Env, ReturnType> {
+    fn from(fault: FaultKind) -> Self {
+        Self::Fault(Fault::from(fault))
+    }
 }

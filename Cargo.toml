@@ -1,5 +1,5 @@
 [workspace]
-members = ["budlang", "budlang-cli", "xtask", "benchmarks"]
+members = ["budlang", "budlang-cli", "xtask", "benchmarks", "budvm"]
 
 [profile.release]
 debug = true

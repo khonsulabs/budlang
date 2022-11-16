@@ -1,7 +1,6 @@
 use budlang::{
     ast::{self, Call, ExpressionTree, Function, If},
-    symbol::Symbol,
-    vm::{self, Comparison},
+    vm::{self, Comparison, Symbol},
 };
 
 use crate::ast::BinOpKind;
@@ -36,8 +35,8 @@ fn main() {
     .compile(&mut ())
     .unwrap();
 
-    let mut context = vm::Bud::empty();
-    let result: i64 = code_unit.execute_in(&mut context).unwrap();
+    let mut context = vm::VirtualMachine::empty();
+    let result: i64 = code_unit.load_into(&mut context).unwrap();
     assert_eq!(result, 9227465);
 }
 

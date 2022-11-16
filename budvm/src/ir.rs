@@ -9,14 +9,33 @@ use std::{
 };
 
 use crate::{
-    ast::{CompilationError, NodeId},
     symbol::{OptionalSymbol, Symbol},
-    vm::{
-        self, Bud, Comparison, Environment, FromStack, Intrinsic, StringLiteralDisplay, Value,
-        ValueOrSource,
-    },
-    Error,
+    Comparison, Environment, Error, FromStack, Intrinsic, StringLiteralDisplay, Value,
+    ValueOrSource, VirtualMachine,
 };
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum LinkError {
+    UndefinedFunction(Symbol),
+    UndefinedIdentifier(Symbol),
+    InvalidScopeOperation,
+}
+
+impl Display for LinkError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LinkError::UndefinedFunction(symbol) => {
+                write!(f, "undefined function: {symbol}")
+            }
+            LinkError::InvalidScopeOperation => {
+                write!(f, "the scope used did not support a required operation")
+            }
+            LinkError::UndefinedIdentifier(symbol) => {
+                write!(f, "undefined identifier: {symbol}")
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Label(pub(crate) usize);
@@ -200,12 +219,6 @@ pub enum Literal {
     String(String),
 }
 
-#[derive(Debug, Clone)]
-pub struct Mapping {
-    pub key: NodeId,
-    pub value: NodeId,
-}
-
 impl Literal {
     #[must_use]
     pub fn instantiate<Env>(&self) -> Value
@@ -251,7 +264,7 @@ impl Display for ValueSource {
     }
 }
 
-impl<'a> From<&'a ValueSource> for vm::ValueSource {
+impl<'a> From<&'a ValueSource> for crate::ValueSource {
     fn from(source: &'a ValueSource) -> Self {
         match source {
             ValueSource::Argument(arg) => Self::Argument(*arg),
@@ -314,7 +327,7 @@ impl Display for Destination {
     }
 }
 
-impl<'a> From<&'a Destination> for vm::Destination {
+impl<'a> From<&'a Destination> for crate::Destination {
     fn from(source: &'a Destination) -> Self {
         match source {
             Destination::Variable(variable) => Self::Variable(variable.0),
@@ -345,11 +358,11 @@ impl Display for CompareAction {
 
 impl CompareAction {
     #[must_use]
-    pub fn link(&self, labels: &[Option<usize>]) -> vm::CompareAction {
+    pub fn link(&self, labels: &[Option<usize>]) -> crate::CompareAction {
         match self {
-            CompareAction::Store(destination) => vm::CompareAction::Store(destination.into()),
+            CompareAction::Store(destination) => crate::CompareAction::Store(destination.into()),
             CompareAction::JumpIfFalse(target) => {
-                vm::CompareAction::JumpIfFalse(labels.get(target.0).unwrap().unwrap())
+                crate::CompareAction::JumpIfFalse(labels.get(target.0).unwrap().unwrap())
             }
         }
     }
@@ -363,11 +376,11 @@ pub struct CodeBlockBuilder {
     temporary_variables: usize,
     scope: HashMap<Symbol, ScopeSymbol>,
     labels: CodeLabels,
-    pub(crate) variables: HashMap<Symbol, Variable>,
+    variables: HashMap<Symbol, Variable>,
 }
 
 impl CodeBlockBuilder {
-    pub(crate) fn add_symbol(&mut self, symbol: impl Into<Symbol>, value: ScopeSymbol) {
+    pub fn add_symbol(&mut self, symbol: impl Into<Symbol>, value: ScopeSymbol) {
         if matches!(&value, ScopeSymbol::Argument(_)) {
             self.args += 1;
         }
@@ -436,7 +449,7 @@ impl CodeBlockBuilder {
         &mut self,
         symbol: &Symbol,
         destination: Destination,
-    ) -> Result<(), CompilationError> {
+    ) -> Result<(), LinkError> {
         match self.scope.get(symbol) {
             Some(ScopeSymbol::Argument(index)) => {
                 self.store_into_destination(LiteralOrSource::Argument(*index), destination);
@@ -447,7 +460,7 @@ impl CodeBlockBuilder {
                 Ok(())
             }
             Some(ScopeSymbol::Function { .. }) => todo!("pushing a vtable entry?"),
-            None => Err(CompilationError::UndefinedIdentifier(symbol.clone())),
+            None => Err(LinkError::UndefinedIdentifier(symbol.clone())),
         }
     }
 
@@ -493,6 +506,12 @@ impl CodeBlockBuilder {
             break_label,
             continue_label,
         }
+    }
+
+    /// Returns the collection of known variables.
+    #[must_use]
+    pub fn variables(&self) -> &HashMap<Symbol, Variable> {
+        &self.variables
     }
 }
 
@@ -607,7 +626,7 @@ pub struct CodeBlock {
 
 impl CodeBlock {
     #[allow(clippy::too_many_lines)]
-    pub fn link<S>(&self, scope: &S) -> Result<vm::CodeBlock, CompilationError>
+    pub fn link<S>(&self, scope: &S) -> Result<crate::CodeBlock, LinkError>
     where
         S: Scope,
     {
@@ -625,8 +644,8 @@ impl CodeBlock {
         self.code
             .iter()
             .filter_map(|op| compile_instruction(op, &labels, scope).transpose())
-            .collect::<Result<_, CompilationError>>()
-            .map(|instructions| vm::CodeBlock {
+            .collect::<Result<_, LinkError>>()
+            .map(|instructions| crate::CodeBlock {
                 variables: self.variables,
                 code: instructions,
             })
@@ -653,7 +672,7 @@ fn compile_instruction<S>(
     op: &Instruction,
     labels: &[Option<usize>],
     scope: &S,
-) -> Result<Option<vm::Instruction>, CompilationError>
+) -> Result<Option<crate::Instruction>, LinkError>
 where
     S: Scope,
 {
@@ -662,7 +681,7 @@ where
             left,
             right,
             destination,
-        } => vm::Instruction::Add {
+        } => crate::Instruction::Add {
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
@@ -671,7 +690,7 @@ where
             left,
             right,
             destination,
-        } => vm::Instruction::Sub {
+        } => crate::Instruction::Sub {
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
@@ -680,7 +699,7 @@ where
             left,
             right,
             destination,
-        } => vm::Instruction::Multiply {
+        } => crate::Instruction::Multiply {
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
@@ -689,7 +708,7 @@ where
             left,
             right,
             destination,
-        } => vm::Instruction::Divide {
+        } => crate::Instruction::Divide {
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
@@ -697,12 +716,12 @@ where
         Instruction::If {
             condition,
             false_jump_to,
-        } => vm::Instruction::If {
+        } => crate::Instruction::If {
             condition: condition.instantiate::<S::Environment>(),
             false_jump_to: labels[false_jump_to.0].expect("label not inserted"),
         },
         Instruction::JumpTo(label) => {
-            vm::Instruction::JumpTo(labels[label.0].expect("label not inserted"))
+            crate::Instruction::JumpTo(labels[label.0].expect("label not inserted"))
         }
         Instruction::Label(_label) => return Ok(None), // Labels are no-ops
         Instruction::Compare {
@@ -710,20 +729,20 @@ where
             left,
             right,
             action,
-        } => vm::Instruction::Compare {
+        } => crate::Instruction::Compare {
             comparison: *comparison,
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
             action: action.link(labels),
         },
-        Instruction::Push(value) => vm::Instruction::Push(value.instantiate::<S::Environment>()),
-        Instruction::PopAndDrop => vm::Instruction::PopAndDrop,
-        Instruction::Return(value) => vm::Instruction::Return(
+        Instruction::Push(value) => crate::Instruction::Push(value.instantiate::<S::Environment>()),
+        Instruction::PopAndDrop => crate::Instruction::PopAndDrop,
+        Instruction::Return(value) => crate::Instruction::Return(
             value
                 .as_ref()
                 .map(LiteralOrSource::instantiate::<S::Environment>),
         ),
-        Instruction::Load { value, variable } => vm::Instruction::Load {
+        Instruction::Load { value, variable } => crate::Instruction::Load {
             variable_index: variable.0,
             value: value.instantiate::<S::Environment>(),
         },
@@ -737,10 +756,10 @@ where
                 .map(|symbol| {
                     scope
                         .resolve_function_vtable_index(symbol)
-                        .ok_or_else(|| CompilationError::UndefinedFunction(symbol.clone()))
+                        .ok_or_else(|| LinkError::UndefinedFunction(symbol.clone()))
                 })
                 .transpose()?;
-            vm::Instruction::Call {
+            crate::Instruction::Call {
                 vtable_index,
                 arg_count: *arg_count,
                 destination: destination.into(),
@@ -751,7 +770,7 @@ where
             name,
             arg_count,
             destination,
-        } => vm::Instruction::CallInstance {
+        } => crate::Instruction::CallInstance {
             target: target
                 .as_ref()
                 .map(LiteralOrSource::instantiate::<S::Environment>),
@@ -763,12 +782,40 @@ where
             intrinsic,
             arg_count,
             destination,
-        } => vm::Instruction::CallIntrinsic {
+        } => crate::Instruction::CallIntrinsic {
             intrinsic: *intrinsic,
             arg_count: *arg_count,
             destination: destination.into(),
         },
     }))
+}
+
+pub trait Scope {
+    type Environment: Environment;
+
+    /// Returns the vtable index of a function with the provided name.
+    fn resolve_function_vtable_index(&self, name: &Symbol) -> Option<usize>;
+    fn map_each_symbol(&self, callback: &mut impl FnMut(Symbol, ScopeSymbolKind));
+
+    /// Defines a function with the provided name.
+    fn define_function(&mut self, function: crate::Function) -> Option<usize>;
+    fn define_persistent_variable(&mut self, name: Symbol, variable: Variable);
+}
+
+impl Scope for () {
+    type Environment = ();
+
+    fn resolve_function_vtable_index(&self, _name: &Symbol) -> Option<usize> {
+        None
+    }
+
+    fn map_each_symbol(&self, _callback: &mut impl FnMut(Symbol, ScopeSymbolKind)) {}
+
+    fn define_function(&mut self, _function: crate::Function) -> Option<usize> {
+        None
+    }
+
+    fn define_persistent_variable(&mut self, _name: Symbol, _variable: Variable) {}
 }
 
 #[derive(Debug)]
@@ -801,7 +848,7 @@ impl Function {
         }
     }
 
-    pub fn compile<S>(&self, context: &mut S) -> Result<vm::Function, CompilationError>
+    pub fn compile<S>(&self, context: &mut S) -> Result<crate::Function, LinkError>
     where
         S: Scope,
     {
@@ -813,7 +860,7 @@ impl Function {
         if env::var("PRINT_IR").is_ok() {
             println!("{}", block.display_indented("  "));
         }
-        let function = vm::Function {
+        let function = crate::Function {
             name,
             arg_count: self.args.len(),
             code: block.code,
@@ -822,7 +869,7 @@ impl Function {
         Ok(function)
     }
 
-    pub fn compile_into<S>(&self, context: &mut S) -> Result<usize, CompilationError>
+    pub fn compile_into<S>(&self, context: &mut S) -> Result<usize, LinkError>
     where
         S: Scope,
     {
@@ -830,7 +877,7 @@ impl Function {
 
         let vtable_index = context
             .define_function(function)
-            .ok_or(CompilationError::InvalidScope)?;
+            .ok_or(LinkError::InvalidScopeOperation)?;
         Ok(vtable_index)
     }
 
@@ -841,19 +888,15 @@ impl Function {
 }
 
 #[derive(Debug)]
-pub struct UnlinkedCodeUnit {
+pub struct Module {
     pub vtable: Vec<Function>,
-    pub modules: Vec<UnlinkedCodeUnit>,
+    pub modules: Vec<Module>,
     pub init: Option<Function>,
 }
 
-impl UnlinkedCodeUnit {
+impl Module {
     #[must_use]
-    pub fn new(
-        vtable: Vec<Function>,
-        modules: Vec<UnlinkedCodeUnit>,
-        init: Option<Function>,
-    ) -> Self {
+    pub fn new(vtable: Vec<Function>, modules: Vec<Module>, init: Option<Function>) -> Self {
         Self {
             vtable,
             modules,
@@ -862,9 +905,9 @@ impl UnlinkedCodeUnit {
     }
 
     /// Runs all code in this unit in the passed context.
-    pub fn execute_in<'a, Output: FromStack, Env>(
+    pub fn load_into<'a, Output: FromStack, Env>(
         &self,
-        context: &'a mut Bud<Env>,
+        context: &'a mut VirtualMachine<Env>,
     ) -> Result<Output, Error<'a, Env, Output>>
     where
         Env: Environment,
@@ -910,10 +953,10 @@ impl UnlinkedCodeUnit {
             let vtable_index = init.compile_into(context)?;
             context
                 .run(
-                    Cow::Owned(vec![vm::Instruction::Call {
+                    Cow::Owned(vec![crate::Instruction::Call {
                         vtable_index: Some(vtable_index),
                         arg_count: 0,
-                        destination: vm::Destination::Stack,
+                        destination: crate::Destination::Stack,
                     }]),
                     0,
                 )
@@ -922,34 +965,6 @@ impl UnlinkedCodeUnit {
             Output::from_value(Value::Void).map_err(Error::from)
         }
     }
-}
-
-pub trait Scope {
-    type Environment: Environment;
-
-    /// Returns the vtable index of a function with the provided name.
-    fn resolve_function_vtable_index(&self, name: &Symbol) -> Option<usize>;
-    fn map_each_symbol(&self, callback: &mut impl FnMut(Symbol, ScopeSymbolKind));
-
-    /// Defines a function with the provided name.
-    fn define_function(&mut self, function: vm::Function) -> Option<usize>;
-    fn define_variable(&mut self, name: Symbol, variable: Variable);
-}
-
-impl Scope for () {
-    type Environment = ();
-
-    fn resolve_function_vtable_index(&self, _name: &Symbol) -> Option<usize> {
-        None
-    }
-
-    fn map_each_symbol(&self, _callback: &mut impl FnMut(Symbol, ScopeSymbolKind)) {}
-
-    fn define_function(&mut self, _function: vm::Function) -> Option<usize> {
-        None
-    }
-
-    fn define_variable(&mut self, _name: Symbol, _variable: Variable) {}
 }
 
 // #[test]

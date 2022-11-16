@@ -4,10 +4,7 @@ use std::{
     hash::Hash,
 };
 
-use crate::{
-    symbol::Symbol,
-    vm::{DynamicValue, FaultKind, PoppedValues, Value, ValueKind},
-};
+use crate::{symbol::Symbol, DynamicValue, FaultKind, PoppedValues, Value, ValueKind};
 
 /// A [`Display`] implementor that converts a string value to its literal form
 /// including wrapping double quotes.

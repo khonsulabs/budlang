@@ -6,11 +6,7 @@ use std::{
 };
 
 use ariadne::{Label, Report, ReportKind};
-use budlang::{
-    parser::ParseError,
-    vm::{Bud, Value},
-    Error,
-};
+use budlang::{parser::ParseError, vm::Value, Bud, Error};
 use clap::Parser;
 use crossterm::tty::IsTty;
 use reedline::{

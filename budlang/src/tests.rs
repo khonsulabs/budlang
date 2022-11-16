@@ -2,12 +2,12 @@ use std::{fmt::Display, vec};
 
 use crate::{
     parser::{Lexer, TokenKind},
-    symbol::Symbol,
-    vm::{
-        self, Bud, DynamicFault, DynamicValue, Fault, FaultKind, FaultOrPause, HashMap,
-        Instruction, List, PoppedValues, Value, ValueOrSource,
-    },
-    Error,
+    Bud, Error,
+};
+
+use budvm::{
+    DynamicFault, DynamicValue, Fault, FaultKind, FaultOrPause, HashMap, Instruction, List,
+    PoppedValues, Symbol, Value, ValueOrSource,
 };
 
 macro_rules! assert_run {
@@ -114,7 +114,7 @@ impl DynamicValue for TestDynamic {
 #[test]
 fn dynamic_values() {
     // Call the squared function on the passed TestDynamic
-    let test = vm::Function {
+    let test = budvm::Function {
         name: Symbol::from("test"),
         arg_count: 1,
         variable_count: 0,
@@ -122,7 +122,7 @@ fn dynamic_values() {
             target: Some(ValueOrSource::Argument(0)),
             name: Symbol::from("squared"),
             arg_count: 0,
-            destination: vm::Destination::Stack,
+            destination: budvm::Destination::Stack,
         }],
     };
 
@@ -179,10 +179,10 @@ fn dynamic_error() {
         .call::<(), _, _>(&Symbol::from("test"), [Value::dynamic(TestDynamic(2))])
         .unwrap_err();
     match error {
-        Error::Fault(Fault {
+        Fault {
             kind: FaultOrPause::Fault(FaultKind::Dynamic(dynamic)),
             ..
-        }) => {
+        } => {
             let error = dynamic.try_unwrap::<String>().unwrap();
             assert!(error.contains("test"));
         }
@@ -233,10 +233,10 @@ fn maps() {
         Bud::empty()
             .run_source::<HashMap>(r#"{3.2: 1, }"#)
             .unwrap_err(),
-        Error::Fault(Fault {
+        Error::Vm(budvm::Error::Fault(Fault {
             kind: FaultOrPause::Fault(FaultKind::ValueCannotBeHashed(Value::Real(_))),
             ..
-        })
+        }))
     ));
     let map = dbg!(Bud::empty()
         .run_source::<HashMap>(

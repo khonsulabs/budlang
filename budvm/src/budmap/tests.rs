@@ -4,7 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::map::{BudMap, Entry};
+use crate::budmap::{BudMap, Entry};
 
 /// This hash implementor is designed to cause collisions by being a terrible
 /// algorithm (only xor) and restricting the hash space to 8 bits. This means

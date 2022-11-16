@@ -1,6 +1,6 @@
 use budlang::{
-    vm::{Bud, Budgeted, Fault, FaultOrPause},
-    Error,
+    vm::{self, Budgeted, Fault, FaultOrPause},
+    Bud, Error,
 };
 
 fn main() {
@@ -32,10 +32,10 @@ fn main() {
                 assert_eq!(result, 55);
                 break;
             }
-            Err(Error::Fault(Fault {
+            Err(Error::Vm(vm::Error::Fault(Fault {
                 kind: FaultOrPause::Pause(mut paused),
                 ..
-            })) => {
+            }))) => {
                 println!("Ran out of budget. Allowing 10 more operations");
                 paused.environment_mut().add_budget(10);
                 total_budget_allocated += 10;

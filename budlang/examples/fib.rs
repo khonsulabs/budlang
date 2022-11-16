@@ -1,7 +1,7 @@
-use budlang::vm;
+use budlang::Bud;
 
 fn main() {
-    let mut context = vm::Bud::empty();
+    let mut context = Bud::empty();
     let result: i64 = context
         .run_source(
             r#"
