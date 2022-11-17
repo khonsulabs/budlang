@@ -232,7 +232,7 @@ impl Node {
     ) -> Result<LiteralOrSource, CompilationError> {
         match self {
             Node::Literal(literal) => Ok(LiteralOrSource::Literal(literal.clone())),
-            Node::Identifier(identifier) => match operations.symbol(identifier) {
+            Node::Identifier(identifier) => match operations.lookup(identifier) {
                 Some(ScopeSymbol::Argument(arg)) => Ok(LiteralOrSource::Argument(*arg)),
                 Some(ScopeSymbol::Variable(var)) => Ok(LiteralOrSource::Variable(*var)),
                 Some(ScopeSymbol::Function { .. }) => todo!("attempt to take function as value"),
@@ -479,7 +479,7 @@ impl Call {
                     Some(ScopeSymbol::Argument(_) | ScopeSymbol::Variable(_)) => {
                         todo!("calling a lambda function in an argument")
                     }
-                    Some(ScopeSymbol::Function { function }) => {
+                    Some(ScopeSymbol::Function(function)) => {
                         operations.push(Instruction::Call {
                             function: Some(function.clone()),
                             arg_count: self.args.len(),
@@ -1106,6 +1106,7 @@ impl From<LinkError> for CompilationError {
             LinkError::UndefinedFunction(name) => CompilationError::UndefinedFunction(name),
             LinkError::UndefinedIdentifier(name) => CompilationError::UndefinedIdentifier(name),
             LinkError::InvalidScopeOperation => CompilationError::InvalidScope,
+            LinkError::InvalidLabel(_label) => unreachable!("invalid label encountered"),
         }
     }
 }

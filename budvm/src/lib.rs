@@ -75,7 +75,7 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
-    /// Left `left` by `right` and places the result in `destination`.
+    /// Multiply `left` by `right` and places the result in `destination`.
     ///
     /// If this operation causes an overflow, [`Value::Void`] will be stored in
     /// the destination instead.
@@ -148,11 +148,6 @@ pub enum Instruction {
     },
     /// Pushes a value to the stack.
     Push(ValueOrSource),
-    /// Pops a value from the stack and drops the value.
-    ///
-    /// Attempting to pop beyond the baseline of the currently executing set of
-    /// instructions will cause a [`FaultKind::StackUnderflow`] to be returned.
-    PopAndDrop,
     /// Returns from the current stack frame.
     Return(Option<ValueOrSource>),
     /// Loads a `value` into a variable.
@@ -273,7 +268,6 @@ impl Display for Instruction {
                 action,
             } => write!(f, "{comparison} {left} {right} {action}"),
             Instruction::Push(value) => write!(f, "push {value}"),
-            Instruction::PopAndDrop => write!(f, "pop-and-drop"),
             Instruction::Load {
                 value,
                 variable_index,
@@ -1465,10 +1459,6 @@ where
 
                 Ok(None)
             }
-            Instruction::PopAndDrop => {
-                self.pop()?;
-                Ok(None)
-            }
             Instruction::Return(value) => {
                 let value = match value {
                     Some(ValueOrSource::Value(value)) => value.clone(),
@@ -1525,15 +1515,6 @@ where
                 self.return_value = Some(returned_value);
                 Ok(())
             }
-        }
-    }
-
-    #[inline]
-    fn pop(&mut self) -> Result<Value, FaultKind> {
-        if self.stack.len() > self.return_offset {
-            self.stack.pop()
-        } else {
-            Err(FaultKind::StackUnderflow)
         }
     }
 

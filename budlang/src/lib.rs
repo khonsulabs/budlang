@@ -209,7 +209,7 @@ where
             if let (Some(name), Ok(_)) = (&function.name, env::var("PRINT_IR")) {
                 println!("function {}", name);
             }
-            function.compile_into(&mut self.0)?;
+            function.link_into(&mut self.0)?;
         }
 
         if let Some(init) = &unit.init {
@@ -217,7 +217,7 @@ where
                 println!("function init");
             }
 
-            let function = init.compile(&mut self.0)?;
+            let function = init.link(&mut self.0)?;
             let variable_count = self.persistent_variables().len();
             let new_variables = variable_count - previous_variable_count;
             if new_variables > 0 {
