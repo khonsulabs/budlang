@@ -1,3 +1,13 @@
+# Bud (budlang)
+
+**WARNING: This crate is not anywhere near being ready to publish.**
+
+![budlang forbids unsafe code](https://img.shields.io/badge/unsafe-forbid-success)
+[![crate version](https://img.shields.io/crates/v/budlang.svg)](https://crates.io/crates/budlang)
+[![Live Build Status](https://img.shields.io/github/workflow/status/khonsulabs/budlang/Tests/main)](https://github.com/khonsulabs/budlang/actions?query=workflow:Tests)
+[![HTML Coverage Report for `main` branch](https://khonsulabs.github.io/budlang/coverage/badge.svg)](https://khonsulabs.github.io/budlang/coverage/)
+[![Documentation](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/budlang/main/budlang)
+
 A safe, fast, lightweight embeddable scripting language written in Rust.
 
 ## Why Bud?
@@ -9,9 +19,9 @@ crate has no dependencies.
 
 ### Safe to run untrusted code
 
-The virtual machine invokes [`Environment::step()`]($step$) before each
+The virtual machine invokes [`Environment::step()`](https://khonsulabs.github.io/budlang/main/budlang/vm/trait.Environment.html#tymethod.step) before each
 instruction is exected. The environment can return
-[`ExecutionBehavior::Pause`]($pause$) to pause execution, and the state of the
+[`ExecutionBehavior::Pause`](https://khonsulabs.github.io/budlang/main/budlang/vm/enum.ExecutionBehavior.html#variant.Pause) to pause execution, and the state of the
 virtual machine will be saved such that it can be resumed again.
 
 **Work In Progress:** Bud will have various configuration
@@ -55,10 +65,10 @@ instruction:
 |  1 | `return 1`            | 1 | `return 1`           |
 |    |                       | 2 | `jump 8`             |
 |  2 | `sub @0 1 stack`      | 3 | `sub @0 1 stack`     |
-|  3 | `recurse-call 1 $$0`  | 4 | `recurse-call 1 $$0` |
+|  3 | `recurse-call 1 $0`  | 4 | `recurse-call 1 $0` |
 |  4 | `sub @0 2 stack`      | 5 | `sub @0 2 stack`     |
-|  5 | `recurse-call 1 $$1`  | 6 | `recurse-call 1 $$1` |
-|  6 | `add $$0 $$1 $$$$`    | 7 | `add $$0 $$1 $$$$`   |
+|  5 | `recurse-call 1 $1`  | 6 | `recurse-call 1 $1` |
+|  6 | `add $0 $1 $$`    | 7 | `add $0 $1 $$`   |
 
 ## Why not Bud?
 
@@ -93,3 +103,11 @@ Aside from the goals outlined above, the use cases it's being designed for are:
 [fib-ex]: https://github.com/khonsulabs/budlang/blob/main/budlang/examples/fib.rs
 [fib-vm]: https://github.com/khonsulabs/budlang/blob/main/budvm/examples/fib-vm.rs
 [bonsaidb]: https://bonsaidb.io/
+
+## Open-source Licenses
+
+This project, like all projects from [Khonsu Labs](https://khonsulabs.com/), are
+open-source. This repository is available under the [MIT License](./LICENSE-MIT)
+or the [Apache License 2.0](./LICENSE-APACHE).
+
+To learn more about contributing, please see [CONTRIBUTING.md](./CONTRIBUTING.md).

@@ -1,6 +1,10 @@
 Configuration(
     files: {
         "../README.md":  [
+            "repo-readme.md",
+            "https://github.com/khonsulabs/.github/raw/main/snippets/readme-footer.md",
+        ],
+        "../budlang/README.md":  [
             "header.md",
             "docs.md",
             "https://github.com/khonsulabs/.github/raw/main/snippets/readme-footer.md",
@@ -9,6 +13,17 @@ Configuration(
             for_docs: true,
             sections: [
                 "docs.md",
+            ]
+        ),
+        "../budvm/README.md":  [
+            "vm-header.md",
+            "vm-docs.md",
+            "https://github.com/khonsulabs/.github/raw/main/snippets/readme-footer.md",
+        ],
+        "../budvm/src/.crate-docs.md":  (
+            for_docs: true,
+            sections: [
+                "vm-docs.md",
             ]
         ),
         "../CONTRIBUTING.md":  [
@@ -31,6 +46,10 @@ Configuration(
                 default: "https://khonsulabs.github.io/budlang/main/budlang",
                 release: "https://docs.rs/budlang",
             ),
+            "vm-docs-base": (
+                default: "https://khonsulabs.github.io/budvm/main/budvm",
+                release: "https://docs.rs/budvm",
+            ),
             "src-base": (
                 default: "https://github.com/khonsulabs/budlang/blob/main",
                 release: "https://github.com/khonsulabs/budlang/blob/v0.0.0",
@@ -44,6 +63,23 @@ Configuration(
                 default: "https://khonsulabs.github.io/budlang/main/budlang/vm/enum.ExecutionBehavior.html#variant.Pause",
                 release: "https://docs.rs/budlang/*/budlang/vm/enum.ExecutionBehavior.html#variant.Pause",
                 for_docs: "crate::vm::ExecutionBehavior::Pause",
+            ),
+            "vm": (
+                default: "https://khonsulabs.github.io/budlang/main/budvm/struct.VirtualMachine.html",
+                release: "https://docs.rs/budlang/*/budvm/struct.VirtualMachine.html",
+                for_docs: "crate::VirtualMachine",
+            ),
+            "budvm": (
+                default: "https://github.com/khonsulabs/budlang/blob/main/budvm",
+                release: "https://crates.io/crates/budvm",
+            ),
+            "budlang": (
+                default: "https://github.com/khonsulabs/budlang/blob/main/budlang",
+                release: "https://crates.io/crates/budlang",
+            ),
+            "budlang-cli": (
+                default: "https://github.com/khonsulabs/budlang/blob/main/budlang-cli",
+                release: "https://crates.io/crates/budlang-cli",
             ),
         }
     ],

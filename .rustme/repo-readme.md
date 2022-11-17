@@ -10,7 +10,7 @@ it language agnostic.
 
 ## [`budlang`][budlang]
 
-[![crate version](https://img.shields.io/crates/v/budlang.svg)](https://crates.io/crates/budlang) [![Documentation](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/budlang/main/budlang)
+[![crate version](https://img.shields.io/crates/v/budlang.svg)](https://crates.io/crates/budlang) [![Documentation](https://img.shields.io/badge/docs-main-informational)]($docs-base$)
 
 The [`budlang`][budlang] crate is where the Bud language is implemented. It is
 built using [`budvm`][budvm].
@@ -24,19 +24,11 @@ from the command line or using a REPL environment.
 
 ## [`budvm`][budvm]
 
-[![crate version](https://img.shields.io/crates/v/budvm.svg)](https://crates.io/crates/budvm) [![Documentation](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/budvm/main/budvm)
+[![crate version](https://img.shields.io/crates/v/budvm.svg)](https://crates.io/crates/budvm) [![Documentation](https://img.shields.io/badge/docs-main-informational)]($vm-docs-base$)
 
 The [`budvm`][budvm] crate defines a `#[forbid(unsafe_code)]` virtual machine
 implementation.
 
-[budlang]: $budlang$
-[budvm]: $budvm$
-[budlang-cli]: $budlang-cli$
-
-## Open-source Licenses
-
-This project, like all projects from [Khonsu Labs](https://khonsulabs.com/), are
-open-source. This repository is available under the [MIT License](./LICENSE-MIT)
-or the [Apache License 2.0](./LICENSE-APACHE).
-
-To learn more about contributing, please see [CONTRIBUTING.md](./CONTRIBUTING.md).
+[budlang]: $$budlang$$
+[budvm]: $$budvm$$
+[budlang-cli]: $$budlang-cli$$

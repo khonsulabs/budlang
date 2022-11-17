@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use budlang::vm::{
+use budvm::{
     CompareAction, Comparison, Destination, Function, Instruction, Symbol, Value, ValueOrSource,
     VirtualMachine,
 };
@@ -12,7 +12,7 @@ fn main() {
         arg_count: 1,
         variable_count: 2,
         code: vec![
-            // if v0 <= 2
+            // if n <= 2
             Instruction::Compare {
                 comparison: Comparison::LessThanOrEqual,
                 left: ValueOrSource::Argument(ARG_N),
@@ -20,7 +20,7 @@ fn main() {
                 action: CompareAction::JumpIfFalse(2),
             },
             Instruction::Return(Some(ValueOrSource::Value(Value::Integer(1)))),
-            // self(n - 1) (result left on stack)
+            // v1 = self(n - 1)
             Instruction::Sub {
                 left: ValueOrSource::Argument(ARG_N),
                 right: ValueOrSource::Value(Value::Integer(1)),
@@ -31,7 +31,7 @@ fn main() {
                 arg_count: 1,
                 destination: Destination::Variable(0),
             },
-            // self(n - 2) (result left on stack)
+            // v2 = self(n - 2)
             Instruction::Sub {
                 left: ValueOrSource::Argument(ARG_N),
                 right: ValueOrSource::Value(Value::Integer(2)),
@@ -42,7 +42,7 @@ fn main() {
                 arg_count: 1,
                 destination: Destination::Variable(1),
             },
-            // add the two values together
+            // return v1 + v2
             Instruction::Add {
                 left: ValueOrSource::Variable(0),
                 right: ValueOrSource::Variable(1),

@@ -1,4 +1,4 @@
-//! Test
+#![doc = include_str!(".crate-docs.md")]
 #![forbid(unsafe_code)]
 #![warn(
     clippy::cargo,
@@ -448,6 +448,18 @@ pub struct Function {
     pub variable_count: usize,
     /// The instructions that make up the function body.
     pub code: Vec<Instruction>,
+}
+
+impl Function {
+    /// Returns a new function for a given code block.
+    pub fn new(name: impl Into<Symbol>, arg_count: usize, block: CodeBlock) -> Self {
+        Self {
+            name: name.into(),
+            arg_count,
+            variable_count: block.variables,
+            code: block.code,
+        }
+    }
 }
 
 /// A virtual machine value.
@@ -2601,8 +2613,11 @@ fn budget_with_frames() {
 /// A block of code that can be executed on the virtual machine.
 #[derive(Debug)]
 pub struct CodeBlock {
-    pub(crate) variables: usize,
-    pub(crate) code: Vec<Instruction>,
+    /// The number of variables this code block requires.
+    pub variables: usize,
+
+    /// The virtual machine instructions.
+    pub code: Vec<Instruction>,
 }
 
 impl CodeBlock {
