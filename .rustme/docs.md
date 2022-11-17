@@ -4,8 +4,9 @@ A safe, fast, lightweight embeddable scripting language written in Rust.
 
 ### Memory-safe
 
-This project forbids unsafe code (`#![forbid(unsafe_code)]`), and the `budlang`
-crate has no dependencies.
+This project forbids unsafe code (`#![forbid(unsafe_code)]`), and has only one
+dependency: [`budvm`][budvm]. The only unsafe code depended on by this crate is
+in Rust's standard library.
 
 ### Safe to run untrusted code
 
@@ -93,3 +94,4 @@ Aside from the goals outlined above, the use cases it's being designed for are:
 [fib-ex]: https://github.com/khonsulabs/budlang/blob/main/budlang/examples/fib.rs
 [fib-vm]: https://github.com/khonsulabs/budlang/blob/main/budvm/examples/fib-vm.rs
 [bonsaidb]: https://bonsaidb.io/
+[budvm]: $budvm$

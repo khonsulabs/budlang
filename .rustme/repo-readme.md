@@ -29,6 +29,6 @@ from the command line or using a REPL environment.
 The [`budvm`][budvm] crate defines a `#[forbid(unsafe_code)]` virtual machine
 implementation.
 
-[budlang]: $$budlang$$
-[budvm]: $$budvm$$
-[budlang-cli]: $$budlang-cli$$
+[budlang]: $budlang$
+[budvm]: $budvm$
+[budlang-cli]: $budlang-cli$

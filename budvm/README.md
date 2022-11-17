@@ -34,7 +34,7 @@ In all cases, the [`VirtualMachine`][vm] type is used to execute instructions.
 Its documentation goes into detail how it operates.
 
 [budlang]: https://github.com/khonsulabs/budlang
-[vm]: $vm$
+[vm]: https://khonsulabs.github.io/budlang/main/budvm/struct.VirtualMachine.html
 [fib-vm]: https://github.com/khonsulabs/budlang/blob/main/budvm/examples/fib-vm.rs
 [fib-ir]: https://github.com/khonsulabs/budlang/blob/main/budvm/examples/fib-ir.rs
 
