@@ -1279,6 +1279,90 @@
 <span id="1279">1279</span>
 <span id="1280">1280</span>
 <span id="1281">1281</span>
+<span id="1282">1282</span>
+<span id="1283">1283</span>
+<span id="1284">1284</span>
+<span id="1285">1285</span>
+<span id="1286">1286</span>
+<span id="1287">1287</span>
+<span id="1288">1288</span>
+<span id="1289">1289</span>
+<span id="1290">1290</span>
+<span id="1291">1291</span>
+<span id="1292">1292</span>
+<span id="1293">1293</span>
+<span id="1294">1294</span>
+<span id="1295">1295</span>
+<span id="1296">1296</span>
+<span id="1297">1297</span>
+<span id="1298">1298</span>
+<span id="1299">1299</span>
+<span id="1300">1300</span>
+<span id="1301">1301</span>
+<span id="1302">1302</span>
+<span id="1303">1303</span>
+<span id="1304">1304</span>
+<span id="1305">1305</span>
+<span id="1306">1306</span>
+<span id="1307">1307</span>
+<span id="1308">1308</span>
+<span id="1309">1309</span>
+<span id="1310">1310</span>
+<span id="1311">1311</span>
+<span id="1312">1312</span>
+<span id="1313">1313</span>
+<span id="1314">1314</span>
+<span id="1315">1315</span>
+<span id="1316">1316</span>
+<span id="1317">1317</span>
+<span id="1318">1318</span>
+<span id="1319">1319</span>
+<span id="1320">1320</span>
+<span id="1321">1321</span>
+<span id="1322">1322</span>
+<span id="1323">1323</span>
+<span id="1324">1324</span>
+<span id="1325">1325</span>
+<span id="1326">1326</span>
+<span id="1327">1327</span>
+<span id="1328">1328</span>
+<span id="1329">1329</span>
+<span id="1330">1330</span>
+<span id="1331">1331</span>
+<span id="1332">1332</span>
+<span id="1333">1333</span>
+<span id="1334">1334</span>
+<span id="1335">1335</span>
+<span id="1336">1336</span>
+<span id="1337">1337</span>
+<span id="1338">1338</span>
+<span id="1339">1339</span>
+<span id="1340">1340</span>
+<span id="1341">1341</span>
+<span id="1342">1342</span>
+<span id="1343">1343</span>
+<span id="1344">1344</span>
+<span id="1345">1345</span>
+<span id="1346">1346</span>
+<span id="1347">1347</span>
+<span id="1348">1348</span>
+<span id="1349">1349</span>
+<span id="1350">1350</span>
+<span id="1351">1351</span>
+<span id="1352">1352</span>
+<span id="1353">1353</span>
+<span id="1354">1354</span>
+<span id="1355">1355</span>
+<span id="1356">1356</span>
+<span id="1357">1357</span>
+<span id="1358">1358</span>
+<span id="1359">1359</span>
+<span id="1360">1360</span>
+<span id="1361">1361</span>
+<span id="1362">1362</span>
+<span id="1363">1363</span>
+<span id="1364">1364</span>
+<span id="1365">1365</span>
 </pre><pre class="rust"><code><span class="comment">// TODO docs for parser
 </span><span class="attribute">#![allow(missing_docs)]
 </span><span class="comment">// We use the Range type which doesn&#39;t allow this, and it&#39;s not worth making a
@@ -1286,24 +1370,23 @@
 </span><span class="attribute">#![allow(clippy::range_plus_one)]
 
 </span><span class="kw">use </span>std::{
+    borrow::Cow,
     fmt::{Display, Write},
     ops::Range,
     str::CharIndices,
 };
 
-<span class="kw">use crate</span>::{
-    ast::{
-        BinOpKind, Break, Call, CodeUnit, Continue, Function, If, Loop, LoopParameters, Mapping,
-        NodeId, SyntaxTreeBuilder,
-    },
-    symbol::Symbol,
-    vm::Comparison,
+<span class="kw">use </span><span class="kw">crate</span>::ast::{
+    BinOpKind, Break, Call, CodeUnit, Continue, Function, If, Loop, LoopParameters, Mapping,
+    NodeId, SyntaxTreeBuilder,
 };
+
+<span class="kw">use </span>budvm::{Comparison, Symbol};
 
 <span class="attribute">#[derive(Clone, Debug, PartialEq)]
 </span><span class="kw">pub struct </span>Token {
-    kind: TokenKind,
-    range: Range&lt;usize&gt;,
+    <span class="kw">pub </span>kind: TokenKind,
+    <span class="kw">pub </span>range: Range&lt;usize&gt;,
 }
 
 <span class="kw">impl </span>Token {
@@ -1323,12 +1406,13 @@
 }
 
 <span class="attribute">#[derive(Clone, Debug, PartialEq)]
-</span><span class="kw">enum </span>TokenKind {
+</span><span class="kw">pub enum </span>TokenKind {
     Identifier(Symbol),
     Integer(i64),
     Real(f64),
     String(String),
     Assign,
+    Comment(String),
     Comparison(Comparison),
     Not,
     Add,
@@ -1344,6 +1428,7 @@
     Hash,
     Unknown(char),
 }
+
 <span class="kw">impl </span>Display <span class="kw">for </span>TokenKind {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
@@ -1374,12 +1459,13 @@
             TokenKind::Colon =&gt; f.write_char(<span class="string">&#39;:&#39;</span>),
             TokenKind::Hash =&gt; f.write_char(<span class="string">&#39;#&#39;</span>),
             TokenKind::Unknown(token) =&gt; Display::fmt(token, f),
+            TokenKind::Comment(value) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;// {value}&quot;</span>),
         }
     }
 }
 
-<span class="attribute">#[derive(Clone, Debug, PartialEq)]
-</span><span class="kw">enum </span>BracketType {
+<span class="attribute">#[derive(Clone, Debug, Eq, PartialEq)]
+</span><span class="kw">pub enum </span>BracketType {
     Paren,
     Square,
     Curly,
@@ -1498,14 +1584,15 @@
     }
 }
 
-<span class="kw">struct </span>Lexer&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">pub struct </span>Lexer&lt;<span class="lifetime">&#39;a</span>&gt; {
     source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str,
     chars: DoublePeekable&lt;CharIndices&lt;<span class="lifetime">&#39;a</span>&gt;&gt;,
     peeked_token: <span class="prelude-ty">Option</span>&lt;<span class="prelude-ty">Result</span>&lt;Token, ParseError&gt;&gt;,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Lexer&lt;<span class="lifetime">&#39;a</span>&gt; {
-    <span class="kw">fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; <span class="self">Self </span>{
+    <span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             source,
             chars: DoublePeekable {
@@ -1569,7 +1656,7 @@
                     <span class="kw">while </span><span class="self">self
                         </span>.chars
                         .peek()
-                        .map_or(<span class="bool-val">false</span>, |(<span class="kw">_</span>, char)| char.is_numeric())
+                        .map_or(<span class="bool-val">false</span>, |(<span class="kw">_</span>, char)| char.is_numeric() || <span class="kw-2">*</span>char == <span class="string">&#39;_&#39;</span>)
                     {
                         end = <span class="self">self</span>.chars.next().expect(<span class="string">&quot;just peeked&quot;</span>).<span class="number">0</span>;
                     }
@@ -1586,12 +1673,19 @@
                         <span class="kw">while </span><span class="self">self
                             </span>.chars
                             .peek()
-                            .map_or(<span class="bool-val">false</span>, |(<span class="kw">_</span>, char)| char.is_numeric())
+                            .map_or(<span class="bool-val">false</span>, |(<span class="kw">_</span>, char)| char.is_numeric() || <span class="kw-2">*</span>char == <span class="string">&#39;_&#39;</span>)
                         {
                             end = <span class="self">self</span>.chars.next().expect(<span class="string">&quot;just peeked&quot;</span>).<span class="number">0</span>;
                         }
 
-                        <span class="kw">let </span>value = <span class="self">self</span>.source[offset..=end].parse::&lt;f64&gt;().unwrap();
+                        <span class="kw">let </span>source = <span class="kw-2">&amp;</span><span class="self">self</span>.source[offset..=end];
+                        <span class="kw">let </span>source = <span class="kw">if </span>source.find(<span class="string">&#39;_&#39;</span>).is_some() {
+                            Cow::Owned(source.replace(<span class="string">&#39;_&#39;</span>, <span class="string">&quot;&quot;</span>))
+                        } <span class="kw">else </span>{
+                            Cow::Borrowed(source)
+                        };
+
+                        <span class="kw">let </span>value = source.parse::&lt;f64&gt;().unwrap();
 
                         <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token {
                             kind: TokenKind::Real(value),
@@ -1599,8 +1693,13 @@
                         }));
                     }
 
-                    <span class="kw">let </span>value = <span class="self">self</span>.source[offset..=end].parse::&lt;i64&gt;().unwrap();
-
+                    <span class="kw">let </span>source = <span class="kw-2">&amp;</span><span class="self">self</span>.source[offset..=end];
+                    <span class="kw">let </span>source = <span class="kw">if </span>source.find(<span class="string">&#39;_&#39;</span>).is_some() {
+                        Cow::Owned(source.replace(<span class="string">&#39;_&#39;</span>, <span class="string">&quot;&quot;</span>))
+                    } <span class="kw">else </span>{
+                        Cow::Borrowed(source)
+                    };
+                    <span class="kw">let </span>value = source.parse::&lt;i64&gt;().unwrap();
                     <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token {
                         kind: TokenKind::Integer(value),
                         range: offset..end + <span class="number">1</span>,
@@ -1616,7 +1715,26 @@
                     <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token::at_offset(TokenKind::Multiply, offset)))
                 }
                 <span class="prelude-val">Some</span>((offset, char)) <span class="kw">if </span>char == <span class="string">&#39;/&#39; </span>=&gt; {
-                    <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token::at_offset(TokenKind::Divide, offset)))
+                    <span class="kw">if </span><span class="macro">matches!</span>(<span class="self">self</span>.chars.peek().map(|(<span class="kw">_</span>, ch)| <span class="kw-2">*</span>ch), <span class="prelude-val">Some</span>(<span class="string">&#39;/&#39;</span>)) {
+                        <span class="comment">// Comment
+                        </span><span class="kw">let </span>(<span class="kw-2">mut </span>end, <span class="kw">_</span>) = <span class="self">self</span>.chars.next().expect(<span class="string">&quot;just peeked&quot;</span>);
+
+                        <span class="comment">// Read until end of line
+                        </span><span class="kw">while </span><span class="self">self
+                            </span>.chars
+                            .peek()
+                            .map_or(<span class="bool-val">false</span>, |(<span class="kw">_</span>, char)| <span class="kw-2">*</span>char != <span class="string">&#39;\n&#39; </span>&amp;&amp; <span class="kw-2">*</span>char != <span class="string">&#39;\r&#39;</span>)
+                        {
+                            end = <span class="self">self</span>.chars.next().expect(<span class="string">&quot;just peeked&quot;</span>).<span class="number">0</span>;
+                        }
+
+                        <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token::new(
+                            TokenKind::Comment(<span class="self">self</span>.source[offset..=end].to_string()),
+                            offset..end + <span class="number">1</span>,
+                        )))
+                    } <span class="kw">else </span>{
+                        <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token::at_offset(TokenKind::Divide, offset)))
+                    }
                 }
                 <span class="prelude-val">Some</span>((offset, char)) <span class="kw">if </span>char == <span class="string">&#39;=&#39; </span>=&gt; <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token::at_offset(
                     TokenKind::Comparison(Comparison::Equal),
@@ -1728,17 +1846,35 @@
             offset: <span class="self">self</span>.source.len(),
             found: <span class="prelude-val">None</span>,
         })<span class="question-mark">??</span>;
-        <span class="macro">assert!</span>(<span class="macro">matches!</span>(end_of_line.kind, TokenKind::EndOfLine)); <span class="comment">// TODO error trailing stuff
-        </span><span class="prelude-val">Ok</span>(())
+        <span class="kw">match </span><span class="kw-2">&amp;</span>end_of_line.kind {
+            TokenKind::Comment(<span class="kw">_</span>) =&gt; <span class="self">self</span>.expect_end_of_line(),
+            TokenKind::EndOfLine | TokenKind::Close(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(()),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ParseError::ExpectedEndOfLine {
+                offset: end_of_line.range.start,
+                found: <span class="prelude-val">Some</span>(end_of_line),
+            }),
+        }
     }
 
     <span class="kw">fn </span>expect_end_of_line_or_eof(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), ParseError&gt; {
-        <span class="kw">let </span>end_of_line = <span class="kw">match </span><span class="self">self</span>.next().transpose()<span class="question-mark">? </span>{
-            <span class="prelude-val">Some</span>(token) =&gt; token,
-            <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(()),
-        };
-        <span class="macro">assert!</span>(<span class="macro">matches!</span>(end_of_line.kind, TokenKind::EndOfLine)); <span class="comment">// TODO error trailing stuff
-        </span><span class="prelude-val">Ok</span>(())
+        <span class="kw">match </span><span class="self">self</span>.peek_token_kind() {
+            <span class="prelude-val">Some</span>(TokenKind::Comment(<span class="kw">_</span>)) =&gt; {
+                <span class="self">self</span>.next();
+                <span class="self">self</span>.expect_end_of_line_or_eof()<span class="question-mark">?</span>;
+            }
+            <span class="prelude-val">Some</span>(TokenKind::EndOfLine) =&gt; {
+                <span class="self">self</span>.next();
+            }
+            <span class="prelude-val">Some</span>(TokenKind::Close(<span class="kw">_</span>)) | <span class="prelude-val">None </span>=&gt; {}
+            <span class="kw">_ </span>=&gt; {
+                <span class="kw">let </span>token = <span class="self">self</span>.next().expect(<span class="string">&quot;just peeked&quot;</span>)<span class="question-mark">?</span>;
+                <span class="kw">return </span><span class="prelude-val">Err</span>(ParseError::ExpectedEndOfLine {
+                    offset: token.range.start,
+                    found: <span class="prelude-val">Some</span>(token),
+                });
+            }
+        }
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn </span>read_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start_offset: usize) -&gt; <span class="prelude-ty">Result</span>&lt;Token, ParseError&gt; {
@@ -1862,7 +1998,7 @@
                 functions.push(function);
             }
 
-            TokenKind::EndOfLine =&gt; {}
+            TokenKind::Comment(<span class="kw">_</span>) | TokenKind::EndOfLine =&gt; {}
             <span class="kw">_ </span>=&gt; {
                 <span class="kw">let </span>expression = parse_expression(token, <span class="kw-2">&amp;</span>init_tree, <span class="kw-2">&amp;mut </span>tokens, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
                 statements.push(expression);
@@ -1951,7 +2087,7 @@
                 <span class="comment">// end of function
                 </span><span class="kw">break</span>;
             }
-            TokenKind::EndOfLine =&gt; {
+            TokenKind::Comment(<span class="kw">_</span>) | TokenKind::EndOfLine =&gt; {
                 tokens.next();
             }
             <span class="kw">_ </span>=&gt; {
@@ -1983,21 +2119,35 @@
             <span class="kw">let </span>if_true = parse_statements(tree, tokens, owning_function_name)<span class="question-mark">?</span>;
 
             <span class="kw">let </span><span class="kw-2">mut </span>if_op = If::new(condition, if_true);
+            <span class="kw">let </span><span class="kw-2">mut </span>expect_end = <span class="bool-val">true</span>;
 
             <span class="kw">match </span>tokens.peek_token_kind() {
                 <span class="prelude-val">Some</span>(TokenKind::Identifier(sym)) <span class="kw">if </span>sym == <span class="string">&quot;else&quot; </span>=&gt; {
                     <span class="kw">let </span>_else_token = tokens.next();
-                    tokens.expect_end_of_line()<span class="question-mark">?</span>;
-                    <span class="kw">let </span>else_block = parse_statements(tree, tokens, owning_function_name)<span class="question-mark">?</span>;
+                    <span class="kw">let </span>else_block = <span class="kw">match </span>tokens.peek_token_kind() {
+                        <span class="prelude-val">Some</span>(TokenKind::Identifier(sym)) <span class="kw">if </span>sym == <span class="string">&quot;if&quot; </span>=&gt; {
+                            <span class="kw">let </span>if_token =
+                                tokens.next().expect(<span class="string">&quot;just peeked&quot;</span>).expect(<span class="string">&quot;just matched&quot;</span>);
+                            expect_end = <span class="bool-val">false</span>;
+                            parse_expression(if_token, tree, tokens, owning_function_name)<span class="question-mark">?
+                        </span>}
+                        <span class="kw">_ </span>=&gt; {
+                            tokens.expect_end_of_line()<span class="question-mark">?</span>;
+                            parse_statements(tree, tokens, owning_function_name)<span class="question-mark">?
+                        </span>}
+                    };
                     if_op = if_op.with_else(else_block);
                 }
                 <span class="kw">_ </span>=&gt; {}
             }
-            <span class="kw">match </span>tokens.expect_next(<span class="string">&quot;end&quot;</span>)<span class="question-mark">?</span>.kind {
-                TokenKind::Identifier(end) <span class="kw">if </span>end == <span class="string">&quot;end&quot; </span>=&gt; {}
-                other =&gt; <span class="macro">todo!</span>(<span class="string">&quot;unexpected {other:?}&quot;</span>),
+
+            <span class="kw">if </span>expect_end {
+                <span class="kw">match </span>tokens.expect_next(<span class="string">&quot;end&quot;</span>)<span class="question-mark">?</span>.kind {
+                    TokenKind::Identifier(end) <span class="kw">if </span>end == <span class="string">&quot;end&quot; </span>=&gt; {}
+                    other =&gt; <span class="macro">todo!</span>(<span class="string">&quot;unexpected {other:?}&quot;</span>),
+                }
+                tokens.expect_end_of_line_or_eof()<span class="question-mark">?</span>;
             }
-            tokens.expect_end_of_line_or_eof()<span class="question-mark">?</span>;
 
             <span class="prelude-val">Ok</span>(tree.if_node(if_op))
         }
@@ -2055,7 +2205,7 @@
         TokenKind::Identifier(sym) <span class="kw">if </span>sym == <span class="string">&quot;for&quot; </span>=&gt; {
             <span class="prelude-val">Some</span>(parse_for_loop(tree, tokens, owning_function_name)<span class="question-mark">?</span>)
         }
-        TokenKind::EndOfLine =&gt; {
+        TokenKind::Comment(<span class="kw">_</span>) | TokenKind::EndOfLine =&gt; {
             <span class="comment">// loop [#label]
             </span><span class="prelude-val">None
         </span>}
@@ -2170,7 +2320,10 @@
 
     <span class="kw">if </span>keyword == <span class="string">&quot;break&quot; </span>{
         <span class="comment">// break [#label] [expr]
-        </span><span class="kw">let </span>value = <span class="kw">if let </span><span class="prelude-val">Some</span>(TokenKind::EndOfLine) = tokens.peek_token_kind() {
+        </span><span class="kw">let </span>value = <span class="kw">if </span><span class="macro">matches!</span>(
+            tokens.peek_token_kind(),
+            <span class="prelude-val">Some</span>(TokenKind::EndOfLine | TokenKind::Comment(<span class="kw">_</span>))
+        ) {
             <span class="prelude-val">None
         </span>} <span class="kw">else </span>{
             <span class="kw">let </span>first_token = tokens.expect_next(<span class="string">&quot;end of line or expression&quot;</span>)<span class="question-mark">?</span>;
@@ -2527,7 +2680,7 @@
 
 <span class="attribute">#[test]
 </span><span class="kw">fn </span>string_parsing() {
-    <span class="kw">use </span><span class="kw">crate</span>::vm::DynamicValue;
+    <span class="kw">use </span>budvm::DynamicValue;
     <span class="macro">assert_eq!</span>(
         Lexer::new(<span class="string">r#&quot;&quot;hello&quot;&quot;#</span>)
             .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
@@ -2559,6 +2712,21 @@
             .unwrap_err(),
         ParseError::UnexpectedEof(<span class="kw">_</span>)
     ));
+}
+
+<span class="attribute">#[test]
+</span><span class="kw">fn </span>number_parsing() {
+    <span class="kw">let </span>tokens = Lexer::new(<span class="string">r#&quot;0 0.0 -1 -1.0 1_000 -1_000.000_1&quot;#</span>)
+        .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
+        .unwrap();
+
+    <span class="macro">assert_eq!</span>(tokens.len(), <span class="number">6</span>);
+    <span class="macro">assert_eq!</span>(tokens[<span class="number">0</span>].kind, TokenKind::Integer(<span class="number">0</span>));
+    <span class="macro">assert_eq!</span>(tokens[<span class="number">1</span>].kind, TokenKind::Real(<span class="number">0.0</span>));
+    <span class="macro">assert_eq!</span>(tokens[<span class="number">2</span>].kind, TokenKind::Integer(-<span class="number">1</span>));
+    <span class="macro">assert_eq!</span>(tokens[<span class="number">3</span>].kind, TokenKind::Real(-<span class="number">1.0</span>));
+    <span class="macro">assert_eq!</span>(tokens[<span class="number">4</span>].kind, TokenKind::Integer(<span class="number">1_000</span>));
+    <span class="macro">assert_eq!</span>(tokens[<span class="number">5</span>].kind, TokenKind::Real(-<span class="number">1_000.000_1</span>));
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="budlang" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

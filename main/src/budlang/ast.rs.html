@@ -1116,6 +1116,18 @@
 <span id="1116">1116</span>
 <span id="1117">1117</span>
 <span id="1118">1118</span>
+<span id="1119">1119</span>
+<span id="1120">1120</span>
+<span id="1121">1121</span>
+<span id="1122">1122</span>
+<span id="1123">1123</span>
+<span id="1124">1124</span>
+<span id="1125">1125</span>
+<span id="1126">1126</span>
+<span id="1127">1127</span>
+<span id="1128">1128</span>
+<span id="1129">1129</span>
+<span id="1130">1130</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)] </span><span class="comment">// TODO docs and panics for ast
 
 </span><span class="kw">use </span>std::{
@@ -1124,13 +1136,12 @@
     fmt::{Debug, Display},
 };
 
-<span class="kw">use crate</span>::{
+<span class="kw">use </span>budvm::{
     ir::{
-        <span class="self">self</span>, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, Literal,
-        LiteralOrSource, LoopScope, Scope, ScopeSymbol, ScopeSymbolKind, UnlinkedCodeUnit,
+        <span class="self">self</span>, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, LinkError, Literal,
+        LiteralOrSource, LoopScope, Module, Scope, ScopeSymbol, ScopeSymbolKind,
     },
-    symbol::{OptionalSymbol, Symbol},
-    vm::{Comparison, Intrinsic},
+    Comparison, Intrinsic, OptionalSymbol, Symbol,
 };
 
 <span class="kw">pub struct </span>ExpressionTree {
@@ -1330,7 +1341,9 @@
                     .store_into_destination(LiteralOrSource::Literal(literal.clone()), result);
                 <span class="prelude-val">Ok</span>(())
             }
-            Node::Identifier(identifier) =&gt; operations.load_from_symbol(identifier, result),
+            Node::Identifier(identifier) =&gt; operations
+                .load_from_symbol(identifier, result)
+                .map_err(CompilationError::from),
             Node::Map(map) =&gt; map.generate_code(result, operations, tree),
             Node::List(list) =&gt; list.generate_code(result, operations, tree),
             <span class="comment">// Node::Lookup(lookup) =&gt; lookup.generate_code(operations, tree),
@@ -1349,7 +1362,7 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;LiteralOrSource, CompilationError&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             Node::Literal(literal) =&gt; <span class="prelude-val">Ok</span>(LiteralOrSource::Literal(literal.clone())),
-            Node::Identifier(identifier) =&gt; <span class="kw">match </span>operations.symbol(identifier) {
+            Node::Identifier(identifier) =&gt; <span class="kw">match </span>operations.lookup(identifier) {
                 <span class="prelude-val">Some</span>(ScopeSymbol::Argument(arg)) =&gt; <span class="prelude-val">Ok</span>(LiteralOrSource::Argument(<span class="kw-2">*</span>arg)),
                 <span class="prelude-val">Some</span>(ScopeSymbol::Variable(var)) =&gt; <span class="prelude-val">Ok</span>(LiteralOrSource::Variable(<span class="kw-2">*</span>var)),
                 <span class="prelude-val">Some</span>(ScopeSymbol::Function { .. }) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;attempt to take function as value&quot;</span>),
@@ -1596,7 +1609,7 @@
                     <span class="prelude-val">Some</span>(ScopeSymbol::Argument(<span class="kw">_</span>) | ScopeSymbol::Variable(<span class="kw">_</span>)) =&gt; {
                         <span class="macro">todo!</span>(<span class="string">&quot;calling a lambda function in an argument&quot;</span>)
                     }
-                    <span class="prelude-val">Some</span>(ScopeSymbol::Function { function }) =&gt; {
+                    <span class="prelude-val">Some</span>(ScopeSymbol::Function(function)) =&gt; {
                         operations.push(Instruction::Call {
                             function: <span class="prelude-val">Some</span>(function.clone()),
                             arg_count: <span class="self">self</span>.args.len(),
@@ -2115,7 +2128,7 @@
     <span class="kw">pub fn </span>compile&lt;InitScope: Scope&gt;(
         <span class="self">self</span>,
         scope: <span class="kw-2">&amp;mut </span>InitScope,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;UnlinkedCodeUnit, CompilationError&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Module, CompilationError&gt; {
         <span class="kw">let </span>init = <span class="kw">match </span><span class="self">self</span>.init_statements.len() {
             <span class="number">0 </span>=&gt; <span class="prelude-val">None</span>,
             <span class="number">1 </span>=&gt; <span class="prelude-val">Some</span>(<span class="self">self</span>.init_statements[<span class="number">0</span>]),
@@ -2144,8 +2157,8 @@
                 ScopeSymbolKind::Function | ScopeSymbolKind::Argument =&gt; {}
             });
             <span class="self">self</span>.init_tree.finish(body).generate_code(<span class="kw-2">&amp;mut </span>block)<span class="question-mark">?</span>;
-            <span class="kw">for </span>(symbol, variable) <span class="kw">in </span><span class="kw-2">&amp;</span>block.variables {
-                scope.define_variable(symbol.clone(), <span class="kw-2">*</span>variable);
+            <span class="kw">for </span>(symbol, variable) <span class="kw">in </span>block.variables() {
+                scope.define_persistent_variable(symbol.clone(), <span class="kw-2">*</span>variable);
             }
 
             <span class="prelude-val">Some</span>(ir::Function::new(<span class="string">&quot;__init&quot;</span>, Vec::new(), block.finish()))
@@ -2153,7 +2166,7 @@
             <span class="prelude-val">None
         </span>};
 
-        <span class="prelude-val">Ok</span>(UnlinkedCodeUnit::new(
+        <span class="prelude-val">Ok</span>(Module::new(
             vtable,
             <span class="self">self</span>.modules
                 .into_iter()
@@ -2215,6 +2228,17 @@
     UndefinedFunction(Symbol),
     UndefinedIdentifier(Symbol),
     InvalidScope,
+}
+
+<span class="kw">impl </span>From&lt;LinkError&gt; <span class="kw">for </span>CompilationError {
+    <span class="kw">fn </span>from(err: LinkError) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>err {
+            LinkError::UndefinedFunction(name) =&gt; CompilationError::UndefinedFunction(name),
+            LinkError::UndefinedIdentifier(name) =&gt; CompilationError::UndefinedIdentifier(name),
+            LinkError::InvalidScopeOperation =&gt; CompilationError::InvalidScope,
+            LinkError::InvalidLabel(_label) =&gt; <span class="macro">unreachable!</span>(<span class="string">&quot;invalid label encountered&quot;</span>),
+        }
+    }
 }
 
 <span class="kw">impl </span>std::error::Error <span class="kw">for </span>CompilationError {}
