@@ -574,6 +574,50 @@ fn logic() {
     assert!(!bud.run_source::<bool>(r#"true xor true"#,).unwrap());
     assert!(bud.run_source::<bool>(r#"true xor false"#,).unwrap());
     assert!(bud.run_source::<bool>(r#"false xor true"#,).unwrap());
+
+    assert!(!bud.run_source::<bool>(r#"not true"#,).unwrap());
+    assert!(bud.run_source::<bool>(r#"not false"#,).unwrap());
+    assert_eq!(bud.run_source::<i64>(r#"not 0"#,).unwrap(), !0);
+    assert!(bud.run_source::<bool>(r#"not 0.0"#,).unwrap());
+    assert!(bud.run_source::<bool>(r#"not """#,).unwrap());
+
+    assert!(bud
+        .run_source::<bool>(
+            r#"
+                a := false
+                not a
+            "#,
+        )
+        .unwrap());
+    assert_eq!(
+        bud.run_source::<i64>(
+            r#"
+                a := 0
+                not a
+            "#,
+        )
+        .unwrap(),
+        !0
+    );
+    assert!(bud
+        .run_source::<bool>(
+            r#"
+                a := 0.0
+                not a
+            "#,
+        )
+        .unwrap());
+    assert!(bud
+        .run_source::<bool>(
+            r#"
+                    a := ""
+                    not a
+                "#,
+        )
+        .unwrap());
+
+    // Verify that this groups `(not true) and true` instead of `not (true and true)`.
+    assert!(!bud.run_source::<bool>(r#"not true and true"#,).unwrap());
 }
 
 #[test]

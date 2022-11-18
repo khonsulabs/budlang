@@ -2029,10 +2029,7 @@ where
                 if let Some(not) = dynamic.not() {
                     not
                 } else {
-                    return Err(Fault::invalid_type(
-                        "`@received-value` (@received-type) does not support not",
-                        value.clone(),
-                    ));
+                    Value::Boolean(dynamic.is_falsey())
                 }
             }
         };

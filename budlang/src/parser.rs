@@ -1158,6 +1158,15 @@ fn parse_term(
         TokenKind::Identifier(lookup_base) => match lookup_base.as_str() {
             "true" => Ok(tree.boolean(true)),
             "false" => Ok(tree.boolean(false)),
+            "not" => {
+                let expr = parse_term(
+                    tokens.expect_next("expression")?,
+                    tree,
+                    tokens,
+                    owning_function_name,
+                )?;
+                Ok(tree.not_node(expr))
+            }
             _ => parse_lookup(lookup_base, tree, tokens, owning_function_name),
         },
         TokenKind::Integer(integer) => Ok(tree.integer(integer)),

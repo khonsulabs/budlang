@@ -82,6 +82,10 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
                 .field("left", &self.node(binop.left))
                 .field("right", &self.node(binop.right))
                 .finish(),
+            Node::Not(op) => f
+                .debug_struct("Not")
+                .field("expr", &self.node(op.expr))
+                .finish(),
             Node::Assign(assign) => f
                 .debug_struct("Assign")
                 .field("target", &self.node(assign.target))
@@ -166,6 +170,7 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
 enum Node {
     If(If),
     BinOp(BinOp),
+    Not(Not), // Upgrade to UnaryOp if we add more
     Assign(Assign),
     // UnaryOp(UnaryOp),
     Block(Block),
@@ -191,6 +196,7 @@ impl Node {
         match self {
             Node::If(if_expr) => if_expr.generate_code(result, operations, tree),
             Node::BinOp(bin_op) => bin_op.generate_code(result, operations, tree),
+            Node::Not(not) => not.generate_code(result, operations, tree),
             Node::Block(statements) => {
                 let mut last_result_var = None;
                 for statement in &statements.0 {
@@ -512,6 +518,42 @@ impl BinOpKind {
             _ => unreachable!("pre-matched above"),
         }
         operations.label(after_op);
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct Not {
+    expr: NodeId,
+}
+
+impl Not {
+    fn generate_code(
+        &self,
+        result: Destination,
+        operations: &mut CodeBlockBuilder,
+        tree: &ExpressionTree,
+    ) -> Result<(), CompilationError> {
+        match tree.node(self.expr) {
+            Node::Literal(literal) => {
+                let expr = LiteralOrSource::Literal(match literal {
+                    Literal::Void => Literal::Boolean(true),
+                    Literal::Integer(value) => Literal::Integer(!value),
+                    Literal::Real(value) => Literal::Boolean(value.abs() < f64::EPSILON),
+                    Literal::Boolean(value) => Literal::Boolean(!value),
+                    Literal::String(value) => Literal::Boolean(value.is_empty()),
+                });
+                operations.store_into_destination(expr, result);
+            }
+            other => {
+                let expr = operations.new_temporary_variable();
+                other.generate_code(Destination::Variable(expr), operations, tree)?;
+                operations.push(Instruction::Not {
+                    value: LiteralOrSource::Variable(expr),
+                    destination: result,
+                });
+            }
+        }
         Ok(())
     }
 }
@@ -1018,6 +1060,10 @@ impl SyntaxTreeBuilder {
 
     pub fn boolean(&self, boolean: bool) -> NodeId {
         self.push(Node::Literal(Literal::Boolean(boolean)))
+    }
+
+    pub fn not_node(&self, expr: NodeId) -> NodeId {
+        self.push(Node::Not(Not { expr }))
     }
 
     pub fn call(&self, call: Call) -> NodeId {
