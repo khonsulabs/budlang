@@ -99,6 +99,71 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
+    /// Performs an `and` operation with `left` and `right`, storing the result
+    /// in `destination`.
+    ///
+    /// If both operands are integers, this performs a bitwise operation.
+    /// Dynamic types can also implement custom behaviors for this operation.
+    ///
+    /// If no other implementations are provided for the given types, the result
+    /// will be a boolean evaluation of `left.is_truthy() and
+    /// right.is_truthy()`.
+    And {
+        /// The left hand side of the operation.
+        left: ValueOrSource,
+        /// The right hand side of the operation.
+        right: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs an `or` operation with `left` and `right`, storing the result
+    /// in `destination`.
+    ///
+    /// If both operands are integers, this performs a bitwise operation.
+    /// Dynamic types can also implement custom behaviors for this operation.
+    ///
+    /// If no other implementations are provided for the given types, the result
+    /// will be a boolean evaluation of `left.is_truthy() or
+    /// right.is_truthy()`.
+    Or {
+        /// The left hand side of the operation.
+        left: ValueOrSource,
+        /// The right hand side of the operation.
+        right: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a `xor` operation with `left` and `right`, storing the result
+    /// in `destination`.
+    ///
+    /// If both operands are integers, this performs a bitwise operation.
+    /// Dynamic types can also implement custom behaviors for this operation.
+    ///
+    /// If no other implementations are provided for the given types, the result
+    /// will be a boolean evaluation of `left.is_truthy() xor
+    /// right.is_truthy()`.
+    Xor {
+        /// The left hand side of the operation.
+        left: ValueOrSource,
+        /// The right hand side of the operation.
+        right: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a `not` operation for `value`, storing the result in
+    /// `destination`.
+    ///
+    /// If the operands is an integer, this performs a bitwise operation.
+    /// Dynamic types can also implement custom behaviors for this operation.
+    ///
+    /// If no other implementations are provided for the given types, the result
+    /// will be a boolean evaluation of `not value.is_truthy()`.
+    Not {
+        /// The left hand side of the operation.
+        value: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
     /// Checks [`condition.is_truthy()`](Value::is_truthy), jumping to the
     /// target instruction if false.
     ///
@@ -256,6 +321,22 @@ impl Display for Instruction {
                 right,
                 destination,
             } => write!(f, "div {left} {right} {destination}"),
+            Instruction::And {
+                left,
+                right,
+                destination,
+            } => write!(f, "and {left} {right} {destination}"),
+            Instruction::Or {
+                left,
+                right,
+                destination,
+            } => write!(f, "or {left} {right} {destination}"),
+            Instruction::Xor {
+                left,
+                right,
+                destination,
+            } => write!(f, "xor {left} {right} {destination}"),
+            Instruction::Not { value, destination } => write!(f, "not {value} {destination}"),
             Instruction::If {
                 condition,
                 false_jump_to,
@@ -1452,6 +1533,25 @@ where
                 right,
                 destination,
             } => self.checked_div(left, right, *destination),
+            Instruction::And {
+                left,
+                right,
+                destination,
+            } => self.and(left, right, *destination),
+            Instruction::Or {
+                left,
+                right,
+                destination,
+            } => self.or(left, right, *destination),
+            Instruction::Xor {
+                left,
+                right,
+                destination,
+            } => self.xor(left, right, *destination),
+            Instruction::Not {
+                value: left,
+                destination,
+            } => self.not(left, *destination),
             Instruction::If {
                 condition: value,
                 false_jump_to,
@@ -1913,6 +2013,33 @@ where
 
         Ok(None)
     }
+
+    fn not(
+        &mut self,
+        value: &ValueOrSource,
+        destination: Destination,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let value = self.resolve_value_or_source(value)?;
+        let produced_value = match value {
+            Value::Void => Value::Boolean(true),
+            Value::Integer(value) => Value::Integer(!value),
+            Value::Real(value) => Value::Boolean(real_eq(*value, 0.0)),
+            Value::Boolean(value) => Value::Boolean(!*value),
+            Value::Dynamic(dynamic) => {
+                if let Some(not) = dynamic.not() {
+                    not
+                } else {
+                    return Err(Fault::invalid_type(
+                        "`@received-value` (@received-type) does not support not",
+                        value.clone(),
+                    ));
+                }
+            }
+        };
+        *self.resolve_value_source_mut(destination)? = produced_value;
+
+        Ok(None)
+    }
 }
 
 macro_rules! checked_op {
@@ -2009,6 +2136,83 @@ checked_op!(checked_add, add, "add");
 checked_op!(checked_sub, sub, "subtract");
 checked_op!(checked_mul, mul, "multiply");
 checked_op!(checked_div, div, "divide");
+
+macro_rules! unchecked_op {
+    ($name:ident,  $fullname:literal, $default:expr) => {
+        impl<'a, Env, Output> StackFrame<'a, Env, Output>
+        where
+            Env: Environment,
+        {
+            fn $name(
+                &mut self,
+                left: &ValueOrSource,
+                right: &ValueOrSource,
+                result: Destination,
+            ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+                let left_value = self.resolve_value_or_source(left)?;
+                let right_value = self.resolve_value_or_source(right)?;
+                let default = $default;
+
+                let produced_value = match (left_value, right_value) {
+                    (Value::Integer(left), Value::Integer(right)) => left.$name(right),
+                    (Value::Dynamic(left), right) => {
+                        if let Some(value) = left.$name(right) {
+                            value
+                        } else if let Value::Dynamic(right) = right {
+                            if let Some(value) = right.$name(left_value) {
+                                value
+                            } else {
+                                (default)(left_value, right_value)
+                            }
+                        } else {
+                            (default)(left_value, right_value)
+                        }
+                    }
+                    (left, Value::Dynamic(right)) => {
+                        if let Some(value) = right.$name(left) {
+                            value
+                        } else {
+                            (default)(left_value, right_value)
+                        }
+                    }
+                    _ => (default)(left_value, right_value),
+                };
+                *self.resolve_value_source_mut(result)? = produced_value;
+                Ok(None)
+            }
+        }
+    };
+}
+
+unchecked_op!(and, "and", |a: &Value, b: &Value| Value::Boolean(
+    a.is_truthy() && b.is_truthy()
+));
+unchecked_op!(or, "or", |a: &Value, b: &Value| Value::Boolean(
+    a.is_truthy() || b.is_truthy()
+));
+unchecked_op!(xor, "xor", |a: &Value, b: &Value| Value::Boolean(
+    a.is_truthy() ^ b.is_truthy()
+));
+
+trait LogicOrBitwiseOps {
+    fn and(&self, other: &Self) -> Value;
+    fn or(&self, other: &Self) -> Value;
+    fn xor(&self, other: &Self) -> Value;
+}
+
+impl LogicOrBitwiseOps for i64 {
+    fn and(&self, other: &Self) -> Value {
+        Value::Integer(*self & *other)
+    }
+
+    fn or(&self, other: &Self) -> Value {
+        Value::Integer(*self | *other)
+    }
+
+    fn xor(&self, other: &Self) -> Value {
+        Value::Integer(*self ^ *other)
+    }
+}
 
 /// An unexpected event occurred while executing the virtual machine.
 #[derive(Debug, PartialEq)]

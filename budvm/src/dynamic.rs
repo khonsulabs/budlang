@@ -23,6 +23,13 @@ pub trait DynamicValue: Send + Sync + Debug + 'static {
     /// virtual machine uses this string only when creating error messages.
     fn kind(&self) -> &'static str;
 
+    /// Returns the logical or bitwise inverse for this value. If none is
+    /// returned, the virtual machine will use `!self.is_truthy()`.
+    #[must_use]
+    fn not(&self) -> Option<Value> {
+        None
+    }
+
     /// Returns true if self and other are considered equal. Returns false if
     /// self and other are able to be compared but are not equal. Returns None
     /// if the values are unable to be compared.
@@ -95,6 +102,33 @@ pub trait DynamicValue: Send + Sync + Debug + 'static {
     #[allow(unused_variables)]
     fn checked_div(&self, other: &Value, is_reverse: bool) -> Result<Option<Value>, FaultKind> {
         Ok(None)
+    }
+
+    /// Returns the "logical and" or "bitwise and" result of `self and other`.
+    /// If none is returned, the virtual machine will create a boolean result
+    /// from `self.is_truthy() and self.is_truthy()`.
+    #[must_use]
+    #[allow(unused_variables)]
+    fn and(&self, other: &Value) -> Option<Value> {
+        None
+    }
+
+    /// Returns the "logical or" or "bitwise or" result of `self or other`. If
+    /// none is returned, the virtual machine will create a boolean result from
+    /// `self.is_truthy() or self.is_truthy()`.
+    #[must_use]
+    #[allow(unused_variables)]
+    fn or(&self, other: &Value) -> Option<Value> {
+        None
+    }
+
+    /// Returns the "logical xor" or "bitwise xor" result of `self xor other`.
+    /// If none is returned, the virtual machine will create a boolean result
+    /// from `self.is_truthy() xor self.is_truthy()`.
+    #[must_use]
+    #[allow(unused_variables)]
+    fn xor(&self, other: &Value) -> Option<Value> {
+        None
     }
 
     /// Calls a function by `name` with `args`.
@@ -240,6 +274,12 @@ impl Dynamic {
         self.0.is_truthy()
     }
 
+    /// Returns the result of [`DynamicValue::not()`] for the wrapped value.
+    #[must_use]
+    pub fn not(&self) -> Option<Value> {
+        self.0.not()
+    }
+
     /// Returns the inverse of [`DynamicValue::is_truthy()`] for the wrapped
     /// value.
     #[must_use]
@@ -285,6 +325,24 @@ impl Dynamic {
         self.0.checked_div(other, is_reverse)
     }
 
+    /// Returns the result of [`DynamicValue::and()`] for the wrapped value.
+    #[must_use]
+    pub fn and(&self, other: &Value) -> Option<Value> {
+        self.0.and(other)
+    }
+
+    /// Returns the result of [`DynamicValue::or()`] for the wrapped value.
+    #[must_use]
+    pub fn or(&self, other: &Value) -> Option<Value> {
+        self.0.or(other)
+    }
+
+    /// Returns the result of [`DynamicValue::xor()`] for the wrapped value.
+    #[must_use]
+    pub fn xor(&self, other: &Value) -> Option<Value> {
+        self.0.xor(other)
+    }
+
     /// Invokes [`DynamicValue::call`] with the given parameters.
     pub fn call(&mut self, name: &Symbol, args: PoppedValues<'_>) -> Result<Value, FaultKind> {
         self.0.call(name, args)
@@ -320,6 +378,7 @@ trait UnboxableDynamicValue: Debug + Send + Sync {
     fn as_opt_any_mut(&mut self) -> &mut dyn Any;
 
     fn is_truthy(&self) -> bool;
+    fn not(&self) -> Option<Value>;
     fn kind(&self) -> &'static str;
     fn partial_eq(&self, other: &Value) -> Option<bool>;
     fn partial_cmp(&self, other: &Value) -> Option<Ordering>;
@@ -327,6 +386,9 @@ trait UnboxableDynamicValue: Debug + Send + Sync {
     fn checked_sub(&self, other: &Value, is_reverse: bool) -> Result<Option<Value>, FaultKind>;
     fn checked_mul(&self, other: &Value, is_reverse: bool) -> Result<Option<Value>, FaultKind>;
     fn checked_div(&self, other: &Value, is_reverse: bool) -> Result<Option<Value>, FaultKind>;
+    fn and(&self, other: &Value) -> Option<Value>;
+    fn or(&self, other: &Value) -> Option<Value>;
+    fn xor(&self, other: &Value) -> Option<Value>;
     fn to_source(&self) -> Option<String>;
     fn hash(&self, state: &mut dyn Hasher) -> bool;
     fn call(&self, name: &Symbol, arguments: PoppedValues<'_>) -> Result<Value, FaultKind>;
@@ -366,6 +428,10 @@ where
 
     fn is_truthy(&self) -> bool {
         self.value().is_truthy()
+    }
+
+    fn not(&self) -> Option<Value> {
+        self.value().not()
     }
 
     fn kind(&self) -> &'static str {
@@ -410,6 +476,18 @@ where
 
     fn call(&self, name: &Symbol, mut arguments: PoppedValues<'_>) -> Result<Value, FaultKind> {
         self.value().call(name, &mut arguments)
+    }
+
+    fn and(&self, other: &Value) -> Option<Value> {
+        self.value().and(other)
+    }
+
+    fn or(&self, other: &Value) -> Option<Value> {
+        self.value().or(other)
+    }
+
+    fn xor(&self, other: &Value) -> Option<Value> {
+        self.value().xor(other)
     }
 }
 

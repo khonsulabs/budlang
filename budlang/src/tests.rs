@@ -550,3 +550,42 @@ fn if_else_if() {
         .unwrap();
     assert_eq!(result, 9);
 }
+
+#[test]
+fn logic() {
+    // To verify short circuit behavior, we have register a native function that
+    // panics when called.
+    let mut bud = Bud::empty()
+        .with_native_function("unreachable", |_args: &mut PoppedValues<'_>| {
+            unreachable!("short circuit failed")
+        });
+
+    assert!(!bud
+        .run_source::<bool>(r#"false and unreachable()"#,)
+        .unwrap());
+    assert!(bud.run_source::<bool>(r#"true and true"#,).unwrap());
+    assert!(!bud.run_source::<bool>(r#"true and false"#,).unwrap());
+
+    assert!(bud.run_source::<bool>(r#"true or unreachable()"#,).unwrap());
+    assert!(bud.run_source::<bool>(r#"false or true"#,).unwrap());
+    assert!(bud.run_source::<bool>(r#"false or false"#,).unwrap());
+
+    assert!(!bud.run_source::<bool>(r#"false xor false"#,).unwrap());
+    assert!(!bud.run_source::<bool>(r#"true xor true"#,).unwrap());
+    assert!(bud.run_source::<bool>(r#"true xor false"#,).unwrap());
+    assert!(bud.run_source::<bool>(r#"false xor true"#,).unwrap());
+}
+
+#[test]
+fn bitwise() {
+    assert_run!("1 & 3", 1);
+    assert_run!("1 | 3", 3);
+    assert_run!("1 ^ 3", 2);
+
+    // Test coersion to logic. These operators won't short circuit, but they
+    // behave consistently by truncating to boolean operations when non-integer
+    // types are mixed.
+    assert_run!("1 & false", false);
+    assert_run!("1 | false", true);
+    assert_run!("1 ^ true", false);
+}

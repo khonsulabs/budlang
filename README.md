@@ -24,7 +24,7 @@ from the command line or using a REPL environment.
 
 ## [`budvm`][budvm]
 
-[![crate version](https://img.shields.io/crates/v/budvm.svg)](https://crates.io/crates/budvm) [![Documentation](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/budvm/main/budvm)
+[![crate version](https://img.shields.io/crates/v/budvm.svg)](https://crates.io/crates/budvm) [![Documentation](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/budlang/main/budvm)
 
 The [`budvm`][budvm] crate defines a `#[forbid(unsafe_code)]` virtual machine
 implementation.

@@ -47,7 +47,7 @@ Configuration(
                 release: "https://docs.rs/budlang",
             ),
             "vm-docs-base": (
-                default: "https://khonsulabs.github.io/budvm/main/budvm",
+                default: "https://khonsulabs.github.io/budlang/main/budvm",
                 release: "https://docs.rs/budvm",
             ),
             "src-base": (

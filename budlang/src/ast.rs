@@ -362,6 +362,12 @@ pub enum BinOpKind {
     Sub,
     Multiply,
     Divide,
+    LogicalAnd,
+    LogicalOr,
+    LogicalXor,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
     Compare(Comparison),
 }
 
@@ -377,37 +383,135 @@ impl BinOpKind {
         let left = tree.node(left);
         let right = tree.node(right);
         let left = left.to_value_or_source(operations, tree)?;
-        let right = right.to_value_or_source(operations, tree)?;
 
-        match self {
-            BinOpKind::Add => operations.push(Instruction::Add {
-                left,
-                right,
-                destination,
-            }),
-            BinOpKind::Sub => operations.push(Instruction::Sub {
-                left,
-                right,
-                destination,
-            }),
-            BinOpKind::Multiply => operations.push(Instruction::Multiply {
-                left,
-                right,
-                destination,
-            }),
-            BinOpKind::Divide => operations.push(Instruction::Divide {
-                left,
-                right,
-                destination,
-            }),
-            BinOpKind::Compare(comparison) => operations.push(Instruction::Compare {
-                comparison: *comparison,
-                left,
-                right,
-                action: CompareAction::Store(destination),
-            }),
+        if matches!(self, BinOpKind::LogicalAnd | BinOpKind::LogicalOr) {
+            // These operators short circuit, so we delay evaluating right until
+            // we've checked the left.
+            self.generate_short_circuit_op(left, right, destination, operations, tree)?;
+        } else {
+            // None of these operators short circuit, so we can evaluate right
+            // immediately.
+            let right = right.to_value_or_source(operations, tree)?;
+            match self {
+                BinOpKind::Add => operations.push(Instruction::Add {
+                    left,
+                    right,
+                    destination,
+                }),
+                BinOpKind::Sub => operations.push(Instruction::Sub {
+                    left,
+                    right,
+                    destination,
+                }),
+                BinOpKind::Multiply => operations.push(Instruction::Multiply {
+                    left,
+                    right,
+                    destination,
+                }),
+                BinOpKind::Divide => operations.push(Instruction::Divide {
+                    left,
+                    right,
+                    destination,
+                }),
+                BinOpKind::BitwiseAnd => operations.push(Instruction::And {
+                    left,
+                    right,
+                    destination,
+                }),
+                BinOpKind::BitwiseOr => operations.push(Instruction::Or {
+                    left,
+                    right,
+                    destination,
+                }),
+                BinOpKind::BitwiseXor | BinOpKind::LogicalXor => {
+                    operations.push(Instruction::Xor {
+                        left,
+                        right,
+                        destination,
+                    });
+                }
+                BinOpKind::Compare(comparison) => operations.push(Instruction::Compare {
+                    comparison: *comparison,
+                    left,
+                    right,
+                    action: CompareAction::Store(destination),
+                }),
+                BinOpKind::LogicalAnd | BinOpKind::LogicalOr => {
+                    unreachable!("short circuit binops are handled elsewhere")
+                }
+            }
         }
 
+        Ok(())
+    }
+    fn generate_short_circuit_op(
+        &self,
+        left: LiteralOrSource,
+        right: &Node,
+        destination: Destination,
+        operations: &mut CodeBlockBuilder,
+        tree: &ExpressionTree,
+    ) -> Result<(), CompilationError> {
+        let after_op = operations.new_label();
+        match self {
+            BinOpKind::LogicalAnd => {
+                let store_false = operations.new_label();
+                operations.push(Instruction::If {
+                    condition: left,
+                    false_jump_to: store_false,
+                });
+                // If left was false, we jump over the evaluation of right.
+                let right = right.to_value_or_source(operations, tree)?;
+                operations.push(Instruction::If {
+                    condition: right,
+                    false_jump_to: store_false,
+                });
+                operations.store_into_destination(
+                    LiteralOrSource::Literal(Literal::Boolean(true)),
+                    destination,
+                );
+                operations.push(Instruction::JumpTo(after_op));
+
+                operations.label(store_false);
+                operations.store_into_destination(
+                    LiteralOrSource::Literal(Literal::Boolean(false)),
+                    destination,
+                );
+            }
+            BinOpKind::LogicalOr => {
+                let check_right = operations.new_label();
+                let store_true = operations.new_label();
+                operations.push(Instruction::If {
+                    condition: left,
+                    false_jump_to: check_right,
+                });
+                // If left was true, we already know we're good
+                operations.push(Instruction::JumpTo(store_true));
+
+                operations.label(check_right);
+                let right = right.to_value_or_source(operations, tree)?;
+                let store_false = operations.new_label();
+                operations.push(Instruction::If {
+                    condition: right,
+                    false_jump_to: store_false,
+                });
+
+                operations.label(store_true);
+                operations.store_into_destination(
+                    LiteralOrSource::Literal(Literal::Boolean(true)),
+                    destination,
+                );
+                operations.push(Instruction::JumpTo(after_op));
+
+                operations.label(store_false);
+                operations.store_into_destination(
+                    LiteralOrSource::Literal(Literal::Boolean(true)),
+                    destination,
+                );
+            }
+            _ => unreachable!("pre-matched above"),
+        }
+        operations.label(after_op);
         Ok(())
     }
 }
@@ -885,11 +989,7 @@ impl SyntaxTreeBuilder {
     }
 
     pub fn compare_node(&self, comparison: Comparison, left: NodeId, right: NodeId) -> NodeId {
-        self.push(Node::BinOp(BinOp {
-            kind: BinOpKind::Compare(comparison),
-            left,
-            right,
-        }))
+        self.binop_node(BinOpKind::Compare(comparison), left, right)
     }
 
     pub fn assign_node(&self, target: NodeId, value: NodeId) -> NodeId {

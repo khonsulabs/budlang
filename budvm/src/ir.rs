@@ -95,6 +95,71 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
+    /// Performs an `and` operation with `left` and `right`, storing the result
+    /// in `destination`.
+    ///
+    /// If both operands are integers, this performs a bitwise operation.
+    /// Dynamic types can also implement custom behaviors for this operation.
+    ///
+    /// If no other implementations are provided for the given types, the result
+    /// will be a boolean evaluation of `left.is_truthy() and
+    /// right.is_truthy()`.
+    And {
+        /// The left hand side of the operation.
+        left: LiteralOrSource,
+        /// The right hand side of the operation.
+        right: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs an `or` operation with `left` and `right`, storing the result
+    /// in `destination`.
+    ///
+    /// If both operands are integers, this performs a bitwise operation.
+    /// Dynamic types can also implement custom behaviors for this operation.
+    ///
+    /// If no other implementations are provided for the given types, the result
+    /// will be a boolean evaluation of `left.is_truthy() or
+    /// right.is_truthy()`.
+    Or {
+        /// The left hand side of the operation.
+        left: LiteralOrSource,
+        /// The right hand side of the operation.
+        right: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a `xor` operation with `left` and `right`, storing the result
+    /// in `destination`.
+    ///
+    /// If both operands are integers, this performs a bitwise operation.
+    /// Dynamic types can also implement custom behaviors for this operation.
+    ///
+    /// If no other implementations are provided for the given types, the result
+    /// will be a boolean evaluation of `left.is_truthy() xor
+    /// right.is_truthy()`.
+    Xor {
+        /// The left hand side of the operation.
+        left: LiteralOrSource,
+        /// The right hand side of the operation.
+        right: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a `not` operation for `value`, storing the result in
+    /// `destination`.
+    ///
+    /// If the operands is an integer, this performs a bitwise operation.
+    /// Dynamic types can also implement custom behaviors for this operation.
+    ///
+    /// If no other implementations are provided for the given types, the result
+    /// will be a boolean evaluation of `not value.is_truthy()`.
+    Not {
+        /// The left hand side of the operation.
+        value: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
     /// Checks [`condition.is_truthy()`](Value::is_truthy), jumping to the
     /// target label if false.
     ///
@@ -233,6 +298,22 @@ impl Display for Instruction {
                 right,
                 destination,
             } => write!(f, "div {left} {right} {destination}"),
+            Instruction::And {
+                left,
+                right,
+                destination,
+            } => write!(f, "and {left} {right} {destination}"),
+            Instruction::Or {
+                left,
+                right,
+                destination,
+            } => write!(f, "or {left} {right} {destination}"),
+            Instruction::Xor {
+                left,
+                right,
+                destination,
+            } => write!(f, "xor {left} {right} {destination}"),
+            Instruction::Not { value, destination } => write!(f, "not {value} {destination}"),
             Instruction::If {
                 condition,
                 false_jump_to,
@@ -827,6 +908,37 @@ where
         } => crate::Instruction::Divide {
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::Or {
+            left,
+            right,
+            destination,
+        } => crate::Instruction::Or {
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::And {
+            left,
+            right,
+            destination,
+        } => crate::Instruction::And {
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::Xor {
+            left,
+            right,
+            destination,
+        } => crate::Instruction::Xor {
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::Not { value, destination } => crate::Instruction::Not {
+            value: value.instantiate::<S::Environment>(),
             destination: destination.into(),
         },
         Instruction::If {

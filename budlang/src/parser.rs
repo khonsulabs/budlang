@@ -61,6 +61,9 @@ pub enum TokenKind {
     Period,
     Colon,
     Hash,
+    Ampersand,
+    Pipe,
+    Caret,
     Unknown(char),
 }
 
@@ -93,6 +96,9 @@ impl Display for TokenKind {
             TokenKind::Period => f.write_char('.'),
             TokenKind::Colon => f.write_char(':'),
             TokenKind::Hash => f.write_char('#'),
+            TokenKind::Ampersand => f.write_char('&'),
+            TokenKind::Pipe => f.write_char('|'),
+            TokenKind::Caret => f.write_char('^'),
             TokenKind::Unknown(token) => Display::fmt(token, f),
             TokenKind::Comment(value) => write!(f, "// {value}"),
         }
@@ -434,6 +440,15 @@ impl<'a> Lexer<'a> {
                 }
                 Some((offset, char)) if char == '#' => {
                     Some(Ok(Token::at_offset(TokenKind::Hash, offset)))
+                }
+                Some((offset, char)) if char == '&' => {
+                    Some(Ok(Token::at_offset(TokenKind::Ampersand, offset)))
+                }
+                Some((offset, char)) if char == '|' => {
+                    Some(Ok(Token::at_offset(TokenKind::Pipe, offset)))
+                }
+                Some((offset, char)) if char == '^' => {
+                    Some(Ok(Token::at_offset(TokenKind::Caret, offset)))
                 }
                 Some((offset, char)) if char == '(' => Some(Ok(Token::at_offset(
                     TokenKind::Open(BracketType::Paren),
@@ -987,14 +1002,14 @@ fn parse_assign_expression(
 ) -> Result<NodeId, ParseError> {
     // This operator groups differently than most of the other operators. a := b
     // := c should result in `(a := (b := c))`, not `((a := b) := c))`.
-    let mut left = parse_comparison_expression(first_token, tree, tokens, owning_function_name)?;
+    let mut left = parse_logic_expression(first_token, tree, tokens, owning_function_name)?;
 
     let mut stack = Vec::new();
     while let Some(TokenKind::Assign) = tokens.peek_token_kind() {
         tokens.next();
         stack.push(left);
         let first_token = tokens.expect_next("value to assign")?;
-        left = parse_comparison_expression(first_token, tree, tokens, owning_function_name)?;
+        left = parse_logic_expression(first_token, tree, tokens, owning_function_name)?;
     }
 
     // Perform the assignments.
@@ -1006,7 +1021,49 @@ fn parse_assign_expression(
     Ok(right)
 }
 
+fn parse_logic_expression(
+    first_token: Token,
+    tree: &SyntaxTreeBuilder,
+    tokens: &mut Lexer<'_>,
+    owning_function_name: Option<&str>,
+) -> Result<NodeId, ParseError> {
+    let mut left = parse_comparison_expression(first_token, tree, tokens, owning_function_name)?;
+
+    while let Some(binop_kind) = match tokens.peek_token_kind() {
+        Some(TokenKind::Identifier(sym)) if sym == "and" => Some(BinOpKind::LogicalAnd),
+        Some(TokenKind::Identifier(sym)) if sym == "or" => Some(BinOpKind::LogicalOr),
+        Some(TokenKind::Identifier(sym)) if sym == "xor" => Some(BinOpKind::LogicalXor),
+        _ => None,
+    } {
+        let _op_token = tokens.next();
+        let next_token = tokens.expect_next("value to compare against")?;
+        let right = parse_comparison_expression(next_token, tree, tokens, owning_function_name)?;
+        left = tree.binop_node(binop_kind, left, right);
+    }
+
+    Ok(left)
+}
+
 fn parse_comparison_expression(
+    first_token: Token,
+    tree: &SyntaxTreeBuilder,
+    tokens: &mut Lexer<'_>,
+    owning_function_name: Option<&str>,
+) -> Result<NodeId, ParseError> {
+    let mut left = parse_bitwise_expression(first_token, tree, tokens, owning_function_name)?;
+
+    while let Some(TokenKind::Comparison(comparison)) = tokens.peek_token_kind() {
+        let comparison = *comparison;
+        let _op_token = tokens.next();
+        let next_token = tokens.expect_next("value to compare against")?;
+        let right = parse_bitwise_expression(next_token, tree, tokens, owning_function_name)?;
+        left = tree.compare_node(comparison, left, right);
+    }
+
+    Ok(left)
+}
+
+fn parse_bitwise_expression(
     first_token: Token,
     tree: &SyntaxTreeBuilder,
     tokens: &mut Lexer<'_>,
@@ -1014,12 +1071,16 @@ fn parse_comparison_expression(
 ) -> Result<NodeId, ParseError> {
     let mut left = parse_add_sub(first_token, tree, tokens, owning_function_name)?;
 
-    while let Some(TokenKind::Comparison(comparison)) = tokens.peek_token_kind() {
-        let comparison = *comparison;
+    while let Some(binop_kind) = match tokens.peek_token_kind() {
+        Some(TokenKind::Ampersand) => Some(BinOpKind::BitwiseAnd),
+        Some(TokenKind::Pipe) => Some(BinOpKind::BitwiseOr),
+        Some(TokenKind::Caret) => Some(BinOpKind::BitwiseXor),
+        _ => None,
+    } {
         let _op_token = tokens.next();
         let next_token = tokens.expect_next("value to compare against")?;
         let right = parse_add_sub(next_token, tree, tokens, owning_function_name)?;
-        left = tree.compare_node(comparison, left, right);
+        left = tree.binop_node(binop_kind, left, right);
     }
 
     Ok(left)
