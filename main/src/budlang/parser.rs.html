@@ -1424,6 +1424,15 @@
 <span id="1424">1424</span>
 <span id="1425">1425</span>
 <span id="1426">1426</span>
+<span id="1427">1427</span>
+<span id="1428">1428</span>
+<span id="1429">1429</span>
+<span id="1430">1430</span>
+<span id="1431">1431</span>
+<span id="1432">1432</span>
+<span id="1433">1433</span>
+<span id="1434">1434</span>
+<span id="1435">1435</span>
 </pre><pre class="rust"><code><span class="comment">// TODO docs for parser
 </span><span class="attribute">#![allow(missing_docs)]
 </span><span class="comment">// We use the Range type which doesn&#39;t allow this, and it&#39;s not worth making a
@@ -2584,6 +2593,15 @@
         TokenKind::Identifier(lookup_base) =&gt; <span class="kw">match </span>lookup_base.as_str() {
             <span class="string">&quot;true&quot; </span>=&gt; <span class="prelude-val">Ok</span>(tree.boolean(<span class="bool-val">true</span>)),
             <span class="string">&quot;false&quot; </span>=&gt; <span class="prelude-val">Ok</span>(tree.boolean(<span class="bool-val">false</span>)),
+            <span class="string">&quot;not&quot; </span>=&gt; {
+                <span class="kw">let </span>expr = parse_term(
+                    tokens.expect_next(<span class="string">&quot;expression&quot;</span>)<span class="question-mark">?</span>,
+                    tree,
+                    tokens,
+                    owning_function_name,
+                )<span class="question-mark">?</span>;
+                <span class="prelude-val">Ok</span>(tree.not_node(expr))
+            }
             <span class="kw">_ </span>=&gt; parse_lookup(lookup_base, tree, tokens, owning_function_name),
         },
         TokenKind::Integer(integer) =&gt; <span class="prelude-val">Ok</span>(tree.integer(integer)),
