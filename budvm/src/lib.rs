@@ -1007,6 +1007,83 @@ enum ModuleItem {
 /// Each instance of this type has its own sandboxed environment. Its stack
 /// space, function declarations, and [`Environment`] are unique from all other
 /// instances of Bud with the exception that [`Symbol`]s are tracked globally.
+///
+/// # General Virtual Machine design
+///
+/// At the core of this type is a [`Stack`], which is a list of [`Value`]s. The
+/// virtual machine divides the stack into "frames" (regions of [`Value`]s) as
+/// it executes and calls functions.
+///
+/// Each stack frame is divided into two sections: arguments that were passed to
+/// the function, and space for local variables. Stack frames are automatically
+/// managed by the virtual machine.
+///
+/// The only time [`Value`]s need to be pushed to the stack directly is when
+/// calling a function. Each argument being passed to the function is pushed to
+/// the stack, and the virtual machine adopts the pushed values as part of the
+/// called function's stack frame.
+///
+/// This example demonstrates a basic function that takes one argument and uses
+/// 1 local variable. It performs the equivalent of creating a string like
+/// `Hello, {name}!`.
+///
+/// ```rust
+/// use std::borrow::Cow;
+/// use budvm::{VirtualMachine, Function, Instruction, Value, ValueOrSource, Destination, Symbol};
+///
+/// let greet = Function {
+///     name: Symbol::from("greet"),
+///     arg_count: 1,
+///     variable_count: 1,
+///     code: vec![
+///         Instruction::Add {
+///             left: ValueOrSource::Value(Value::dynamic(String::from("Hello, "))),
+///             right: ValueOrSource::Argument(0),
+///             destination: Destination::Variable(0),
+///         },
+///         Instruction::Add {
+///             left: ValueOrSource::Variable(0),
+///             right: ValueOrSource::Value(Value::dynamic(String::from("!"))),
+///             destination: Destination::Return,
+///         },
+///     ],
+/// };
+///
+/// let mut vm = VirtualMachine::empty().with_function(greet);
+/// let result: String = vm
+///     .run(
+///         Cow::Borrowed(&[
+///             Instruction::Push(ValueOrSource::Value(Value::dynamic(String::from("Ferris")))),
+///             Instruction::Call {
+///                 vtable_index: Some(0),
+///                 arg_count: 1,
+///                 destination: Destination::Stack,
+///             },
+///         ]),
+///         0,
+///     )
+///     .unwrap();
+/// assert_eq!(result, "Hello, Ferris!");
+/// ```
+///
+/// When the virtual machine finishes executing [`Instruction::Call`],
+/// [`Instruction::CallIntrinsic`], or [`Instruction::CallInstance`], the return
+/// value is placed in the correct location and the stack is cleaned up to
+/// remove all pushed arguments and local variables of the function being
+/// called.
+///
+/// The Rust interface will automatically pop a value from the stack upon
+/// returning. The [`FromStack`] trait allows a type to be converted seamlessly
+/// as in the above example.
+///
+/// The previous example also highlights one other interesting aspect of the
+/// virtual machine: all heap-allocated types are grouped into a single
+/// [`Dynamic`] type. This means that the virtual machine doesn't actually know
+/// anything about the `String` type. The virtual machine knows how to perform
+/// operations with [`Dynamic`] values, and any Rust type that implements
+/// [`DynamicValue`] can be used in the virtual machine.
+///
+/// Each [`Instruction`] variant is documented with its expected behavior.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct VirtualMachine<Env> {
     /// The stack for this virtual machine. Take care when manually manipulating
