@@ -3470,6 +3470,83 @@
 <span id="3470">3470</span>
 <span id="3471">3471</span>
 <span id="3472">3472</span>
+<span id="3473">3473</span>
+<span id="3474">3474</span>
+<span id="3475">3475</span>
+<span id="3476">3476</span>
+<span id="3477">3477</span>
+<span id="3478">3478</span>
+<span id="3479">3479</span>
+<span id="3480">3480</span>
+<span id="3481">3481</span>
+<span id="3482">3482</span>
+<span id="3483">3483</span>
+<span id="3484">3484</span>
+<span id="3485">3485</span>
+<span id="3486">3486</span>
+<span id="3487">3487</span>
+<span id="3488">3488</span>
+<span id="3489">3489</span>
+<span id="3490">3490</span>
+<span id="3491">3491</span>
+<span id="3492">3492</span>
+<span id="3493">3493</span>
+<span id="3494">3494</span>
+<span id="3495">3495</span>
+<span id="3496">3496</span>
+<span id="3497">3497</span>
+<span id="3498">3498</span>
+<span id="3499">3499</span>
+<span id="3500">3500</span>
+<span id="3501">3501</span>
+<span id="3502">3502</span>
+<span id="3503">3503</span>
+<span id="3504">3504</span>
+<span id="3505">3505</span>
+<span id="3506">3506</span>
+<span id="3507">3507</span>
+<span id="3508">3508</span>
+<span id="3509">3509</span>
+<span id="3510">3510</span>
+<span id="3511">3511</span>
+<span id="3512">3512</span>
+<span id="3513">3513</span>
+<span id="3514">3514</span>
+<span id="3515">3515</span>
+<span id="3516">3516</span>
+<span id="3517">3517</span>
+<span id="3518">3518</span>
+<span id="3519">3519</span>
+<span id="3520">3520</span>
+<span id="3521">3521</span>
+<span id="3522">3522</span>
+<span id="3523">3523</span>
+<span id="3524">3524</span>
+<span id="3525">3525</span>
+<span id="3526">3526</span>
+<span id="3527">3527</span>
+<span id="3528">3528</span>
+<span id="3529">3529</span>
+<span id="3530">3530</span>
+<span id="3531">3531</span>
+<span id="3532">3532</span>
+<span id="3533">3533</span>
+<span id="3534">3534</span>
+<span id="3535">3535</span>
+<span id="3536">3536</span>
+<span id="3537">3537</span>
+<span id="3538">3538</span>
+<span id="3539">3539</span>
+<span id="3540">3540</span>
+<span id="3541">3541</span>
+<span id="3542">3542</span>
+<span id="3543">3543</span>
+<span id="3544">3544</span>
+<span id="3545">3545</span>
+<span id="3546">3546</span>
+<span id="3547">3547</span>
+<span id="3548">3548</span>
+<span id="3549">3549</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -4479,6 +4556,83 @@
 /// Each instance of this type has its own sandboxed environment. Its stack
 /// space, function declarations, and [`Environment`] are unique from all other
 /// instances of Bud with the exception that [`Symbol`]s are tracked globally.
+///
+/// # General Virtual Machine design
+///
+/// At the core of this type is a [`Stack`], which is a list of [`Value`]s. The
+/// virtual machine divides the stack into &quot;frames&quot; (regions of [`Value`]s) as
+/// it executes and calls functions.
+///
+/// Each stack frame is divided into two sections: arguments that were passed to
+/// the function, and space for local variables. Stack frames are automatically
+/// managed by the virtual machine.
+///
+/// The only time [`Value`]s need to be pushed to the stack directly is when
+/// calling a function. Each argument being passed to the function is pushed to
+/// the stack, and the virtual machine adopts the pushed values as part of the
+/// called function&#39;s stack frame.
+///
+/// This example demonstrates a basic function that takes one argument and uses
+/// 1 local variable. It performs the equivalent of creating a string like
+/// `Hello, {name}!`.
+///
+/// ```rust
+/// use std::borrow::Cow;
+/// use budvm::{VirtualMachine, Function, Instruction, Value, ValueOrSource, Destination, Symbol};
+///
+/// let greet = Function {
+///     name: Symbol::from(&quot;greet&quot;),
+///     arg_count: 1,
+///     variable_count: 1,
+///     code: vec![
+///         Instruction::Add {
+///             left: ValueOrSource::Value(Value::dynamic(String::from(&quot;Hello, &quot;))),
+///             right: ValueOrSource::Argument(0),
+///             destination: Destination::Variable(0),
+///         },
+///         Instruction::Add {
+///             left: ValueOrSource::Variable(0),
+///             right: ValueOrSource::Value(Value::dynamic(String::from(&quot;!&quot;))),
+///             destination: Destination::Return,
+///         },
+///     ],
+/// };
+///
+/// let mut vm = VirtualMachine::empty().with_function(greet);
+/// let result: String = vm
+///     .run(
+///         Cow::Borrowed(&amp;[
+///             Instruction::Push(ValueOrSource::Value(Value::dynamic(String::from(&quot;Ferris&quot;)))),
+///             Instruction::Call {
+///                 vtable_index: Some(0),
+///                 arg_count: 1,
+///                 destination: Destination::Stack,
+///             },
+///         ]),
+///         0,
+///     )
+///     .unwrap();
+/// assert_eq!(result, &quot;Hello, Ferris!&quot;);
+/// ```
+///
+/// When the virtual machine finishes executing [`Instruction::Call`],
+/// [`Instruction::CallIntrinsic`], or [`Instruction::CallInstance`], the return
+/// value is placed in the correct location and the stack is cleaned up to
+/// remove all pushed arguments and local variables of the function being
+/// called.
+///
+/// The Rust interface will automatically pop a value from the stack upon
+/// returning. The [`FromStack`] trait allows a type to be converted seamlessly
+/// as in the above example.
+///
+/// The previous example also highlights one other interesting aspect of the
+/// virtual machine: all heap-allocated types are grouped into a single
+/// [`Dynamic`] type. This means that the virtual machine doesn&#39;t actually know
+/// anything about the `String` type. The virtual machine knows how to perform
+/// operations with [`Dynamic`] values, and any Rust type that implements
+/// [`DynamicValue`] can be used in the virtual machine.
+///
+/// Each [`Instruction`] variant is documented with its expected behavior.
 </span><span class="attribute">#[derive(Debug, Default, Clone, PartialEq)]
 </span><span class="kw">pub struct </span>VirtualMachine&lt;Env&gt; {
     <span class="doccomment">/// The stack for this virtual machine. Take care when manually manipulating
