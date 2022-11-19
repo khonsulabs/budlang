@@ -95,16 +95,18 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
-    /// Performs an `and` operation with `left` and `right`, storing the result
-    /// in `destination`.
+    /// Performs a logical and of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Boolean`].
     ///
-    /// If both operands are integers, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
+    /// `left` and `right` will be checked for thruthyness. If both are truthy,
+    /// this operation will store true in `destination`. Otherwise, false will
+    /// be stored.
     ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `left.is_truthy() and
-    /// right.is_truthy()`.
-    And {
+    /// # Short Circuiting
+    ///
+    /// This instruction will not evaluate `right`'s truthiness if `left` is
+    /// false.
+    LogicalAnd {
         /// The left hand side of the operation.
         left: LiteralOrSource,
         /// The right hand side of the operation.
@@ -112,16 +114,18 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
-    /// Performs an `or` operation with `left` and `right`, storing the result
-    /// in `destination`.
+    /// Performs a logical or of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Boolean`].
     ///
-    /// If both operands are integers, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
+    /// `left` and `right` will be checked for thruthyness. If either are
+    /// truthy, this operation will store true in `destination`. Otherwise,
+    /// false will be stored.
     ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `left.is_truthy() or
-    /// right.is_truthy()`.
-    Or {
+    /// # Short Circuiting
+    ///
+    /// This instruction will not evaluate `right`'s truthiness if `left` is
+    /// true.
+    LogicalOr {
         /// The left hand side of the operation.
         left: LiteralOrSource,
         /// The right hand side of the operation.
@@ -129,16 +133,62 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
-    /// Performs a `xor` operation with `left` and `right`, storing the result
-    /// in `destination`.
+    /// Performs a logical exclusive-or of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Boolean`].
     ///
-    /// If both operands are integers, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
+    /// `left` and `right` will be checked for thruthyness. If one is truthy and
+    /// the other is not, this operation will store true in `destination`.
+    /// Otherwise, false will be stored.
+    LogicalXor {
+        /// The left hand side of the operation.
+        left: LiteralOrSource,
+        /// The right hand side of the operation.
+        right: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a bitwise and of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Integer`].
     ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `left.is_truthy() xor
-    /// right.is_truthy()`.
-    Xor {
+    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// returned.
+    ///
+    /// The result will have each bit set based on whether the corresponding bit
+    /// in both `left` and `right` are both 1.
+    BitwiseAnd {
+        /// The left hand side of the operation.
+        left: LiteralOrSource,
+        /// The right hand side of the operation.
+        right: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a bitwise or of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Integer`].
+    ///
+    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// returned.
+    ///
+    /// The result will have each bit set based on whether either corresponding bit
+    /// in `left` or `right` are 1.
+    BitwiseOr {
+        /// The left hand side of the operation.
+        left: LiteralOrSource,
+        /// The right hand side of the operation.
+        right: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a bitwise exclusive-or of `left` and `right` and places the
+    /// result in `destination`. This operation always results in a
+    /// [`Value::Integer`].
+    ///
+    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// returned.
+    ///
+    /// The result will have each bit set based on whether only one
+    /// corresponding bit in either `left` or `right` are 1.
+    BitwiseXor {
         /// The left hand side of the operation.
         left: LiteralOrSource,
         /// The right hand side of the operation.
@@ -302,6 +352,7 @@ pub enum Instruction {
 }
 
 impl Display for Instruction {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Instruction::Add {
@@ -324,21 +375,36 @@ impl Display for Instruction {
                 right,
                 destination,
             } => write!(f, "div {left} {right} {destination}"),
-            Instruction::And {
+            Instruction::LogicalAnd {
                 left,
                 right,
                 destination,
             } => write!(f, "and {left} {right} {destination}"),
-            Instruction::Or {
+            Instruction::LogicalOr {
                 left,
                 right,
                 destination,
             } => write!(f, "or {left} {right} {destination}"),
-            Instruction::Xor {
+            Instruction::LogicalXor {
                 left,
                 right,
                 destination,
             } => write!(f, "xor {left} {right} {destination}"),
+            Instruction::BitwiseAnd {
+                left,
+                right,
+                destination,
+            } => write!(f, "bitand {left} {right} {destination}"),
+            Instruction::BitwiseOr {
+                left,
+                right,
+                destination,
+            } => write!(f, "bitor {left} {right} {destination}"),
+            Instruction::BitwiseXor {
+                left,
+                right,
+                destination,
+            } => write!(f, "bitxor {left} {right} {destination}"),
             Instruction::ShiftLeft {
                 left,
                 right,
@@ -946,29 +1012,56 @@ where
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
         },
-        Instruction::Or {
+        Instruction::LogicalOr {
             left,
             right,
             destination,
-        } => crate::Instruction::Or {
+        } => crate::Instruction::LogicalOr {
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
         },
-        Instruction::And {
+        Instruction::LogicalAnd {
             left,
             right,
             destination,
-        } => crate::Instruction::And {
+        } => crate::Instruction::LogicalAnd {
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
         },
-        Instruction::Xor {
+        Instruction::LogicalXor {
             left,
             right,
             destination,
-        } => crate::Instruction::Xor {
+        } => crate::Instruction::LogicalXor {
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::BitwiseOr {
+            left,
+            right,
+            destination,
+        } => crate::Instruction::BitwiseOr {
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::BitwiseAnd {
+            left,
+            right,
+            destination,
+        } => crate::Instruction::BitwiseAnd {
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::BitwiseXor {
+            left,
+            right,
+            destination,
+        } => crate::Instruction::BitwiseXor {
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),

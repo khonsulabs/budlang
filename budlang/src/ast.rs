@@ -421,18 +421,25 @@ impl BinOpKind {
                     right,
                     destination,
                 }),
-                BinOpKind::BitwiseAnd => operations.push(Instruction::And {
+                BinOpKind::BitwiseAnd => operations.push(Instruction::BitwiseAnd {
                     left,
                     right,
                     destination,
                 }),
-                BinOpKind::BitwiseOr => operations.push(Instruction::Or {
+                BinOpKind::BitwiseOr => operations.push(Instruction::BitwiseOr {
                     left,
                     right,
                     destination,
                 }),
-                BinOpKind::BitwiseXor | BinOpKind::LogicalXor => {
-                    operations.push(Instruction::Xor {
+                BinOpKind::LogicalXor => {
+                    operations.push(Instruction::LogicalXor {
+                        left,
+                        right,
+                        destination,
+                    });
+                }
+                BinOpKind::BitwiseXor => {
+                    operations.push(Instruction::BitwiseXor {
                         left,
                         right,
                         destination,
