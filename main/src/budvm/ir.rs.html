@@ -1274,6 +1274,60 @@
 <span id="1274">1274</span>
 <span id="1275">1275</span>
 <span id="1276">1276</span>
+<span id="1277">1277</span>
+<span id="1278">1278</span>
+<span id="1279">1279</span>
+<span id="1280">1280</span>
+<span id="1281">1281</span>
+<span id="1282">1282</span>
+<span id="1283">1283</span>
+<span id="1284">1284</span>
+<span id="1285">1285</span>
+<span id="1286">1286</span>
+<span id="1287">1287</span>
+<span id="1288">1288</span>
+<span id="1289">1289</span>
+<span id="1290">1290</span>
+<span id="1291">1291</span>
+<span id="1292">1292</span>
+<span id="1293">1293</span>
+<span id="1294">1294</span>
+<span id="1295">1295</span>
+<span id="1296">1296</span>
+<span id="1297">1297</span>
+<span id="1298">1298</span>
+<span id="1299">1299</span>
+<span id="1300">1300</span>
+<span id="1301">1301</span>
+<span id="1302">1302</span>
+<span id="1303">1303</span>
+<span id="1304">1304</span>
+<span id="1305">1305</span>
+<span id="1306">1306</span>
+<span id="1307">1307</span>
+<span id="1308">1308</span>
+<span id="1309">1309</span>
+<span id="1310">1310</span>
+<span id="1311">1311</span>
+<span id="1312">1312</span>
+<span id="1313">1313</span>
+<span id="1314">1314</span>
+<span id="1315">1315</span>
+<span id="1316">1316</span>
+<span id="1317">1317</span>
+<span id="1318">1318</span>
+<span id="1319">1319</span>
+<span id="1320">1320</span>
+<span id="1321">1321</span>
+<span id="1322">1322</span>
+<span id="1323">1323</span>
+<span id="1324">1324</span>
+<span id="1325">1325</span>
+<span id="1326">1326</span>
+<span id="1327">1327</span>
+<span id="1328">1328</span>
+<span id="1329">1329</span>
+<span id="1330">1330</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An intermediate representation of virtual machine instructions.
 //!
 //! This intermediate representation provides conveniences for handling
@@ -1418,6 +1472,32 @@
         <span class="doccomment">/// The left hand side of the operation.
         </span>left: LiteralOrSource,
         <span class="doccomment">/// The right hand side of the operation.
+        </span>right: LiteralOrSource,
+        <span class="doccomment">/// The destination for the result to be stored in.
+        </span>destination: Destination,
+    },
+    <span class="doccomment">/// Performs a bitwise shift left of `left` by `right` bits, storing
+    /// the result in `destination`.
+    ///
+    /// This operation requires both operands to be integers. If either are not
+    /// integers, a fault will be returned.
+    </span>ShiftLeft {
+        <span class="doccomment">/// The value to shift
+        </span>left: LiteralOrSource,
+        <span class="doccomment">/// The number of bits to shift by
+        </span>right: LiteralOrSource,
+        <span class="doccomment">/// The destination for the result to be stored in.
+        </span>destination: Destination,
+    },
+    <span class="doccomment">/// Performs a bitwise shift right of `left` by `right` bits, storing the
+    /// result in `destination`.
+    ///
+    /// This operation requires both operands to be integers. If either are not
+    /// integers, a fault will be returned.
+    </span>ShiftRight {
+        <span class="doccomment">/// The value to shift
+        </span>left: LiteralOrSource,
+        <span class="doccomment">/// The number of bits to shift by
         </span>right: LiteralOrSource,
         <span class="doccomment">/// The destination for the result to be stored in.
         </span>destination: Destination,
@@ -1589,6 +1669,16 @@
                 right,
                 destination,
             } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;xor {left} {right} {destination}&quot;</span>),
+            Instruction::ShiftLeft {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;shl {left} {right} {destination}&quot;</span>),
+            Instruction::ShiftRight {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;shr {left} {right} {destination}&quot;</span>),
             Instruction::Not { value, destination } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;not {value} {destination}&quot;</span>),
             Instruction::If {
                 condition,
@@ -2209,6 +2299,24 @@
             right,
             destination,
         } =&gt; <span class="kw">crate</span>::Instruction::Xor {
+            left: left.instantiate::&lt;S::Environment&gt;(),
+            right: right.instantiate::&lt;S::Environment&gt;(),
+            destination: destination.into(),
+        },
+        Instruction::ShiftLeft {
+            left,
+            right,
+            destination,
+        } =&gt; <span class="kw">crate</span>::Instruction::ShiftLeft {
+            left: left.instantiate::&lt;S::Environment&gt;(),
+            right: right.instantiate::&lt;S::Environment&gt;(),
+            destination: destination.into(),
+        },
+        Instruction::ShiftRight {
+            left,
+            right,
+            destination,
+        } =&gt; <span class="kw">crate</span>::Instruction::ShiftRight {
             left: left.instantiate::&lt;S::Environment&gt;(),
             right: right.instantiate::&lt;S::Environment&gt;(),
             destination: destination.into(),

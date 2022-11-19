@@ -1274,6 +1274,22 @@
 <span id="1274">1274</span>
 <span id="1275">1275</span>
 <span id="1276">1276</span>
+<span id="1277">1277</span>
+<span id="1278">1278</span>
+<span id="1279">1279</span>
+<span id="1280">1280</span>
+<span id="1281">1281</span>
+<span id="1282">1282</span>
+<span id="1283">1283</span>
+<span id="1284">1284</span>
+<span id="1285">1285</span>
+<span id="1286">1286</span>
+<span id="1287">1287</span>
+<span id="1288">1288</span>
+<span id="1289">1289</span>
+<span id="1290">1290</span>
+<span id="1291">1291</span>
+<span id="1292">1292</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)] </span><span class="comment">// TODO docs and panics for ast
 
 </span><span class="kw">use </span>std::{
@@ -1650,6 +1666,8 @@
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
+    ShiftLeft,
+    ShiftRight,
     Compare(Comparison),
 }
 
@@ -1707,6 +1725,20 @@
                 }),
                 BinOpKind::BitwiseXor | BinOpKind::LogicalXor =&gt; {
                     operations.push(Instruction::Xor {
+                        left,
+                        right,
+                        destination,
+                    });
+                }
+                BinOpKind::ShiftLeft =&gt; {
+                    operations.push(Instruction::ShiftLeft {
+                        left,
+                        right,
+                        destination,
+                    });
+                }
+                BinOpKind::ShiftRight =&gt; {
+                    operations.push(Instruction::ShiftRight {
                         left,
                         right,
                         destination,

@@ -1433,6 +1433,18 @@
 <span id="1433">1433</span>
 <span id="1434">1434</span>
 <span id="1435">1435</span>
+<span id="1436">1436</span>
+<span id="1437">1437</span>
+<span id="1438">1438</span>
+<span id="1439">1439</span>
+<span id="1440">1440</span>
+<span id="1441">1441</span>
+<span id="1442">1442</span>
+<span id="1443">1443</span>
+<span id="1444">1444</span>
+<span id="1445">1445</span>
+<span id="1446">1446</span>
+<span id="1447">1447</span>
 </pre><pre class="rust"><code><span class="comment">// TODO docs for parser
 </span><span class="attribute">#![allow(missing_docs)]
 </span><span class="comment">// We use the Range type which doesn&#39;t allow this, and it&#39;s not worth making a
@@ -1489,6 +1501,8 @@
     Sub,
     Multiply,
     Divide,
+    ShiftLeft,
+    ShiftRight,
     Open(BracketType),
     Close(BracketType),
     EndOfLine,
@@ -1511,6 +1525,8 @@
             TokenKind::String(value) =&gt; Display::fmt(value, f),
             TokenKind::Assign =&gt; f.write_str(<span class="string">&quot;:=&quot;</span>),
             TokenKind::Comparison(value) =&gt; Display::fmt(value, f),
+            TokenKind::ShiftLeft =&gt; f.write_str(<span class="string">&quot;&lt;&lt;&quot;</span>),
+            TokenKind::ShiftRight =&gt; f.write_str(<span class="string">&quot;&gt;&gt;&quot;</span>),
             TokenKind::Not =&gt; f.write_char(<span class="string">&#39;!&#39;</span>),
             TokenKind::Add =&gt; f.write_char(<span class="string">&#39;+&#39;</span>),
             TokenKind::Sub =&gt; f.write_char(<span class="string">&#39;-&#39;</span>),
@@ -1829,34 +1845,40 @@
                     }
                 }
                 <span class="prelude-val">Some</span>((offset, char)) <span class="kw">if </span>char == <span class="string">&#39;&lt;&#39; </span>=&gt; {
-                    <span class="kw">if </span><span class="macro">matches!</span>(<span class="self">self</span>.chars.peek().map(|(<span class="kw">_</span>, ch)| <span class="kw-2">*</span>ch), <span class="prelude-val">Some</span>(<span class="string">&#39;=&#39;</span>)) {
-                        <span class="self">self</span>.chars.next();
+                    <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="kw">match </span><span class="self">self</span>.chars.peek().map(|(<span class="kw">_</span>, ch)| <span class="kw-2">*</span>ch) {
+                        <span class="prelude-val">Some</span>(<span class="string">&#39;=&#39;</span>) =&gt; {
+                            <span class="self">self</span>.chars.next();
+                            Token::new(
+                                TokenKind::Comparison(Comparison::LessThanOrEqual),
+                                offset..offset + <span class="number">2</span>,
+                            )
+                        }
+                        <span class="prelude-val">Some</span>(<span class="string">&#39;&lt;&#39;</span>) =&gt; {
+                            <span class="self">self</span>.chars.next();
+                            Token::new(TokenKind::ShiftLeft, offset..offset + <span class="number">2</span>)
+                        }
 
-                        <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token::new(
-                            TokenKind::Comparison(Comparison::LessThanOrEqual),
-                            offset..offset + <span class="number">2</span>,
-                        )))
-                    } <span class="kw">else </span>{
-                        <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token::at_offset(
-                            TokenKind::Comparison(Comparison::LessThan),
-                            offset,
-                        )))
-                    }
+                        <span class="kw">_ </span>=&gt; Token::at_offset(TokenKind::Comparison(Comparison::LessThan), offset),
+                    }))
                 }
                 <span class="prelude-val">Some</span>((offset, char)) <span class="kw">if </span>char == <span class="string">&#39;&gt;&#39; </span>=&gt; {
-                    <span class="kw">if </span><span class="macro">matches!</span>(<span class="self">self</span>.chars.peek().map(|(<span class="kw">_</span>, ch)| <span class="kw-2">*</span>ch), <span class="prelude-val">Some</span>(<span class="string">&#39;=&#39;</span>)) {
-                        <span class="self">self</span>.chars.next();
+                    <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="kw">match </span><span class="self">self</span>.chars.peek().map(|(<span class="kw">_</span>, ch)| <span class="kw-2">*</span>ch) {
+                        <span class="prelude-val">Some</span>(<span class="string">&#39;=&#39;</span>) =&gt; {
+                            <span class="self">self</span>.chars.next();
+                            Token::new(
+                                TokenKind::Comparison(Comparison::GreaterThanOrEqual),
+                                offset..offset + <span class="number">2</span>,
+                            )
+                        }
+                        <span class="prelude-val">Some</span>(<span class="string">&#39;&gt;&#39;</span>) =&gt; {
+                            <span class="self">self</span>.chars.next();
+                            Token::new(TokenKind::ShiftRight, offset..offset + <span class="number">2</span>)
+                        }
 
-                        <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token::new(
-                            TokenKind::Comparison(Comparison::GreaterThanOrEqual),
-                            offset..offset + <span class="number">2</span>,
-                        )))
-                    } <span class="kw">else </span>{
-                        <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token::at_offset(
-                            TokenKind::Comparison(Comparison::GreaterThan),
-                            offset,
-                        )))
-                    }
+                        <span class="kw">_ </span>=&gt; {
+                            Token::at_offset(TokenKind::Comparison(Comparison::GreaterThan), offset)
+                        }
+                    }))
                 }
                 <span class="prelude-val">Some</span>((offset, char)) <span class="kw">if </span>char == <span class="string">&#39;:&#39; </span>=&gt; {
                     <span class="kw">if </span><span class="macro">matches!</span>(<span class="self">self</span>.chars.peek().map(|(<span class="kw">_</span>, ch)| <span class="kw-2">*</span>ch), <span class="prelude-val">Some</span>(<span class="string">&#39;=&#39;</span>)) {
@@ -2510,6 +2532,8 @@
         <span class="prelude-val">Some</span>(TokenKind::Ampersand) =&gt; <span class="prelude-val">Some</span>(BinOpKind::BitwiseAnd),
         <span class="prelude-val">Some</span>(TokenKind::Pipe) =&gt; <span class="prelude-val">Some</span>(BinOpKind::BitwiseOr),
         <span class="prelude-val">Some</span>(TokenKind::Caret) =&gt; <span class="prelude-val">Some</span>(BinOpKind::BitwiseXor),
+        <span class="prelude-val">Some</span>(TokenKind::ShiftLeft) =&gt; <span class="prelude-val">Some</span>(BinOpKind::ShiftLeft),
+        <span class="prelude-val">Some</span>(TokenKind::ShiftRight) =&gt; <span class="prelude-val">Some</span>(BinOpKind::ShiftRight),
         <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
     } {
         <span class="kw">let </span>_op_token = tokens.next();
