@@ -3636,6 +3636,63 @@
 <span id="3636">3636</span>
 <span id="3637">3637</span>
 <span id="3638">3638</span>
+<span id="3639">3639</span>
+<span id="3640">3640</span>
+<span id="3641">3641</span>
+<span id="3642">3642</span>
+<span id="3643">3643</span>
+<span id="3644">3644</span>
+<span id="3645">3645</span>
+<span id="3646">3646</span>
+<span id="3647">3647</span>
+<span id="3648">3648</span>
+<span id="3649">3649</span>
+<span id="3650">3650</span>
+<span id="3651">3651</span>
+<span id="3652">3652</span>
+<span id="3653">3653</span>
+<span id="3654">3654</span>
+<span id="3655">3655</span>
+<span id="3656">3656</span>
+<span id="3657">3657</span>
+<span id="3658">3658</span>
+<span id="3659">3659</span>
+<span id="3660">3660</span>
+<span id="3661">3661</span>
+<span id="3662">3662</span>
+<span id="3663">3663</span>
+<span id="3664">3664</span>
+<span id="3665">3665</span>
+<span id="3666">3666</span>
+<span id="3667">3667</span>
+<span id="3668">3668</span>
+<span id="3669">3669</span>
+<span id="3670">3670</span>
+<span id="3671">3671</span>
+<span id="3672">3672</span>
+<span id="3673">3673</span>
+<span id="3674">3674</span>
+<span id="3675">3675</span>
+<span id="3676">3676</span>
+<span id="3677">3677</span>
+<span id="3678">3678</span>
+<span id="3679">3679</span>
+<span id="3680">3680</span>
+<span id="3681">3681</span>
+<span id="3682">3682</span>
+<span id="3683">3683</span>
+<span id="3684">3684</span>
+<span id="3685">3685</span>
+<span id="3686">3686</span>
+<span id="3687">3687</span>
+<span id="3688">3688</span>
+<span id="3689">3689</span>
+<span id="3690">3690</span>
+<span id="3691">3691</span>
+<span id="3692">3692</span>
+<span id="3693">3693</span>
+<span id="3694">3694</span>
+<span id="3695">3695</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -3737,16 +3794,18 @@
         <span class="doccomment">/// The destination for the result to be stored in.
         </span>destination: Destination,
     },
-    <span class="doccomment">/// Performs an `and` operation with `left` and `right`, storing the result
-    /// in `destination`.
+    <span class="doccomment">/// Performs a logical and of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Boolean`].
     ///
-    /// If both operands are integers, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
+    /// `left` and `right` will be checked for thruthyness. If both are truthy,
+    /// this operation will store true in `destination`. Otherwise, false will
+    /// be stored.
     ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `left.is_truthy() and
-    /// right.is_truthy()`.
-    </span>And {
+    /// # Short Circuiting
+    ///
+    /// This instruction will not evaluate `right`&#39;s truthiness if `left` is
+    /// false.
+    </span>LogicalAnd {
         <span class="doccomment">/// The left hand side of the operation.
         </span>left: ValueOrSource,
         <span class="doccomment">/// The right hand side of the operation.
@@ -3754,16 +3813,18 @@
         <span class="doccomment">/// The destination for the result to be stored in.
         </span>destination: Destination,
     },
-    <span class="doccomment">/// Performs an `or` operation with `left` and `right`, storing the result
-    /// in `destination`.
+    <span class="doccomment">/// Performs a logical or of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Boolean`].
     ///
-    /// If both operands are integers, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
+    /// `left` and `right` will be checked for thruthyness. If either are
+    /// truthy, this operation will store true in `destination`. Otherwise,
+    /// false will be stored.
     ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `left.is_truthy() or
-    /// right.is_truthy()`.
-    </span>Or {
+    /// # Short Circuiting
+    ///
+    /// This instruction will not evaluate `right`&#39;s truthiness if `left` is
+    /// true.
+    </span>LogicalOr {
         <span class="doccomment">/// The left hand side of the operation.
         </span>left: ValueOrSource,
         <span class="doccomment">/// The right hand side of the operation.
@@ -3771,16 +3832,62 @@
         <span class="doccomment">/// The destination for the result to be stored in.
         </span>destination: Destination,
     },
-    <span class="doccomment">/// Performs a `xor` operation with `left` and `right`, storing the result
-    /// in `destination`.
+    <span class="doccomment">/// Performs a logical exclusive-or of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Boolean`].
     ///
-    /// If both operands are integers, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
+    /// `left` and `right` will be checked for thruthyness. If one is truthy and
+    /// the other is not, this operation will store true in `destination`.
+    /// Otherwise, false will be stored.
+    </span>LogicalXor {
+        <span class="doccomment">/// The left hand side of the operation.
+        </span>left: ValueOrSource,
+        <span class="doccomment">/// The right hand side of the operation.
+        </span>right: ValueOrSource,
+        <span class="doccomment">/// The destination for the result to be stored in.
+        </span>destination: Destination,
+    },
+    <span class="doccomment">/// Performs a bitwise and of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Integer`].
     ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `left.is_truthy() xor
-    /// right.is_truthy()`.
-    </span>Xor {
+    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// returned.
+    ///
+    /// The result will have each bit set based on whether the corresponding bit
+    /// in both `left` and `right` are both 1.
+    </span>BitwiseAnd {
+        <span class="doccomment">/// The left hand side of the operation.
+        </span>left: ValueOrSource,
+        <span class="doccomment">/// The right hand side of the operation.
+        </span>right: ValueOrSource,
+        <span class="doccomment">/// The destination for the result to be stored in.
+        </span>destination: Destination,
+    },
+    <span class="doccomment">/// Performs a bitwise or of `left` and `right` and places the result in
+    /// `destination`. This operation always results in a [`Value::Integer`].
+    ///
+    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// returned.
+    ///
+    /// The result will have each bit set based on whether either corresponding bit
+    /// in `left` or `right` are 1.
+    </span>BitwiseOr {
+        <span class="doccomment">/// The left hand side of the operation.
+        </span>left: ValueOrSource,
+        <span class="doccomment">/// The right hand side of the operation.
+        </span>right: ValueOrSource,
+        <span class="doccomment">/// The destination for the result to be stored in.
+        </span>destination: Destination,
+    },
+    <span class="doccomment">/// Performs a bitwise exclusive-or of `left` and `right` and places the
+    /// result in `destination`. This operation always results in a
+    /// [`Value::Integer`].
+    ///
+    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// returned.
+    ///
+    /// The result will have each bit set based on whether only one
+    /// corresponding bit in either `left` or `right` are 1.
+    </span>BitwiseXor {
         <span class="doccomment">/// The left hand side of the operation.
         </span>left: ValueOrSource,
         <span class="doccomment">/// The right hand side of the operation.
@@ -3986,21 +4093,36 @@
                 right,
                 destination,
             } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;div {left} {right} {destination}&quot;</span>),
-            Instruction::And {
+            Instruction::LogicalAnd {
                 left,
                 right,
                 destination,
             } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;and {left} {right} {destination}&quot;</span>),
-            Instruction::Or {
+            Instruction::LogicalOr {
                 left,
                 right,
                 destination,
             } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;or {left} {right} {destination}&quot;</span>),
-            Instruction::Xor {
+            Instruction::LogicalXor {
                 left,
                 right,
                 destination,
             } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;xor {left} {right} {destination}&quot;</span>),
+            Instruction::BitwiseAnd {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;bitand {left} {right} {destination}&quot;</span>),
+            Instruction::BitwiseOr {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;bitor {left} {right} {destination}&quot;</span>),
+            Instruction::BitwiseXor {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;bitxor {left} {right} {destination}&quot;</span>),
             Instruction::ShiftLeft {
                 left,
                 right,
@@ -5286,21 +5408,36 @@
                 right,
                 destination,
             } =&gt; <span class="self">self</span>.checked_div(left, right, <span class="kw-2">*</span>destination),
-            Instruction::And {
+            Instruction::LogicalAnd {
                 left,
                 right,
                 destination,
             } =&gt; <span class="self">self</span>.and(left, right, <span class="kw-2">*</span>destination),
-            Instruction::Or {
+            Instruction::LogicalOr {
                 left,
                 right,
                 destination,
             } =&gt; <span class="self">self</span>.or(left, right, <span class="kw-2">*</span>destination),
-            Instruction::Xor {
+            Instruction::LogicalXor {
                 left,
                 right,
                 destination,
             } =&gt; <span class="self">self</span>.xor(left, right, <span class="kw-2">*</span>destination),
+            Instruction::BitwiseAnd {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="self">self</span>.integer_op(left, right, <span class="kw-2">*</span>destination, |a, b| <span class="prelude-val">Ok</span>(a &amp; b)),
+            Instruction::BitwiseOr {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="self">self</span>.integer_op(left, right, <span class="kw-2">*</span>destination, |a, b| <span class="prelude-val">Ok</span>(a | b)),
+            Instruction::BitwiseXor {
+                left,
+                right,
+                destination,
+            } =&gt; <span class="self">self</span>.integer_op(left, right, <span class="kw-2">*</span>destination, |a, b| <span class="prelude-val">Ok</span>(a ^ b)),
             Instruction::ShiftLeft {
                 left,
                 right,
@@ -5841,6 +5978,60 @@
 
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
+
+    <span class="kw">fn </span>and(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        left: <span class="kw-2">&amp;</span>ValueOrSource,
+        right: <span class="kw-2">&amp;</span>ValueOrSource,
+        destination: Destination,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
+        <span class="kw">let </span>left = <span class="self">self</span>.resolve_value_or_source(left)<span class="question-mark">?</span>;
+        <span class="kw">let </span>left = left.is_truthy();
+
+        <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= Value::Boolean(<span class="kw">if </span>left {
+            <span class="kw">let </span>right = <span class="self">self</span>.resolve_value_or_source(right)<span class="question-mark">?</span>;
+            right.is_truthy()
+        } <span class="kw">else </span>{
+            <span class="bool-val">false
+        </span>});
+
+        <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+    }
+
+    <span class="kw">fn </span>or(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        left: <span class="kw-2">&amp;</span>ValueOrSource,
+        right: <span class="kw-2">&amp;</span>ValueOrSource,
+        destination: Destination,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
+        <span class="kw">let </span>left = <span class="self">self</span>.resolve_value_or_source(left)<span class="question-mark">?</span>;
+        <span class="kw">let </span>left = left.is_truthy();
+
+        <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= Value::Boolean(<span class="kw">if </span>left {
+            <span class="bool-val">true
+        </span>} <span class="kw">else </span>{
+            <span class="kw">let </span>right = <span class="self">self</span>.resolve_value_or_source(right)<span class="question-mark">?</span>;
+            right.is_truthy()
+        });
+
+        <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+    }
+
+    <span class="kw">fn </span>xor(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        left: <span class="kw-2">&amp;</span>ValueOrSource,
+        right: <span class="kw-2">&amp;</span>ValueOrSource,
+        destination: Destination,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
+        <span class="kw">let </span>left = <span class="self">self</span>.resolve_value_or_source(left)<span class="question-mark">?</span>;
+        <span class="kw">let </span>left = left.is_truthy();
+        <span class="kw">let </span>right = <span class="self">self</span>.resolve_value_or_source(right)<span class="question-mark">?</span>;
+        <span class="kw">let </span>right = right.is_truthy();
+
+        <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= Value::Boolean(left ^ right);
+
+        <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+    }
 }
 
 <span class="macro">macro_rules! </span>checked_op {
@@ -5937,83 +6128,6 @@
 <span class="macro">checked_op!</span>(checked_sub, sub, <span class="string">&quot;subtract&quot;</span>);
 <span class="macro">checked_op!</span>(checked_mul, mul, <span class="string">&quot;multiply&quot;</span>);
 <span class="macro">checked_op!</span>(checked_div, div, <span class="string">&quot;divide&quot;</span>);
-
-<span class="macro">macro_rules! </span>unchecked_op {
-    (<span class="macro-nonterminal">$name</span>:ident,  <span class="macro-nonterminal">$fullname</span>:literal, <span class="macro-nonterminal">$default</span>:expr) =&gt; {
-        <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt; StackFrame&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;
-        <span class="kw">where
-            </span>Env: Environment,
-        {
-            <span class="kw">fn </span><span class="macro-nonterminal">$name</span>(
-                <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-                left: <span class="kw-2">&amp;</span>ValueOrSource,
-                right: <span class="kw-2">&amp;</span>ValueOrSource,
-                result: Destination,
-            ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
-                <span class="kw">let </span>left_value = <span class="self">self</span>.resolve_value_or_source(left)<span class="question-mark">?</span>;
-                <span class="kw">let </span>right_value = <span class="self">self</span>.resolve_value_or_source(right)<span class="question-mark">?</span>;
-                <span class="kw">let </span>default = <span class="macro-nonterminal">$default</span>;
-
-                <span class="kw">let </span>produced_value = <span class="kw">match </span>(left_value, right_value) {
-                    (Value::Integer(left), Value::Integer(right)) =&gt; left.<span class="macro-nonterminal">$name</span>(right),
-                    (Value::Dynamic(left), right) =&gt; {
-                        <span class="kw">if let </span><span class="prelude-val">Some</span>(value) = left.<span class="macro-nonterminal">$name</span>(right) {
-                            value
-                        } <span class="kw">else if let </span>Value::Dynamic(right) = right {
-                            <span class="kw">if let </span><span class="prelude-val">Some</span>(value) = right.<span class="macro-nonterminal">$name</span>(left_value) {
-                                value
-                            } <span class="kw">else </span>{
-                                (default)(left_value, right_value)
-                            }
-                        } <span class="kw">else </span>{
-                            (default)(left_value, right_value)
-                        }
-                    }
-                    (left, Value::Dynamic(right)) =&gt; {
-                        <span class="kw">if let </span><span class="prelude-val">Some</span>(value) = right.<span class="macro-nonterminal">$name</span>(left) {
-                            value
-                        } <span class="kw">else </span>{
-                            (default)(left_value, right_value)
-                        }
-                    }
-                    <span class="kw">_ </span>=&gt; (default)(left_value, right_value),
-                };
-                <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(result)<span class="question-mark">? </span>= produced_value;
-                <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
-            }
-        }
-    };
-}
-
-<span class="macro">unchecked_op!</span>(and, <span class="string">&quot;and&quot;</span>, |a: <span class="kw-2">&amp;</span>Value, b: <span class="kw-2">&amp;</span>Value| Value::Boolean(
-    a.is_truthy() &amp;&amp; b.is_truthy()
-));
-<span class="macro">unchecked_op!</span>(or, <span class="string">&quot;or&quot;</span>, |a: <span class="kw-2">&amp;</span>Value, b: <span class="kw-2">&amp;</span>Value| Value::Boolean(
-    a.is_truthy() || b.is_truthy()
-));
-<span class="macro">unchecked_op!</span>(xor, <span class="string">&quot;xor&quot;</span>, |a: <span class="kw-2">&amp;</span>Value, b: <span class="kw-2">&amp;</span>Value| Value::Boolean(
-    a.is_truthy() ^ b.is_truthy()
-));
-
-<span class="kw">trait </span>LogicOrBitwiseOps {
-    <span class="kw">fn </span>and(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; Value;
-    <span class="kw">fn </span>or(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; Value;
-    <span class="kw">fn </span>xor(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; Value;
-}
-
-<span class="kw">impl </span>LogicOrBitwiseOps <span class="kw">for </span>i64 {
-    <span class="kw">fn </span>and(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; Value {
-        Value::Integer(<span class="kw-2">*</span><span class="self">self </span>&amp; <span class="kw-2">*</span>other)
-    }
-
-    <span class="kw">fn </span>or(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; Value {
-        Value::Integer(<span class="kw-2">*</span><span class="self">self </span>| <span class="kw-2">*</span>other)
-    }
-
-    <span class="kw">fn </span>xor(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; Value {
-        Value::Integer(<span class="kw-2">*</span><span class="self">self </span>^ <span class="kw-2">*</span>other)
-    }
-}
 
 <span class="doccomment">/// An unexpected event occurred while executing the virtual machine.
 </span><span class="attribute">#[derive(Debug, PartialEq)]

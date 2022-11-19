@@ -1290,6 +1290,13 @@
 <span id="1290">1290</span>
 <span id="1291">1291</span>
 <span id="1292">1292</span>
+<span id="1293">1293</span>
+<span id="1294">1294</span>
+<span id="1295">1295</span>
+<span id="1296">1296</span>
+<span id="1297">1297</span>
+<span id="1298">1298</span>
+<span id="1299">1299</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)] </span><span class="comment">// TODO docs and panics for ast
 
 </span><span class="kw">use </span>std::{
@@ -1713,18 +1720,25 @@
                     right,
                     destination,
                 }),
-                BinOpKind::BitwiseAnd =&gt; operations.push(Instruction::And {
+                BinOpKind::BitwiseAnd =&gt; operations.push(Instruction::BitwiseAnd {
                     left,
                     right,
                     destination,
                 }),
-                BinOpKind::BitwiseOr =&gt; operations.push(Instruction::Or {
+                BinOpKind::BitwiseOr =&gt; operations.push(Instruction::BitwiseOr {
                     left,
                     right,
                     destination,
                 }),
-                BinOpKind::BitwiseXor | BinOpKind::LogicalXor =&gt; {
-                    operations.push(Instruction::Xor {
+                BinOpKind::LogicalXor =&gt; {
+                    operations.push(Instruction::LogicalXor {
+                        left,
+                        right,
+                        destination,
+                    });
+                }
+                BinOpKind::BitwiseXor =&gt; {
+                    operations.push(Instruction::BitwiseXor {
                         left,
                         right,
                         destination,
