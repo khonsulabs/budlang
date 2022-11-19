@@ -150,6 +150,32 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
+    /// Performs a bitwise shift left of `left` by `right` bits, storing
+    /// the result in `destination`.
+    ///
+    /// This operation requires both operands to be integers. If either are not
+    /// integers, a fault will be returned.
+    ShiftLeft {
+        /// The value to shift
+        left: ValueOrSource,
+        /// The number of bits to shift by
+        right: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a bitwise shift right of `left` by `right` bits, storing the
+    /// result in `destination`.
+    ///
+    /// This operation requires both operands to be integers. If either are not
+    /// integers, a fault will be returned.
+    ShiftRight {
+        /// The value to shift
+        left: ValueOrSource,
+        /// The number of bits to shift by
+        right: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
     /// Performs a `not` operation for `value`, storing the result in
     /// `destination`.
     ///
@@ -299,6 +325,7 @@ pub enum Instruction {
 }
 
 impl Display for Instruction {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Instruction::Add {
@@ -336,6 +363,16 @@ impl Display for Instruction {
                 right,
                 destination,
             } => write!(f, "xor {left} {right} {destination}"),
+            Instruction::ShiftLeft {
+                left,
+                right,
+                destination,
+            } => write!(f, "shl {left} {right} {destination}"),
+            Instruction::ShiftRight {
+                left,
+                right,
+                destination,
+            } => write!(f, "shr {left} {right} {destination}"),
             Instruction::Not { value, destination } => write!(f, "not {value} {destination}"),
             Instruction::If {
                 condition,
@@ -1582,6 +1619,7 @@ where
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn execute_operation(
         &mut self,
         operation: &Instruction,
@@ -1625,6 +1663,28 @@ where
                 right,
                 destination,
             } => self.xor(left, right, *destination),
+            Instruction::ShiftLeft {
+                left,
+                right,
+                destination,
+            } => self.integer_op(left, right, *destination, |a, b| {
+                if b < 64 {
+                    Ok(a << b)
+                } else {
+                    Ok(0)
+                }
+            }),
+            Instruction::ShiftRight {
+                left,
+                right,
+                destination,
+            } => self.integer_op(left, right, *destination, |a, b| {
+                if b < 64 {
+                    Ok(a >> b)
+                } else {
+                    Ok(0)
+                }
+            }),
             Instruction::Not {
                 value: left,
                 destination,
@@ -2111,6 +2171,35 @@ where
             }
         };
         *self.resolve_value_source_mut(destination)? = produced_value;
+
+        Ok(None)
+    }
+
+    fn extract_integer(value: &Value) -> Result<i64, Fault<'static, Env, Output>> {
+        if let Value::Integer(value) = value {
+            Ok(*value)
+        } else {
+            Err(Fault::from(FaultKind::type_mismatch(
+                "operation only supports @expected, received @receoved-value (@received-kind)",
+                ValueKind::Integer,
+                value.clone(),
+            )))
+        }
+    }
+
+    fn integer_op(
+        &mut self,
+        left: &ValueOrSource,
+        right: &ValueOrSource,
+        destination: Destination,
+        body: impl FnOnce(i64, i64) -> Result<i64, Fault<'static, Env, Output>>,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let left = self.resolve_value_or_source(left)?;
+        let left = Self::extract_integer(left)?;
+        let right = self.resolve_value_or_source(right)?;
+        let right = Self::extract_integer(right)?;
+        let produced_value = body(left, right)?;
+        *self.resolve_value_source_mut(destination)? = Value::Integer(produced_value);
 
         Ok(None)
     }

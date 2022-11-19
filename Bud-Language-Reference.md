@@ -1,6 +1,6 @@
 # Language Reference
 
-Bud is a compiled, dynamically typed language. Bud code is divided into two
+Bud is a compiled, dynamically typed language. Bud code is divided into three
 concepts: comments, declarations, and expressions.
 
 Each line of code is ended by a carriage return (CR), line feed (LF), or
@@ -250,8 +250,22 @@ false and not_called()
 
 ### Bitwise Binary Expressions
 
-Bitwise binary expresssions use the `&`, `|` and `^` symbols that many other
+Bitwise binary expresssions use the `&`, `|`, `^`, `<<` and `>>` symbols that
+many other
 programming languages use.
+
+* `&` **Bitwise And**: Each bit of the resulting integer will be set only if the
+  bit is set in both the left and right operands.
+* `|` **Bitwise Or**: Each bit of the resulting integer will be set if the bit
+  is set in either the left or right operands.
+* `^` **Bitwise Xor**: Each bit of the resulting integer will be set if the bit
+  is set in either the left or right operand, but not both.
+* `<<` **Bitwise Shift Left**: The left hand integer's bits are shifted left,
+  leaving 0s behind. If the right hand side is larger than the number of bits in
+  an integer, the result will be 0.
+* `>>` **Bitwise Shift Right**: The left hand integer's bits are shifted right,
+  leaving 0s behind. If the right hand side is larger than the number of bits in
+  an integer, the result will be 0.
 
 ```bud
 // Bitwise and
@@ -260,6 +274,10 @@ programming languages use.
 1 | 3 // produces 3
 // Bitwise xor
 1 ^ 3 // produces 2
+// Bitwise Shift Left
+1 << 3 // produces 8
+// Bitwise Shift Right
+8 >> 3 // produces 1
 ```
 
 ### Comparison Expression

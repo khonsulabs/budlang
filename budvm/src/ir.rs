@@ -146,6 +146,32 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
+    /// Performs a bitwise shift left of `left` by `right` bits, storing
+    /// the result in `destination`.
+    ///
+    /// This operation requires both operands to be integers. If either are not
+    /// integers, a fault will be returned.
+    ShiftLeft {
+        /// The value to shift
+        left: LiteralOrSource,
+        /// The number of bits to shift by
+        right: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a bitwise shift right of `left` by `right` bits, storing the
+    /// result in `destination`.
+    ///
+    /// This operation requires both operands to be integers. If either are not
+    /// integers, a fault will be returned.
+    ShiftRight {
+        /// The value to shift
+        left: LiteralOrSource,
+        /// The number of bits to shift by
+        right: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
     /// Performs a `not` operation for `value`, storing the result in
     /// `destination`.
     ///
@@ -313,6 +339,16 @@ impl Display for Instruction {
                 right,
                 destination,
             } => write!(f, "xor {left} {right} {destination}"),
+            Instruction::ShiftLeft {
+                left,
+                right,
+                destination,
+            } => write!(f, "shl {left} {right} {destination}"),
+            Instruction::ShiftRight {
+                left,
+                right,
+                destination,
+            } => write!(f, "shr {left} {right} {destination}"),
             Instruction::Not { value, destination } => write!(f, "not {value} {destination}"),
             Instruction::If {
                 condition,
@@ -933,6 +969,24 @@ where
             right,
             destination,
         } => crate::Instruction::Xor {
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::ShiftLeft {
+            left,
+            right,
+            destination,
+        } => crate::Instruction::ShiftLeft {
+            left: left.instantiate::<S::Environment>(),
+            right: right.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::ShiftRight {
+            left,
+            right,
+            destination,
+        } => crate::Instruction::ShiftRight {
             left: left.instantiate::<S::Environment>(),
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),

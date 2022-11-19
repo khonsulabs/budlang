@@ -54,6 +54,8 @@ pub enum TokenKind {
     Sub,
     Multiply,
     Divide,
+    ShiftLeft,
+    ShiftRight,
     Open(BracketType),
     Close(BracketType),
     EndOfLine,
@@ -76,6 +78,8 @@ impl Display for TokenKind {
             TokenKind::String(value) => Display::fmt(value, f),
             TokenKind::Assign => f.write_str(":="),
             TokenKind::Comparison(value) => Display::fmt(value, f),
+            TokenKind::ShiftLeft => f.write_str("<<"),
+            TokenKind::ShiftRight => f.write_str(">>"),
             TokenKind::Not => f.write_char('!'),
             TokenKind::Add => f.write_char('+'),
             TokenKind::Sub => f.write_char('-'),
@@ -394,34 +398,40 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 Some((offset, char)) if char == '<' => {
-                    if matches!(self.chars.peek().map(|(_, ch)| *ch), Some('=')) {
-                        self.chars.next();
+                    Some(Ok(match self.chars.peek().map(|(_, ch)| *ch) {
+                        Some('=') => {
+                            self.chars.next();
+                            Token::new(
+                                TokenKind::Comparison(Comparison::LessThanOrEqual),
+                                offset..offset + 2,
+                            )
+                        }
+                        Some('<') => {
+                            self.chars.next();
+                            Token::new(TokenKind::ShiftLeft, offset..offset + 2)
+                        }
 
-                        Some(Ok(Token::new(
-                            TokenKind::Comparison(Comparison::LessThanOrEqual),
-                            offset..offset + 2,
-                        )))
-                    } else {
-                        Some(Ok(Token::at_offset(
-                            TokenKind::Comparison(Comparison::LessThan),
-                            offset,
-                        )))
-                    }
+                        _ => Token::at_offset(TokenKind::Comparison(Comparison::LessThan), offset),
+                    }))
                 }
                 Some((offset, char)) if char == '>' => {
-                    if matches!(self.chars.peek().map(|(_, ch)| *ch), Some('=')) {
-                        self.chars.next();
+                    Some(Ok(match self.chars.peek().map(|(_, ch)| *ch) {
+                        Some('=') => {
+                            self.chars.next();
+                            Token::new(
+                                TokenKind::Comparison(Comparison::GreaterThanOrEqual),
+                                offset..offset + 2,
+                            )
+                        }
+                        Some('>') => {
+                            self.chars.next();
+                            Token::new(TokenKind::ShiftRight, offset..offset + 2)
+                        }
 
-                        Some(Ok(Token::new(
-                            TokenKind::Comparison(Comparison::GreaterThanOrEqual),
-                            offset..offset + 2,
-                        )))
-                    } else {
-                        Some(Ok(Token::at_offset(
-                            TokenKind::Comparison(Comparison::GreaterThan),
-                            offset,
-                        )))
-                    }
+                        _ => {
+                            Token::at_offset(TokenKind::Comparison(Comparison::GreaterThan), offset)
+                        }
+                    }))
                 }
                 Some((offset, char)) if char == ':' => {
                     if matches!(self.chars.peek().map(|(_, ch)| *ch), Some('=')) {
@@ -1075,6 +1085,8 @@ fn parse_bitwise_expression(
         Some(TokenKind::Ampersand) => Some(BinOpKind::BitwiseAnd),
         Some(TokenKind::Pipe) => Some(BinOpKind::BitwiseOr),
         Some(TokenKind::Caret) => Some(BinOpKind::BitwiseXor),
+        Some(TokenKind::ShiftLeft) => Some(BinOpKind::ShiftLeft),
+        Some(TokenKind::ShiftRight) => Some(BinOpKind::ShiftRight),
         _ => None,
     } {
         let _op_token = tokens.next();

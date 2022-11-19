@@ -625,6 +625,10 @@ fn bitwise() {
     assert_run!("1 & 3", 1);
     assert_run!("1 | 3", 3);
     assert_run!("1 ^ 3", 2);
+    assert_run!("1 << 3", 8);
+    assert_run!("1 << 64", 0);
+    assert_run!("8 >> 3", 1);
+    assert_run!("1 >> 64", 0);
 
     // Test coersion to logic. These operators won't short circuit, but they
     // behave consistently by truncating to boolean operations when non-integer

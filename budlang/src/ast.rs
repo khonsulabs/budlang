@@ -374,6 +374,8 @@ pub enum BinOpKind {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
+    ShiftLeft,
+    ShiftRight,
     Compare(Comparison),
 }
 
@@ -431,6 +433,20 @@ impl BinOpKind {
                 }),
                 BinOpKind::BitwiseXor | BinOpKind::LogicalXor => {
                     operations.push(Instruction::Xor {
+                        left,
+                        right,
+                        destination,
+                    });
+                }
+                BinOpKind::ShiftLeft => {
+                    operations.push(Instruction::ShiftLeft {
+                        left,
+                        right,
+                        destination,
+                    });
+                }
+                BinOpKind::ShiftRight => {
+                    operations.push(Instruction::ShiftRight {
                         left,
                         right,
                         destination,
