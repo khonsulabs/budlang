@@ -39,9 +39,9 @@ instruction:</p>
 <tr><td>1</td><td><code>return 1</code></td><td>1</td><td><code>return 1</code></td></tr>
 <tr><td></td><td></td><td>2</td><td><code>jump 8</code></td></tr>
 <tr><td>2</td><td><code>sub @0 1 stack</code></td><td>3</td><td><code>sub @0 1 stack</code></td></tr>
-<tr><td>3</td><td><code>recurse-call 1 $0</code></td><td>4</td><td><code>recurse-call 1 $0</code></td></tr>
+<tr><td>3</td><td><code>recurse 1 $0</code></td><td>4</td><td><code>recurse 1 $0</code></td></tr>
 <tr><td>4</td><td><code>sub @0 2 stack</code></td><td>5</td><td><code>sub @0 2 stack</code></td></tr>
-<tr><td>5</td><td><code>recurse-call 1 $1</code></td><td>6</td><td><code>recurse-call 1 $1</code></td></tr>
+<tr><td>5</td><td><code>recurse 1 $1</code></td><td>6</td><td><code>recurse 1 $1</code></td></tr>
 <tr><td>6</td><td><code>add $0 $1 $$</code></td><td>7</td><td><code>add $0 $1 $$</code></td></tr>
 </tbody></table>
 </div><h3 id="why-not-bud"><a href="#why-not-bud">Why not Bud?</a></h3>

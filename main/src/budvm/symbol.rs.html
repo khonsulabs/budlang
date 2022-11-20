@@ -218,30 +218,6 @@
 <span id="218">218</span>
 <span id="219">219</span>
 <span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
-<span id="238">238</span>
-<span id="239">239</span>
-<span id="240">240</span>
-<span id="241">241</span>
-<span id="242">242</span>
-<span id="243">243</span>
-<span id="244">244</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     borrow::Borrow,
     collections::HashSet,
@@ -461,30 +437,6 @@
             }
         }
     });
-}
-
-<span class="doccomment">/// A type that can be converted into `Option&lt;Symbol&gt;`.
-</span><span class="kw">pub trait </span>OptionalSymbol {
-    <span class="doccomment">/// Returns the value as a symbol, if possible.
-    </span><span class="kw">fn </span>into_symbol(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Symbol&gt;;
-}
-
-<span class="kw">impl </span>OptionalSymbol <span class="kw">for </span>Symbol {
-    <span class="kw">fn </span>into_symbol(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Symbol&gt; {
-        <span class="prelude-val">Some</span>(<span class="self">self</span>)
-    }
-}
-
-<span class="kw">impl </span>OptionalSymbol <span class="kw">for </span><span class="prelude-ty">Option</span>&lt;Symbol&gt; {
-    <span class="kw">fn </span>into_symbol(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Symbol&gt; {
-        <span class="self">self
-    </span>}
-}
-
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; OptionalSymbol <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str {
-    <span class="kw">fn </span>into_symbol(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Symbol&gt; {
-        <span class="prelude-val">Some</span>(Symbol::from(<span class="self">self</span>))
-    }
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="budvm" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

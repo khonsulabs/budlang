@@ -3693,6 +3693,7 @@
 <span id="3693">3693</span>
 <span id="3694">3694</span>
 <span id="3695">3695</span>
+<span id="3696">3696</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -3725,6 +3726,7 @@
 </span><span class="kw">pub mod </span>budmap;
 <span class="kw">mod </span>dynamic;
 <span class="kw">pub mod </span>ir;
+<span class="kw">pub mod </span>lexer_util;
 <span class="kw">mod </span>list;
 <span class="kw">mod </span>map;
 <span class="kw">mod </span>string;
@@ -3737,7 +3739,7 @@
     list::List,
     map::HashMap,
     string::StringLiteralDisplay,
-    symbol::{OptionalSymbol, Symbol},
+    symbol::Symbol,
 };
 
 <span class="doccomment">/// A virtual machine instruction.
@@ -4165,7 +4167,7 @@
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(vtable_index) = vtable_index {
                     <span class="macro">write!</span>(f, <span class="string">&quot;call #{vtable_index} {arg_count} {destination}&quot;</span>)
                 } <span class="kw">else </span>{
-                    <span class="macro">write!</span>(f, <span class="string">&quot;recurse-call {arg_count} {destination}&quot;</span>)
+                    <span class="macro">write!</span>(f, <span class="string">&quot;recurse {arg_count} {destination}&quot;</span>)
                 }
             }
             Instruction::CallInstance {
@@ -4177,7 +4179,7 @@
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(target) = target {
                     <span class="macro">write!</span>(f, <span class="string">&quot;invoke {target} {name} {arg_count} {destination}&quot;</span>)
                 } <span class="kw">else </span>{
-                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke stack {name} {arg_count} {destination}&quot;</span>)
+                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke $ {name} {arg_count} {destination}&quot;</span>)
                 }
             }
             Instruction::CallIntrinsic {
@@ -4240,7 +4242,7 @@
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
             Destination::Variable(variable) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;${variable}&quot;</span>),
-            Destination::Stack =&gt; f.write_str(<span class="string">&quot;stack&quot;</span>),
+            Destination::Stack =&gt; f.write_str(<span class="string">&quot;$&quot;</span>),
             Destination::Return =&gt; f.write_str(<span class="string">&quot;$$&quot;</span>),
         }
     }

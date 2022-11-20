@@ -1297,6 +1297,24 @@
 <span id="1297">1297</span>
 <span id="1298">1298</span>
 <span id="1299">1299</span>
+<span id="1300">1300</span>
+<span id="1301">1301</span>
+<span id="1302">1302</span>
+<span id="1303">1303</span>
+<span id="1304">1304</span>
+<span id="1305">1305</span>
+<span id="1306">1306</span>
+<span id="1307">1307</span>
+<span id="1308">1308</span>
+<span id="1309">1309</span>
+<span id="1310">1310</span>
+<span id="1311">1311</span>
+<span id="1312">1312</span>
+<span id="1313">1313</span>
+<span id="1314">1314</span>
+<span id="1315">1315</span>
+<span id="1316">1316</span>
+<span id="1317">1317</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)] </span><span class="comment">// TODO docs and panics for ast
 
 </span><span class="kw">use </span>std::{
@@ -1310,7 +1328,7 @@
         <span class="self">self</span>, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, LinkError, Literal,
         LiteralOrSource, LoopScope, Module, Scope, ScopeSymbol, ScopeSymbolKind,
     },
-    Comparison, Intrinsic, OptionalSymbol, Symbol,
+    Comparison, Intrinsic, Symbol,
 };
 
 <span class="kw">pub struct </span>ExpressionTree {
@@ -1501,7 +1519,11 @@
                 <span class="kw">for </span>statement <span class="kw">in </span><span class="kw-2">&amp;</span>statements.<span class="number">0 </span>{
                     <span class="kw">let </span>statement = tree.node(<span class="kw-2">*</span>statement);
                     <span class="kw">let </span>result = operations.new_temporary_variable();
-                    statement.generate_code(Destination::Variable(result), operations, tree)<span class="question-mark">?</span>;
+                    statement.generate_code(
+                        Destination::Variable(result.clone()),
+                        operations,
+                        tree,
+                    )<span class="question-mark">?</span>;
                     last_result_var = <span class="prelude-val">Some</span>(result);
                 }
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(last_result) = last_result_var {
@@ -1525,8 +1547,8 @@
             </span>Node::Call(call) =&gt; call.generate_code(result, operations, tree),
             Node::Return(value) =&gt; <span class="self">Self</span>::generate_return(<span class="kw-2">*</span>value, operations, tree),
             Node::Loop(l) =&gt; l.generate_code(result, operations, tree),
-            Node::Break(l) =&gt; l.generate_code(result, operations, tree),
-            Node::Continue(l) =&gt; l.generate_code(result, operations, tree),
+            Node::Break(l) =&gt; l.generate_code(operations, tree),
+            Node::Continue(l) =&gt; l.generate_code(operations, tree),
         }
     }
 
@@ -1538,8 +1560,8 @@
         <span class="kw">match </span><span class="self">self </span>{
             Node::Literal(literal) =&gt; <span class="prelude-val">Ok</span>(LiteralOrSource::Literal(literal.clone())),
             Node::Identifier(identifier) =&gt; <span class="kw">match </span>operations.lookup(identifier) {
-                <span class="prelude-val">Some</span>(ScopeSymbol::Argument(arg)) =&gt; <span class="prelude-val">Ok</span>(LiteralOrSource::Argument(<span class="kw-2">*</span>arg)),
-                <span class="prelude-val">Some</span>(ScopeSymbol::Variable(var)) =&gt; <span class="prelude-val">Ok</span>(LiteralOrSource::Variable(<span class="kw-2">*</span>var)),
+                <span class="prelude-val">Some</span>(ScopeSymbol::Argument(arg)) =&gt; <span class="prelude-val">Ok</span>(LiteralOrSource::Argument(arg.clone())),
+                <span class="prelude-val">Some</span>(ScopeSymbol::Variable(var)) =&gt; <span class="prelude-val">Ok</span>(LiteralOrSource::Variable(var.clone())),
                 <span class="prelude-val">Some</span>(ScopeSymbol::Function { .. }) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;attempt to take function as value&quot;</span>),
                 <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(CompilationError::UndefinedIdentifier(identifier.clone())),
             },
@@ -1550,7 +1572,7 @@
             // }
             </span><span class="kw">_ </span>=&gt; {
                 <span class="kw">let </span>variable = operations.new_temporary_variable();
-                <span class="self">self</span>.generate_code(Destination::Variable(variable), operations, tree)<span class="question-mark">?</span>;
+                <span class="self">self</span>.generate_code(Destination::Variable(variable.clone()), operations, tree)<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>(LiteralOrSource::Variable(variable))
             }
         }
@@ -1599,7 +1621,9 @@
         <span class="kw">let </span>condition = tree.node(<span class="self">self</span>.condition);
         <span class="kw">let </span>after_false_label = operations.new_label();
         <span class="kw">let </span>if_false_label = <span class="self">self</span>.else_block.map(|<span class="kw">_</span>| operations.new_label());
-        <span class="kw">let </span>false_jump_to = if_false_label.unwrap_or(after_false_label);
+        <span class="kw">let </span>false_jump_to = if_false_label
+            .clone()
+            .unwrap_or_else(|| after_false_label.clone());
         <span class="kw">if let </span>Node::BinOp(BinOp {
             kind: BinOpKind::Compare(comparison),
             left,
@@ -1620,16 +1644,20 @@
         } <span class="kw">else </span>{
             <span class="comment">// The if statement is a result of something more complex
             </span><span class="kw">let </span>condition_result = operations.new_temporary_variable();
-            condition.generate_code(Destination::Variable(condition_result), operations, tree)<span class="question-mark">?</span>;
+            condition.generate_code(
+                Destination::Variable(condition_result.clone()),
+                operations,
+                tree,
+            )<span class="question-mark">?</span>;
             operations.push(Instruction::If {
                 condition: LiteralOrSource::Variable(condition_result),
                 false_jump_to,
             });
         }
         <span class="kw">let </span>true_block = tree.node(<span class="self">self</span>.true_block);
-        true_block.generate_code(result, operations, tree)<span class="question-mark">?</span>;
+        true_block.generate_code(result.clone(), operations, tree)<span class="question-mark">?</span>;
         <span class="kw">if let </span>(<span class="prelude-val">Some</span>(else_block), <span class="prelude-val">Some</span>(if_false_label)) = (<span class="self">self</span>.else_block, if_false_label) {
-            operations.push(Instruction::JumpTo(after_false_label));
+            operations.push(Instruction::JumpTo(after_false_label.clone()));
             operations.label(if_false_label);
             <span class="kw">let </span>else_block = tree.node(else_block);
             else_block.generate_code(result, operations, tree)<span class="question-mark">?</span>;
@@ -1786,19 +1814,19 @@
                 <span class="kw">let </span>store_false = operations.new_label();
                 operations.push(Instruction::If {
                     condition: left,
-                    false_jump_to: store_false,
+                    false_jump_to: store_false.clone(),
                 });
                 <span class="comment">// If left was false, we jump over the evaluation of right.
                 </span><span class="kw">let </span>right = right.to_value_or_source(operations, tree)<span class="question-mark">?</span>;
                 operations.push(Instruction::If {
                     condition: right,
-                    false_jump_to: store_false,
+                    false_jump_to: store_false.clone(),
                 });
                 operations.store_into_destination(
                     LiteralOrSource::Literal(Literal::Boolean(<span class="bool-val">true</span>)),
-                    destination,
+                    destination.clone(),
                 );
-                operations.push(Instruction::JumpTo(after_op));
+                operations.push(Instruction::JumpTo(after_op.clone()));
 
                 operations.label(store_false);
                 operations.store_into_destination(
@@ -1811,25 +1839,25 @@
                 <span class="kw">let </span>store_true = operations.new_label();
                 operations.push(Instruction::If {
                     condition: left,
-                    false_jump_to: check_right,
+                    false_jump_to: check_right.clone(),
                 });
                 <span class="comment">// If left was true, we already know we&#39;re good
-                </span>operations.push(Instruction::JumpTo(store_true));
+                </span>operations.push(Instruction::JumpTo(store_true.clone()));
 
                 operations.label(check_right);
                 <span class="kw">let </span>right = right.to_value_or_source(operations, tree)<span class="question-mark">?</span>;
                 <span class="kw">let </span>store_false = operations.new_label();
                 operations.push(Instruction::If {
                     condition: right,
-                    false_jump_to: store_false,
+                    false_jump_to: store_false.clone(),
                 });
 
                 operations.label(store_true);
                 operations.store_into_destination(
                     LiteralOrSource::Literal(Literal::Boolean(<span class="bool-val">true</span>)),
-                    destination,
+                    destination.clone(),
                 );
-                operations.push(Instruction::JumpTo(after_op));
+                operations.push(Instruction::JumpTo(after_op.clone()));
 
                 operations.label(store_false);
                 operations.store_into_destination(
@@ -1869,7 +1897,7 @@
             }
             other =&gt; {
                 <span class="kw">let </span>expr = operations.new_temporary_variable();
-                other.generate_code(Destination::Variable(expr), operations, tree)<span class="question-mark">?</span>;
+                other.generate_code(Destination::Variable(expr.clone()), operations, tree)<span class="question-mark">?</span>;
                 operations.push(Instruction::Not {
                     value: LiteralOrSource::Variable(expr),
                     destination: result,
@@ -1966,14 +1994,18 @@
                 </span><span class="kw">let </span>target = tree.node(target);
                 <span class="kw">let </span>target = <span class="kw">if let </span>Node::Identifier(name) = target {
                     <span class="kw">match </span>operations.lookup(name) {
-                        <span class="prelude-val">Some</span>(ScopeSymbol::Argument(arg)) =&gt; LiteralOrSource::Argument(<span class="kw-2">*</span>arg),
-                        <span class="prelude-val">Some</span>(ScopeSymbol::Variable(var)) =&gt; LiteralOrSource::Variable(<span class="kw-2">*</span>var),
+                        <span class="prelude-val">Some</span>(ScopeSymbol::Argument(arg)) =&gt; LiteralOrSource::Argument(arg.clone()),
+                        <span class="prelude-val">Some</span>(ScopeSymbol::Variable(var)) =&gt; LiteralOrSource::Variable(var.clone()),
                         <span class="prelude-val">Some</span>(ScopeSymbol::Function { .. }) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;can&#39;t invoke on a function&quot;</span>),
                         <span class="prelude-val">None </span>=&gt; <span class="macro">todo!</span>(<span class="string">&quot;unknown identifier&quot;</span>),
                     }
                 } <span class="kw">else </span>{
                     <span class="kw">let </span>target_result = operations.new_temporary_variable();
-                    target.generate_code(Destination::Variable(target_result), operations, tree)<span class="question-mark">?</span>;
+                    target.generate_code(
+                        Destination::Variable(target_result.clone()),
+                        operations,
+                        tree,
+                    )<span class="question-mark">?</span>;
                     LiteralOrSource::Variable(target_result)
                 };
 
@@ -2014,7 +2046,7 @@
             Node::Identifier(name) =&gt; {
                 <span class="kw">let </span>variable = operations.variable_index_from_name(name);
                 <span class="kw">let </span>value = tree.node(<span class="self">self</span>.value);
-                value.generate_code(Destination::Variable(variable), operations, tree)<span class="question-mark">?</span>;
+                value.generate_code(Destination::Variable(variable.clone()), operations, tree)<span class="question-mark">?</span>;
                 operations.store_into_destination(LiteralOrSource::Variable(variable), result);
             }
             <span class="kw">_ </span>=&gt; <span class="macro">todo!</span>(<span class="string">&quot;not a variable name&quot;</span>),
@@ -2097,10 +2129,10 @@
         operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>scope = operations.begin_loop(<span class="self">self</span>.name.clone(), result);
+        <span class="kw">let </span><span class="kw-2">mut </span>scope = operations.begin_loop(<span class="self">self</span>.name.clone(), result.clone());
 
-        <span class="kw">let </span>continue_label = scope.continue_label;
-        <span class="kw">let </span>break_label = scope.break_label;
+        <span class="kw">let </span>continue_label = scope.continue_label.clone();
+        <span class="kw">let </span>break_label = scope.break_label.clone();
 
         <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.parameters {
             <span class="prelude-val">Some</span>(LoopParameters::Until(expr)) =&gt; {
@@ -2121,7 +2153,7 @@
                 </span><span class="kw">let </span>variable = scope.variable_index_from_name(var_name);
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(initial_value) = <span class="kw-2">*</span>initial_value {
                     tree.node(initial_value).generate_code(
-                        Destination::Variable(variable),
+                        Destination::Variable(variable.clone()),
                         <span class="kw-2">&amp;mut </span>scope,
                         tree,
                     )<span class="question-mark">?</span>;
@@ -2129,7 +2161,7 @@
 
                 <span class="comment">// On the first pass, we skip executing the step instructions
                 </span><span class="kw">let </span>after_step = scope.new_label();
-                scope.push(Instruction::JumpTo(after_step));
+                scope.push(Instruction::JumpTo(after_step.clone()));
 
                 <span class="comment">// We evaluate the value of the step once at the start of the loop, not on each iteration.
 
@@ -2138,7 +2170,7 @@
                     other =&gt; {
                         <span class="kw">let </span>stop_result = scope.new_temporary_variable();
                         other.generate_code(
-                            Destination::Variable(stop_result),
+                            Destination::Variable(stop_result.clone()),
                             <span class="kw-2">&amp;mut </span>scope,
                             tree,
                         )<span class="question-mark">?</span>;
@@ -2149,7 +2181,7 @@
                 <span class="kw">let </span>step = <span class="kw">if let </span><span class="prelude-val">Some</span>(step) = step {
                     <span class="kw">let </span>step_result = scope.new_temporary_variable();
                     tree.node(<span class="kw-2">*</span>step).generate_code(
-                        Destination::Variable(step_result),
+                        Destination::Variable(step_result.clone()),
                         <span class="kw-2">&amp;mut </span>scope,
                         tree,
                     )<span class="question-mark">?</span>;
@@ -2164,9 +2196,9 @@
                 </span>scope.label_continue();
                 <span class="comment">// Step
                 </span>scope.push(Instruction::Add {
-                    left: LiteralOrSource::Variable(variable),
+                    left: LiteralOrSource::Variable(variable.clone()),
                     right: step,
-                    destination: Destination::Variable(variable),
+                    destination: Destination::Variable(variable.clone()),
                 });
                 scope.label(after_step);
 
@@ -2221,11 +2253,14 @@
 
         <span class="kw">let </span>condition_result = scope.new_temporary_variable();
         <span class="kw">let </span>continue_evaluation = scope.new_label();
-        tree.node(condition)
-            .generate_code(Destination::Variable(condition_result), scope, tree)<span class="question-mark">?</span>;
+        tree.node(condition).generate_code(
+            Destination::Variable(condition_result.clone()),
+            scope,
+            tree,
+        )<span class="question-mark">?</span>;
         scope.push(Instruction::If {
             condition: LiteralOrSource::Variable(condition_result),
-            false_jump_to: continue_evaluation,
+            false_jump_to: continue_evaluation.clone(),
         });
         scope.push(Instruction::JumpTo(break_label));
 
@@ -2242,8 +2277,11 @@
         scope.label_continue();
 
         <span class="kw">let </span>condition_result = scope.new_temporary_variable();
-        tree.node(condition)
-            .generate_code(Destination::Variable(condition_result), scope, tree)<span class="question-mark">?</span>;
+        tree.node(condition).generate_code(
+            Destination::Variable(condition_result.clone()),
+            scope,
+            tree,
+        )<span class="question-mark">?</span>;
         scope.push(Instruction::If {
             condition: LiteralOrSource::Variable(condition_result),
             false_jump_to: break_label,
@@ -2275,14 +2313,13 @@
 <span class="kw">impl </span>Break {
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        _result: Destination,
         operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(loop_info) = operations.loop_info(<span class="self">self</span>.name.as_ref()) {
-            <span class="kw">let </span>break_label = loop_info.break_label;
+            <span class="kw">let </span>break_label = loop_info.break_label.clone();
             <span class="kw">if let </span><span class="prelude-val">Some</span>(value) = <span class="self">self</span>.value {
-                <span class="kw">let </span>result = loop_info.loop_result;
+                <span class="kw">let </span>result = loop_info.loop_result.clone();
                 <span class="kw">let </span>value = tree.node(value);
                 value.generate_code(result, operations, tree)<span class="question-mark">?</span>;
             }
@@ -2302,12 +2339,11 @@
 <span class="kw">impl </span>Continue {
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        _result: Destination,
         operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
         _tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(loop_info) = operations.loop_info(<span class="self">self</span>.name.as_ref()) {
-            <span class="kw">let </span>continue_label = loop_info.continue_label;
+            <span class="kw">let </span>continue_label = loop_info.continue_label.clone();
             operations.push(Instruction::JumpTo(continue_label));
             <span class="prelude-val">Ok</span>(())
         } <span class="kw">else </span>{
@@ -2477,11 +2513,11 @@
             .into_iter()
             .map(|f| {
                 <span class="kw">let </span><span class="kw-2">mut </span>block = CodeBlockBuilder::default();
-                <span class="kw">for </span>(index, arg) <span class="kw">in </span>f.args.iter().enumerate() {
-                    block.add_symbol(arg.clone(), ScopeSymbol::Argument(index));
+                <span class="kw">for </span>arg <span class="kw">in </span><span class="kw-2">&amp;</span>f.args {
+                    block.new_argument(arg.clone());
                 }
                 f.body.generate_code(<span class="kw-2">&amp;mut </span>block)<span class="question-mark">?</span>;
-                <span class="prelude-val">Ok</span>(ir::Function::new(f.name, f.args, block.finish()))
+                <span class="prelude-val">Ok</span>(ir::Function::new(f.name, block.finish()))
             })
             .collect::&lt;<span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, CompilationError&gt;&gt;()<span class="question-mark">?</span>;
 
@@ -2496,10 +2532,10 @@
             });
             <span class="self">self</span>.init_tree.finish(body).generate_code(<span class="kw-2">&amp;mut </span>block)<span class="question-mark">?</span>;
             <span class="kw">for </span>(symbol, variable) <span class="kw">in </span>block.variables() {
-                scope.define_persistent_variable(symbol.clone(), <span class="kw-2">*</span>variable);
+                scope.define_persistent_variable(symbol.clone(), variable.clone());
             }
 
-            <span class="prelude-val">Some</span>(ir::Function::new(<span class="string">&quot;__init&quot;</span>, Vec::new(), block.finish()))
+            <span class="prelude-val">Some</span>(ir::Function::new(<span class="string">&quot;__init&quot;</span>, block.finish()))
         } <span class="kw">else </span>{
             <span class="prelude-val">None
         </span>};
@@ -2541,23 +2577,23 @@
 
 <span class="attribute">#[derive(Debug)]
 </span><span class="kw">pub struct </span>Function {
-    name: <span class="prelude-ty">Option</span>&lt;Symbol&gt;,
+    name: Symbol,
     args: Vec&lt;Symbol&gt;,
     body: ExpressionTree,
 }
 
 <span class="kw">impl </span>Function {
-    <span class="kw">pub fn </span>new(name: <span class="kw">impl </span>OptionalSymbol, args: Vec&lt;Symbol&gt;, body: ExpressionTree) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(name: <span class="kw">impl </span>Into&lt;Symbol&gt;, args: Vec&lt;Symbol&gt;, body: ExpressionTree) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            name: name.into_symbol(),
+            name: name.into(),
             args,
             body,
         }
     }
 
     <span class="attribute">#[must_use]
-    </span><span class="kw">pub fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Symbol&gt; {
-        <span class="self">self</span>.name.as_ref()
+    </span><span class="kw">pub fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Symbol {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.name
     }
 }
 

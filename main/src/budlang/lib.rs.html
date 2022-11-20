@@ -471,15 +471,15 @@
         <span class="kw">let </span>previous_variable_count = <span class="self">self</span>.persistent_variables().len();
         <span class="kw">let </span>unit = parse(source)<span class="question-mark">?</span>.compile(<span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0</span>)<span class="question-mark">?</span>;
         <span class="kw">for </span>function <span class="kw">in </span>unit.vtable {
-            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(name), <span class="prelude-val">Ok</span>(<span class="kw">_</span>)) = (<span class="kw-2">&amp;</span>function.name, env::var(<span class="string">&quot;PRINT_IR&quot;</span>)) {
-                <span class="macro">println!</span>(<span class="string">&quot;function {}&quot;</span>, name);
+            <span class="kw">if </span>env::var(<span class="string">&quot;PRINT_IR&quot;</span>).is_ok() {
+                <span class="macro">println!</span>(<span class="string">&quot;function {}&quot;</span>, function.name);
             }
             function.link_into(<span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0</span>)<span class="question-mark">?</span>;
         }
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(init) = <span class="kw-2">&amp;</span>unit.init {
             <span class="kw">if </span>env::var(<span class="string">&quot;PRINT_IR&quot;</span>).is_ok() {
-                <span class="macro">println!</span>(<span class="string">&quot;function init&quot;</span>);
+                <span class="macro">println!</span>(<span class="string">&quot;function __init&quot;</span>);
             }
 
             <span class="kw">let </span>function = init.link(<span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0</span>)<span class="question-mark">?</span>;

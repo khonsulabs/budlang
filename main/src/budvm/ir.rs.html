@@ -1421,6 +1421,110 @@
 <span id="1421">1421</span>
 <span id="1422">1422</span>
 <span id="1423">1423</span>
+<span id="1424">1424</span>
+<span id="1425">1425</span>
+<span id="1426">1426</span>
+<span id="1427">1427</span>
+<span id="1428">1428</span>
+<span id="1429">1429</span>
+<span id="1430">1430</span>
+<span id="1431">1431</span>
+<span id="1432">1432</span>
+<span id="1433">1433</span>
+<span id="1434">1434</span>
+<span id="1435">1435</span>
+<span id="1436">1436</span>
+<span id="1437">1437</span>
+<span id="1438">1438</span>
+<span id="1439">1439</span>
+<span id="1440">1440</span>
+<span id="1441">1441</span>
+<span id="1442">1442</span>
+<span id="1443">1443</span>
+<span id="1444">1444</span>
+<span id="1445">1445</span>
+<span id="1446">1446</span>
+<span id="1447">1447</span>
+<span id="1448">1448</span>
+<span id="1449">1449</span>
+<span id="1450">1450</span>
+<span id="1451">1451</span>
+<span id="1452">1452</span>
+<span id="1453">1453</span>
+<span id="1454">1454</span>
+<span id="1455">1455</span>
+<span id="1456">1456</span>
+<span id="1457">1457</span>
+<span id="1458">1458</span>
+<span id="1459">1459</span>
+<span id="1460">1460</span>
+<span id="1461">1461</span>
+<span id="1462">1462</span>
+<span id="1463">1463</span>
+<span id="1464">1464</span>
+<span id="1465">1465</span>
+<span id="1466">1466</span>
+<span id="1467">1467</span>
+<span id="1468">1468</span>
+<span id="1469">1469</span>
+<span id="1470">1470</span>
+<span id="1471">1471</span>
+<span id="1472">1472</span>
+<span id="1473">1473</span>
+<span id="1474">1474</span>
+<span id="1475">1475</span>
+<span id="1476">1476</span>
+<span id="1477">1477</span>
+<span id="1478">1478</span>
+<span id="1479">1479</span>
+<span id="1480">1480</span>
+<span id="1481">1481</span>
+<span id="1482">1482</span>
+<span id="1483">1483</span>
+<span id="1484">1484</span>
+<span id="1485">1485</span>
+<span id="1486">1486</span>
+<span id="1487">1487</span>
+<span id="1488">1488</span>
+<span id="1489">1489</span>
+<span id="1490">1490</span>
+<span id="1491">1491</span>
+<span id="1492">1492</span>
+<span id="1493">1493</span>
+<span id="1494">1494</span>
+<span id="1495">1495</span>
+<span id="1496">1496</span>
+<span id="1497">1497</span>
+<span id="1498">1498</span>
+<span id="1499">1499</span>
+<span id="1500">1500</span>
+<span id="1501">1501</span>
+<span id="1502">1502</span>
+<span id="1503">1503</span>
+<span id="1504">1504</span>
+<span id="1505">1505</span>
+<span id="1506">1506</span>
+<span id="1507">1507</span>
+<span id="1508">1508</span>
+<span id="1509">1509</span>
+<span id="1510">1510</span>
+<span id="1511">1511</span>
+<span id="1512">1512</span>
+<span id="1513">1513</span>
+<span id="1514">1514</span>
+<span id="1515">1515</span>
+<span id="1516">1516</span>
+<span id="1517">1517</span>
+<span id="1518">1518</span>
+<span id="1519">1519</span>
+<span id="1520">1520</span>
+<span id="1521">1521</span>
+<span id="1522">1522</span>
+<span id="1523">1523</span>
+<span id="1524">1524</span>
+<span id="1525">1525</span>
+<span id="1526">1526</span>
+<span id="1527">1527</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An intermediate representation of virtual machine instructions.
 //!
 //! This intermediate representation provides conveniences for handling
@@ -1434,41 +1538,73 @@
 };
 
 <span class="kw">use crate</span>::{
-    symbol::{OptionalSymbol, Symbol},
-    Comparison, Environment, Error, FromStack, Intrinsic, StringLiteralDisplay, Value,
-    ValueOrSource, VirtualMachine,
+    symbol::Symbol, Comparison, Environment, Error, FromStack, Intrinsic, StringLiteralDisplay,
+    Value, ValueOrSource, VirtualMachine,
 };
 
+<span class="kw">pub mod </span>asm;
+
 <span class="doccomment">/// A label that can be jumped to.
-</span><span class="attribute">#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-</span><span class="kw">pub struct </span>Label(<span class="kw">pub</span>(<span class="kw">crate</span>) usize);
+</span><span class="attribute">#[derive(Debug, Clone, Eq, PartialEq)]
+</span><span class="kw">pub struct </span>Label {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) index: usize,
+    name: <span class="prelude-ty">Option</span>&lt;Symbol&gt;,
+}
 
 <span class="kw">impl </span>Display <span class="kw">for </span>Label {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
-        <span class="macro">write!</span>(f, <span class="string">&quot;#{}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(name) = <span class="kw-2">&amp;</span><span class="self">self</span>.name {
+            <span class="macro">write!</span>(f, <span class="string">&quot;#{}&quot;</span>, name)
+        } <span class="kw">else </span>{
+            <span class="macro">write!</span>(f, <span class="string">&quot;#_{}&quot;</span>, <span class="self">self</span>.index)
+        }
     }
 }
 
 <span class="doccomment">/// A reference to a local variable.
-</span><span class="attribute">#[derive(Debug, Clone, Copy)]
-</span><span class="kw">pub struct </span>Variable(usize);
+</span><span class="attribute">#[derive(Debug, Clone, Eq, PartialEq)]
+</span><span class="kw">pub struct </span>Variable {
+    index: usize,
+    name: Symbol,
+}
 
 <span class="kw">impl </span>Variable {
     <span class="doccomment">/// Returns the index of this variable on the stack.
     </span><span class="attribute">#[must_use]
-    </span><span class="kw">pub fn </span>index(<span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.<span class="number">0
-    </span>}
+    </span><span class="kw">pub fn </span>index(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.index
+    }
 }
 
 <span class="kw">impl </span>Display <span class="kw">for </span>Variable {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
-        <span class="macro">write!</span>(f, <span class="string">&quot;${}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+        <span class="macro">write!</span>(f, <span class="string">&quot;${}&quot;</span>, <span class="self">self</span>.name)
+    }
+}
+
+<span class="doccomment">/// A reference to an argument passed to a function.
+</span><span class="attribute">#[derive(Debug, Clone, Eq, PartialEq)]
+</span><span class="kw">pub struct </span>Argument {
+    index: usize,
+    name: Symbol,
+}
+
+<span class="kw">impl </span>Argument {
+    <span class="doccomment">/// Returns the index of this variable on the stack.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>index(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.index
+    }
+}
+
+<span class="kw">impl </span>Display <span class="kw">for </span>Argument {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;@{}&quot;</span>, <span class="self">self</span>.name)
     }
 }
 
 <span class="doccomment">/// An intermediate representation of an [`crate::Instruction`].
-</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="attribute">#[derive(Debug, Clone, PartialEq)]
 </span><span class="kw">pub enum </span>Instruction {
     <span class="doccomment">/// Adds `left` and `right` and places the result in `destination`.
     ///
@@ -1842,9 +1978,9 @@
             Instruction::If {
                 condition,
                 false_jump_to,
-            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;if !{condition} jump {false_jump_to}&quot;</span>),
+            } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;ifnot {condition} {false_jump_to}&quot;</span>),
             Instruction::JumpTo(label) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;jump {label}&quot;</span>),
-            Instruction::Label(label) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;label {label}&quot;</span>),
+            Instruction::Label(label) =&gt; Display::fmt(label, f),
             Instruction::Compare {
                 comparison,
                 left,
@@ -1868,7 +2004,7 @@
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(function) = function {
                     <span class="macro">write!</span>(f, <span class="string">&quot;call {function} {arg_count} {destination}&quot;</span>)
                 } <span class="kw">else </span>{
-                    <span class="macro">write!</span>(f, <span class="string">&quot;recurse-call {arg_count} {destination}&quot;</span>)
+                    <span class="macro">write!</span>(f, <span class="string">&quot;recurse {arg_count} {destination}&quot;</span>)
                 }
             }
             Instruction::CallIntrinsic {
@@ -1887,7 +2023,7 @@
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(target) = target {
                     <span class="macro">write!</span>(f, <span class="string">&quot;invoke {target} {name} {arg_count} {destination}&quot;</span>)
                 } <span class="kw">else </span>{
-                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke stack {name} {arg_count} {destination}&quot;</span>)
+                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke $ {name} {arg_count} {destination}&quot;</span>)
                 }
             }
         }
@@ -1895,7 +2031,7 @@
 }
 
 <span class="doccomment">/// A literal value.
-</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="attribute">#[derive(Debug, Clone, PartialEq)]
 </span><span class="kw">pub enum </span>Literal {
     <span class="doccomment">/// A literal that represents [`Value::Void`].
     </span>Void,
@@ -1930,10 +2066,10 @@
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
             <span class="self">Self</span>::Integer(value) =&gt; Display::fmt(value, f),
-            <span class="self">Self</span>::Real(value) =&gt; Display::fmt(value, f),
+            <span class="self">Self</span>::Real(value) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;{value:?}&quot;</span>),
             <span class="self">Self</span>::Boolean(value) =&gt; Display::fmt(value, f),
             <span class="self">Self</span>::String(string) =&gt; Display::fmt(<span class="kw-2">&amp;</span>StringLiteralDisplay::new(string), f),
-            <span class="self">Self</span>::Void =&gt; f.write_str(<span class="string">&quot;Void&quot;</span>),
+            <span class="self">Self</span>::Void =&gt; f.write_str(<span class="string">&quot;void&quot;</span>),
         }
     }
 }
@@ -1950,7 +2086,7 @@
 <span class="kw">impl </span>Display <span class="kw">for </span>ValueSource {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
-            ValueSource::Argument(index) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;@{index}&quot;</span>),
+            ValueSource::Argument(arg) =&gt; Display::fmt(arg, f),
             ValueSource::Variable(variable) =&gt; Display::fmt(variable, f),
         }
     }
@@ -1960,19 +2096,19 @@
     <span class="kw">fn </span>from(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ValueSource) -&gt; <span class="self">Self </span>{
         <span class="kw">match </span>source {
             ValueSource::Argument(arg) =&gt; <span class="self">Self</span>::Argument(<span class="kw-2">*</span>arg),
-            ValueSource::Variable(var) =&gt; <span class="self">Self</span>::Variable(var.<span class="number">0</span>),
+            ValueSource::Variable(var) =&gt; <span class="self">Self</span>::Variable(var.index),
         }
     }
 }
 
 <span class="doccomment">/// A literal value or a location of a value
-</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="attribute">#[derive(Debug, Clone, PartialEq)]
 </span><span class="kw">pub enum </span>LiteralOrSource {
     <span class="doccomment">/// A literal.
     </span>Literal(Literal),
     <span class="doccomment">/// The value is in an argument at the provided 0-based index.
-    </span>Argument(usize),
-    <span class="doccomment">/// The value is in a variable specified.
+    </span>Argument(Argument), <span class="comment">// Make this like Variable
+    </span><span class="doccomment">/// The value is in a variable specified.
     </span>Variable(Variable),
 }
 
@@ -1986,8 +2122,8 @@
     {
         <span class="kw">match </span><span class="self">self </span>{
             LiteralOrSource::Literal(literal) =&gt; ValueOrSource::Value(literal.instantiate::&lt;Env&gt;()),
-            LiteralOrSource::Argument(index) =&gt; ValueOrSource::Argument(<span class="kw-2">*</span>index),
-            LiteralOrSource::Variable(index) =&gt; ValueOrSource::Variable(index.<span class="number">0</span>),
+            LiteralOrSource::Argument(index) =&gt; ValueOrSource::Argument(index.index),
+            LiteralOrSource::Variable(index) =&gt; ValueOrSource::Variable(index.index),
         }
     }
 }
@@ -1996,14 +2132,14 @@
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
             LiteralOrSource::Literal(value) =&gt; Display::fmt(value, f),
-            LiteralOrSource::Argument(index) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;@{index}&quot;</span>),
+            LiteralOrSource::Argument(arg) =&gt; Display::fmt(arg, f),
             LiteralOrSource::Variable(variable) =&gt; Display::fmt(variable, f),
         }
     }
 }
 
 <span class="doccomment">/// A destination for a value.
-</span><span class="attribute">#[derive(Debug, Clone, Copy)]
+</span><span class="attribute">#[derive(Debug, Clone, Eq, PartialEq)]
 </span><span class="kw">pub enum </span>Destination {
     <span class="doccomment">/// Store the value in the 0-based variable index provided.
     </span>Variable(Variable),
@@ -2017,7 +2153,7 @@
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
             Destination::Variable(variable) =&gt; Display::fmt(<span class="kw-2">&amp;</span>variable, f),
-            Destination::Stack =&gt; f.write_str(<span class="string">&quot;stack&quot;</span>),
+            Destination::Stack =&gt; f.write_str(<span class="string">&quot;$&quot;</span>),
             Destination::Return =&gt; f.write_str(<span class="string">&quot;$$&quot;</span>),
         }
     }
@@ -2026,7 +2162,7 @@
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Destination&gt; <span class="kw">for </span><span class="kw">crate</span>::Destination {
     <span class="kw">fn </span>from(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Destination) -&gt; <span class="self">Self </span>{
         <span class="kw">match </span>source {
-            Destination::Variable(variable) =&gt; <span class="self">Self</span>::Variable(variable.<span class="number">0</span>),
+            Destination::Variable(variable) =&gt; <span class="self">Self</span>::Variable(variable.index),
             Destination::Stack =&gt; <span class="self">Self</span>::Stack,
             Destination::Return =&gt; <span class="self">Self</span>::Return,
         }
@@ -2034,7 +2170,7 @@
 }
 
 <span class="doccomment">/// An action to take during an [`Instruction::Compare`].
-</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="attribute">#[derive(Debug, Clone, Eq, PartialEq)]
 </span><span class="kw">pub enum </span>CompareAction {
     <span class="doccomment">/// Store the boolean result in the destination indicated.
     </span>Store(Destination),
@@ -2062,9 +2198,9 @@
             }
             CompareAction::JumpIfFalse(target) =&gt; <span class="prelude-val">Ok</span>(<span class="kw">crate</span>::CompareAction::JumpIfFalse(
                 labels
-                    .get(target.<span class="number">0</span>)
+                    .get(target.index)
                     .and_then(|label| <span class="kw-2">*</span>label)
-                    .ok_or(LinkError::InvalidLabel(<span class="kw-2">*</span>target))<span class="question-mark">?</span>,
+                    .ok_or_else(|| LinkError::InvalidLabel(target.clone()))<span class="question-mark">?</span>,
             )),
         }
     }
@@ -2074,21 +2210,39 @@
 </span><span class="attribute">#[derive(Default)]
 </span><span class="kw">pub struct </span>CodeBlockBuilder {
     label_counter: usize,
+    named_labels: HashMap&lt;Symbol, Label&gt;,
     ops: Vec&lt;Instruction&gt;,
-    args: usize,
+    args: Vec&lt;Argument&gt;,
     temporary_variables: usize,
     scope: HashMap&lt;Symbol, ScopeSymbol&gt;,
-    labels: CodeLabels,
+    loops: LoopLabels,
     variables: HashMap&lt;Symbol, Variable&gt;,
 }
 
 <span class="kw">impl </span>CodeBlockBuilder {
-    <span class="doccomment">/// Adds a new symbol to this code block.
-    </span><span class="kw">pub fn </span>add_symbol(<span class="kw-2">&amp;mut </span><span class="self">self</span>, symbol: <span class="kw">impl </span>Into&lt;Symbol&gt;, value: ScopeSymbol) {
-        <span class="kw">if </span><span class="macro">matches!</span>(<span class="kw-2">&amp;</span>value, ScopeSymbol::Argument(<span class="kw">_</span>)) {
-            <span class="self">self</span>.args += <span class="number">1</span>;
-        }
+    <span class="doccomment">/// Adds a new argument with the given name.
+    </span><span class="kw">pub fn </span>new_argument(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="kw">impl </span>Into&lt;Symbol&gt;) -&gt; Argument {
+        <span class="kw">let </span>index = <span class="self">self</span>.args.len();
+        <span class="kw">let </span>argument = Argument {
+            index,
+            name: name.into(),
+        };
+        <span class="self">self</span>.args.push(argument.clone());
+        <span class="self">self</span>.add_symbol(
+            argument.name.clone(),
+            ScopeSymbol::Argument(argument.clone()),
+        );
+        argument
+    }
 
+    <span class="doccomment">/// Finds an argument by a given name, or None if not found.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>argument(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="prelude-ty">Option</span>&lt;Argument&gt; {
+        <span class="self">self</span>.args.iter().find(|arg| <span class="kw-2">&amp;</span>arg.name == name).cloned()
+    }
+
+    <span class="doccomment">/// Adds a new symbol to this code block.
+    </span><span class="kw">fn </span>add_symbol(<span class="kw-2">&amp;mut </span><span class="self">self</span>, symbol: <span class="kw">impl </span>Into&lt;Symbol&gt;, value: ScopeSymbol) {
         <span class="self">self</span>.scope.insert(symbol.into(), value);
     }
 
@@ -2096,7 +2250,23 @@
     </span><span class="kw">pub fn </span>new_label(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; Label {
         <span class="kw">let </span>label_id = <span class="self">self</span>.label_counter;
         <span class="self">self</span>.label_counter += <span class="number">1</span>;
-        Label(label_id)
+        Label {
+            index: label_id,
+            name: <span class="prelude-val">None</span>,
+        }
+    }
+
+    <span class="doccomment">/// Create a new label with a given name.
+    </span><span class="kw">pub fn </span>named_label(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="kw">impl </span>Into&lt;Symbol&gt;) -&gt; Label {
+        <span class="kw">let </span>name = name.into();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(label) = <span class="self">self</span>.named_labels.get(<span class="kw-2">&amp;</span>name).cloned() {
+            label
+        } <span class="kw">else </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>label = <span class="self">self</span>.new_label();
+            label.name = <span class="prelude-val">Some</span>(name.clone());
+            <span class="self">self</span>.named_labels.insert(name, label.clone());
+            label
+        }
     }
 
     <span class="doccomment">/// Push an instruction.
@@ -2119,7 +2289,7 @@
     /// name is provided.
     </span><span class="attribute">#[must_use]
     </span><span class="kw">pub fn </span>loop_info(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Symbol&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>LoopInfo&gt; {
-        <span class="self">self</span>.labels.find(name)
+        <span class="self">self</span>.loops.find(name)
     }
 
     <span class="doccomment">/// Adds the appropriate instruction to store `value` into `destination`.
@@ -2146,11 +2316,14 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), LinkError&gt; {
         <span class="kw">match </span><span class="self">self</span>.scope.get(symbol) {
             <span class="prelude-val">Some</span>(ScopeSymbol::Argument(index)) =&gt; {
-                <span class="self">self</span>.store_into_destination(LiteralOrSource::Argument(<span class="kw-2">*</span>index), destination);
+                <span class="self">self</span>.store_into_destination(LiteralOrSource::Argument(index.clone()), destination);
                 <span class="prelude-val">Ok</span>(())
             }
             <span class="prelude-val">Some</span>(ScopeSymbol::Variable(variable)) =&gt; {
-                <span class="self">self</span>.store_into_destination(LiteralOrSource::Variable(<span class="kw-2">*</span>variable), destination);
+                <span class="self">self</span>.store_into_destination(
+                    LiteralOrSource::Variable(variable.clone()),
+                    destination,
+                );
                 <span class="prelude-val">Ok</span>(())
             }
             <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(LinkError::UndefinedIdentifier(symbol.clone())),
@@ -2162,12 +2335,16 @@
     /// it and returned.
     </span><span class="kw">pub fn </span>variable_index_from_name(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol) -&gt; Variable {
         <span class="kw">let </span>new_index = <span class="self">self</span>.variables.len();
-        <span class="kw">let </span>variable = <span class="kw-2">*</span><span class="self">self
+        <span class="kw">let </span>variable = <span class="self">self
             </span>.variables
             .entry(name.clone())
-            .or_insert_with(|| Variable(new_index));
-        <span class="kw">if </span>variable.<span class="number">0 </span>== new_index {
-            <span class="self">self</span>.add_symbol(name.clone(), ScopeSymbol::Variable(variable));
+            .or_insert_with(|| Variable {
+                index: new_index,
+                name: name.clone(),
+            })
+            .clone();
+        <span class="kw">if </span>variable.index == new_index {
+            <span class="self">self</span>.add_symbol(name.clone(), ScopeSymbol::Variable(variable.clone()));
         }
         variable
     }
@@ -2188,6 +2365,7 @@
     </span><span class="attribute">#[must_use]
     </span><span class="kw">pub fn </span>finish(<span class="self">self</span>) -&gt; CodeBlock {
         CodeBlock {
+            arguments: <span class="self">self</span>.args.into_iter().map(|arg| arg.name).collect(),
             variables: <span class="self">self</span>.variables.len(),
             code: <span class="self">self</span>.ops,
         }
@@ -2199,10 +2377,10 @@
     </span><span class="kw">pub fn </span>begin_loop(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="prelude-ty">Option</span>&lt;Symbol&gt;, result: Destination) -&gt; LoopScope&lt;<span class="lifetime">&#39;_</span>, <span class="self">Self</span>&gt; {
         <span class="kw">let </span>break_label = <span class="self">self</span>.new_label();
         <span class="kw">let </span>continue_label = <span class="self">self</span>.new_label();
-        <span class="self">self</span>.labels.begin(LoopInfo {
+        <span class="self">self</span>.loops.begin(LoopInfo {
             name,
-            break_label,
-            continue_label,
+            break_label: break_label.clone(),
+            continue_label: continue_label.clone(),
             loop_result: result,
         });
         LoopScope {
@@ -2239,13 +2417,13 @@
     <span class="doccomment">/// Marks the next instruction as where the `break` operation should jump
     /// to.
     </span><span class="kw">pub fn </span>label_break(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.owner.borrow_mut().label(<span class="self">self</span>.break_label);
+        <span class="self">self</span>.owner.borrow_mut().label(<span class="self">self</span>.break_label.clone());
     }
 
     <span class="doccomment">/// Marks the next instruction as where the `continue` operation should jump
     /// to.
     </span><span class="kw">pub fn </span>label_continue(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.owner.borrow_mut().label(<span class="self">self</span>.continue_label);
+        <span class="self">self</span>.owner.borrow_mut().label(<span class="self">self</span>.continue_label.clone());
     }
 }
 
@@ -2292,16 +2470,16 @@
     </span>T: BorrowMut&lt;CodeBlockBuilder&gt;,
 {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.labels.exit_block();
+        <span class="self">self</span>.loops.exit_block();
     }
 }
 
 <span class="attribute">#[derive(Debug, Default)]
-</span><span class="kw">struct </span>CodeLabels {
+</span><span class="kw">struct </span>LoopLabels {
     scopes: Vec&lt;LoopInfo&gt;,
 }
 
-<span class="kw">impl </span>CodeLabels {
+<span class="kw">impl </span>LoopLabels {
     <span class="kw">fn </span>begin(<span class="kw-2">&amp;mut </span><span class="self">self</span>, info: LoopInfo) {
         <span class="self">self</span>.scopes.push(info);
     }
@@ -2336,8 +2514,10 @@
 }
 
 <span class="doccomment">/// A block of intermediate instructions.
-</span><span class="attribute">#[derive(Debug)]
+</span><span class="attribute">#[derive(Debug, PartialEq)]
 </span><span class="kw">pub struct </span>CodeBlock {
+    <span class="doccomment">/// The number of arguments this code block expects to be on the stack.
+    </span><span class="kw">pub </span>arguments: Vec&lt;Symbol&gt;,
     <span class="doccomment">/// The number of variables this code block uses.
     </span><span class="kw">pub </span>variables: usize,
     <span class="doccomment">/// The list of instructions.
@@ -2356,10 +2536,10 @@
         <span class="kw">let </span><span class="kw-2">mut </span>labels_encountered = <span class="number">0</span>;
         <span class="kw">for </span>(index, op) <span class="kw">in </span><span class="self">self</span>.code.iter().enumerate() {
             <span class="kw">if let </span>Instruction::Label(label) = op {
-                <span class="kw">if </span>labels.len() &lt;= label.<span class="number">0 </span>{
-                    labels.resize(label.<span class="number">0 </span>+ <span class="number">1</span>, <span class="prelude-val">None</span>);
+                <span class="kw">if </span>labels.len() &lt;= label.index {
+                    labels.resize(label.index + <span class="number">1</span>, <span class="prelude-val">None</span>);
                 }
-                labels[label.<span class="number">0</span>] = <span class="prelude-val">Some</span>(index - labels_encountered);
+                labels[label.index] = <span class="prelude-val">Some</span>(index - labels_encountered);
                 labels_encountered += <span class="number">1</span>;
             }
         }
@@ -2516,10 +2696,10 @@
             false_jump_to,
         } =&gt; <span class="kw">crate</span>::Instruction::If {
             condition: condition.instantiate::&lt;S::Environment&gt;(),
-            false_jump_to: labels[false_jump_to.<span class="number">0</span>].expect(<span class="string">&quot;label not inserted&quot;</span>),
+            false_jump_to: labels[false_jump_to.index].expect(<span class="string">&quot;label not inserted&quot;</span>),
         },
         Instruction::JumpTo(label) =&gt; {
-            <span class="kw">crate</span>::Instruction::JumpTo(labels[label.<span class="number">0</span>].expect(<span class="string">&quot;label not inserted&quot;</span>))
+            <span class="kw">crate</span>::Instruction::JumpTo(labels[label.index].expect(<span class="string">&quot;label not inserted&quot;</span>))
         }
         Instruction::Label(_label) =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>), <span class="comment">// Labels are no-ops
         </span>Instruction::Compare {
@@ -2540,7 +2720,7 @@
                 .map(LiteralOrSource::instantiate::&lt;S::Environment&gt;),
         ),
         Instruction::Load { value, variable } =&gt; <span class="kw">crate</span>::Instruction::Load {
-            variable_index: variable.<span class="number">0</span>,
+            variable_index: variable.index,
             value: value.instantiate::&lt;S::Environment&gt;(),
         },
         Instruction::Call {
@@ -2639,7 +2819,7 @@
 </span><span class="attribute">#[derive(Debug)]
 </span><span class="kw">pub enum </span>ScopeSymbol {
     <span class="doccomment">/// An argument passed into the executing function.
-    </span>Argument(usize),
+    </span>Argument(Argument),
     <span class="doccomment">/// A local variable.
     </span>Variable(Variable),
     <span class="doccomment">/// A function name.
@@ -2647,22 +2827,19 @@
 }
 
 <span class="doccomment">/// A function, in its intermediate form.
-</span><span class="attribute">#[derive(Debug)]
+</span><span class="attribute">#[derive(Debug, PartialEq)]
 </span><span class="kw">pub struct </span>Function {
     <span class="doccomment">/// The name of the function, if provided.
-    </span><span class="kw">pub </span>name: <span class="prelude-ty">Option</span>&lt;Symbol&gt;,
-    <span class="doccomment">/// A list of names of arguments this function is expecting.
-    </span><span class="kw">pub </span>args: Vec&lt;Symbol&gt;,
+    </span><span class="kw">pub </span>name: Symbol,
     <span class="doccomment">/// The body of the function.
     </span><span class="kw">pub </span>body: CodeBlock,
 }
 
 <span class="kw">impl </span>Function {
     <span class="doccomment">/// Returns a new function
-    </span><span class="kw">pub fn </span>new(name: <span class="kw">impl </span>OptionalSymbol, args: Vec&lt;Symbol&gt;, body: CodeBlock) -&gt; <span class="self">Self </span>{
+    </span><span class="kw">pub fn </span>new(name: <span class="kw">impl </span>Into&lt;Symbol&gt;, body: CodeBlock) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            name: name.into_symbol(),
-            args,
+            name: name.into(),
             body,
         }
     }
@@ -2673,17 +2850,14 @@
     <span class="kw">where
         </span>S: Scope,
     {
-        <span class="kw">let </span>name = <span class="self">self
-            </span>.name
-            .clone()
-            .expect(<span class="string">&quot;compiling an unnamed function into a context isn&#39;t allowed&quot;</span>);
+        <span class="kw">let </span>name = <span class="self">self</span>.name.clone();
         <span class="kw">let </span>block = <span class="self">self</span>.body.link(scope)<span class="question-mark">?</span>;
         <span class="kw">if </span>env::var(<span class="string">&quot;PRINT_IR&quot;</span>).is_ok() {
             <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, block.display_indented(<span class="string">&quot;  &quot;</span>));
         }
         <span class="kw">let </span>function = <span class="kw">crate</span>::Function {
             name,
-            arg_count: <span class="self">self</span>.args.len(),
+            arg_count: <span class="self">self</span>.body.arguments.len(),
             code: block.code,
             variable_count: block.variables,
         };
@@ -2705,8 +2879,22 @@
     }
 }
 
+<span class="kw">impl </span>Display <span class="kw">for </span>Function {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;function {}&quot;</span>, <span class="self">self</span>.name)<span class="question-mark">?</span>;
+        <span class="kw">for </span>arg <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.body.arguments {
+            <span class="macro">write!</span>(f, <span class="string">&quot; @{arg}&quot;</span>)<span class="question-mark">?</span>;
+        }
+        f.write_char(<span class="string">&#39;\n&#39;</span>)<span class="question-mark">?</span>;
+
+        Display::fmt(<span class="kw-2">&amp;</span><span class="self">self</span>.body, f)<span class="question-mark">?</span>;
+
+        <span class="prelude-val">Ok</span>(())
+    }
+}
+
 <span class="doccomment">/// A collection of functions and modules.
-</span><span class="attribute">#[derive(Debug)]
+</span><span class="attribute">#[derive(Debug, Default, PartialEq)]
 </span><span class="kw">pub struct </span>Module {
     <span class="doccomment">/// A list of functions defined in the module.
     </span><span class="kw">pub </span>vtable: Vec&lt;Function&gt;,
@@ -2727,6 +2915,11 @@
         }
     }
 
+    <span class="doccomment">/// Returns a module parsed from Bud Assembly (`budasm`).
+    </span><span class="kw">pub fn </span>from_asm(assembly: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, asm::AsmError&gt; {
+        asm::Parser::parse(assembly)
+    }
+
     <span class="doccomment">/// Runs all code in this unit in the passed context.
     </span><span class="kw">pub fn </span>load_into&lt;<span class="lifetime">&#39;a</span>, Output: FromStack, Env&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -2743,27 +2936,17 @@
         // Compile each function
         </span><span class="kw">for </span>(index, function) <span class="kw">in </span><span class="self">self</span>.vtable.iter().enumerate() {
             <span class="kw">if </span>env::var(<span class="string">&quot;PRINT_IR&quot;</span>).is_ok() {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(name) = <span class="kw-2">&amp;</span>function.name {
-                    <span class="macro">println!</span>(
-                        <span class="string">&quot;function #{index} - {name}({})&quot;</span>,
-                        function
-                            .args
-                            .iter()
-                            .map(Symbol::as_str)
-                            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
-                            .join(<span class="string">&quot;, &quot;</span>)
-                    );
-                } <span class="kw">else </span>{
-                    <span class="macro">println!</span>(
-                        <span class="string">&quot;function #{index}({})&quot;</span>,
-                        function
-                            .args
-                            .iter()
-                            .map(Symbol::as_str)
-                            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
-                            .join(<span class="string">&quot;, &quot;</span>)
-                    );
-                }
+                <span class="macro">println!</span>(
+                    <span class="string">&quot;function #{index} - {}({})&quot;</span>,
+                    function.name,
+                    function
+                        .body
+                        .arguments
+                        .iter()
+                        .map(Symbol::as_str)
+                        .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+                        .join(<span class="string">&quot;, &quot;</span>)
+                );
             }
             function.link_into(context)<span class="question-mark">?</span>;
         }
@@ -2787,6 +2970,27 @@
         } <span class="kw">else </span>{
             Output::from_value(Value::Void).map_err(Error::from)
         }
+    }
+}
+
+<span class="kw">impl </span>Display <span class="kw">for </span>Module {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">let </span><span class="kw-2">mut </span>needs_end_of_line = <span class="bool-val">false</span>;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(init) = <span class="kw-2">&amp;</span><span class="self">self</span>.init {
+            Display::fmt(<span class="kw-2">&amp;</span>init.body, f)<span class="question-mark">?</span>;
+            needs_end_of_line = <span class="bool-val">true</span>;
+        }
+
+        <span class="kw">for </span>function <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.vtable {
+            <span class="kw">if </span>needs_end_of_line {
+                f.write_char(<span class="string">&#39;\n&#39;</span>)<span class="question-mark">?</span>;
+            } <span class="kw">else </span>{
+                needs_end_of_line = <span class="bool-val">true</span>;
+            }
+            Display::fmt(function, f)<span class="question-mark">?</span>;
+        }
+
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -2816,7 +3020,11 @@
                 <span class="macro">write!</span>(f, <span class="string">&quot;undefined identifier: {symbol}&quot;</span>)
             }
             LinkError::InvalidLabel(label) =&gt; {
-                <span class="macro">write!</span>(f, <span class="string">&quot;invalid label: {}&quot;</span>, label.<span class="number">0</span>)
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(name) = <span class="kw-2">&amp;</span>label.name {
+                    <span class="macro">write!</span>(f, <span class="string">&quot;invalid label: #{}&quot;</span>, name)
+                } <span class="kw">else </span>{
+                    <span class="macro">write!</span>(f, <span class="string">&quot;invalid label: {}&quot;</span>, label.index)
+                }
             }
         }
     }
