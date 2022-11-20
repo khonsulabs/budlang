@@ -130,6 +130,23 @@ impl<'a> Iterator for Lexer<'a> {
                         offset..literal.last_offset + 1,
                     )));
                 }
+                (offset, char)
+                    if char == '/' && matches!(self.chars.peek().map(|(_, ch)| *ch), Some('/')) =>
+                {
+                    // Comment
+                    let (mut end, _) = self.chars.next().expect("just peeked");
+
+                    // Read until end of line
+                    while self
+                        .chars
+                        .peek()
+                        .map_or(false, |(_, char)| *char != '\n' && *char != '\r')
+                    {
+                        end = self.chars.next().expect("just peeked").0;
+                    }
+
+                    return Some(Ok(Token::new(TokenKind::Comment, offset..end + 1)));
+                }
                 (_, ch) if ch.is_ascii_whitespace() => {}
                 (offset, character) => {
                     return Some(Err(AsmError::UnexpectedChar { character, offset }))
@@ -658,6 +675,7 @@ impl<'a> Parser<'a> {
 fn basic() {
     let block = Parser::parse(
         r#"
+            // This is a comment.
             return 42
         "#,
     )

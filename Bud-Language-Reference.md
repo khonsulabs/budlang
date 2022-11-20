@@ -1,4 +1,4 @@
-# Language Reference
+# Bud Language Reference
 
 Bud is a compiled, dynamically typed language. Bud code is divided into three
 concepts: comments, declarations, and expressions.
