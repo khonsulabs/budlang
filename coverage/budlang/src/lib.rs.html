@@ -2751,7 +2751,7 @@
                 2
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">            if let (Some(name), Ok(_)) = (&amp;function.name, env::var(&quot;PRINT_IR&quot;)) {</pre>
+                <pre class="has-background-success-light py-0 px-2">            if env::var(&quot;PRINT_IR&quot;).is_ok() {</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -2764,7 +2764,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">                println!(&quot;function {}&quot;, name);</pre>
+                <pre class="has-background-danger-light py-0 px-2">                println!(&quot;function {}&quot;, function.name);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -2855,7 +2855,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">                println!(&quot;function init&quot;);</pre>
+                <pre class="has-background-danger-light py-0 px-2">                println!(&quot;function __init&quot;);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -3484,7 +3484,7 @@
         </div></div>
         <footer class="footer">
             <div class="content has-text-centered">
-                <p class="heading">Date: 2022-11-19 02:32</p>
+                <p class="heading">Date: 2022-11-20 03:51</p>
             </div>
         </footer>
     </body>
