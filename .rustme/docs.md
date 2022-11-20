@@ -56,9 +56,9 @@ instruction:
 |  1 | `return 1`            | 1 | `return 1`           |
 |    |                       | 2 | `jump 8`             |
 |  2 | `sub @0 1 stack`      | 3 | `sub @0 1 stack`     |
-|  3 | `recurse-call 1 $$0`  | 4 | `recurse-call 1 $$0` |
+|  3 | `recurse 1 $$0`       | 4 | `recurse 1 $$0`      |
 |  4 | `sub @0 2 stack`      | 5 | `sub @0 2 stack`     |
-|  5 | `recurse-call 1 $$1`  | 6 | `recurse-call 1 $$1` |
+|  5 | `recurse 1 $$1`       | 6 | `recurse 1 $$1`      |
 |  6 | `add $$0 $$1 $$$$`    | 7 | `add $$0 $$1 $$$$`   |
 
 ## Why not Bud?

@@ -30,6 +30,7 @@ use std::{
 pub mod budmap;
 mod dynamic;
 pub mod ir;
+pub mod lexer_util;
 mod list;
 mod map;
 mod string;
@@ -42,7 +43,7 @@ pub use self::{
     list::List,
     map::HashMap,
     string::StringLiteralDisplay,
-    symbol::{OptionalSymbol, Symbol},
+    symbol::Symbol,
 };
 
 /// A virtual machine instruction.
@@ -470,7 +471,7 @@ impl Display for Instruction {
                 if let Some(vtable_index) = vtable_index {
                     write!(f, "call #{vtable_index} {arg_count} {destination}")
                 } else {
-                    write!(f, "recurse-call {arg_count} {destination}")
+                    write!(f, "recurse {arg_count} {destination}")
                 }
             }
             Instruction::CallInstance {
@@ -482,7 +483,7 @@ impl Display for Instruction {
                 if let Some(target) = target {
                     write!(f, "invoke {target} {name} {arg_count} {destination}")
                 } else {
-                    write!(f, "invoke stack {name} {arg_count} {destination}")
+                    write!(f, "invoke $ {name} {arg_count} {destination}")
                 }
             }
             Instruction::CallIntrinsic {
@@ -545,7 +546,7 @@ impl Display for Destination {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Destination::Variable(variable) => write!(f, "${variable}"),
-            Destination::Stack => f.write_str("stack"),
+            Destination::Stack => f.write_str("$"),
             Destination::Return => f.write_str("$$"),
         }
     }

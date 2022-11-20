@@ -11,41 +11,73 @@ use std::{
 };
 
 use crate::{
-    symbol::{OptionalSymbol, Symbol},
-    Comparison, Environment, Error, FromStack, Intrinsic, StringLiteralDisplay, Value,
-    ValueOrSource, VirtualMachine,
+    symbol::Symbol, Comparison, Environment, Error, FromStack, Intrinsic, StringLiteralDisplay,
+    Value, ValueOrSource, VirtualMachine,
 };
 
+pub mod asm;
+
 /// A label that can be jumped to.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Label(pub(crate) usize);
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Label {
+    pub(crate) index: usize,
+    name: Option<Symbol>,
+}
 
 impl Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "#{}", self.0)
+        if let Some(name) = &self.name {
+            write!(f, "#{}", name)
+        } else {
+            write!(f, "#_{}", self.index)
+        }
     }
 }
 
 /// A reference to a local variable.
-#[derive(Debug, Clone, Copy)]
-pub struct Variable(usize);
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Variable {
+    index: usize,
+    name: Symbol,
+}
 
 impl Variable {
     /// Returns the index of this variable on the stack.
     #[must_use]
-    pub fn index(self) -> usize {
-        self.0
+    pub fn index(&self) -> usize {
+        self.index
     }
 }
 
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "${}", self.0)
+        write!(f, "${}", self.name)
+    }
+}
+
+/// A reference to an argument passed to a function.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Argument {
+    index: usize,
+    name: Symbol,
+}
+
+impl Argument {
+    /// Returns the index of this variable on the stack.
+    #[must_use]
+    pub fn index(&self) -> usize {
+        self.index
+    }
+}
+
+impl Display for Argument {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@{}", self.name)
     }
 }
 
 /// An intermediate representation of an [`crate::Instruction`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Instruction {
     /// Adds `left` and `right` and places the result in `destination`.
     ///
@@ -419,9 +451,9 @@ impl Display for Instruction {
             Instruction::If {
                 condition,
                 false_jump_to,
-            } => write!(f, "if !{condition} jump {false_jump_to}"),
+            } => write!(f, "ifnot {condition} {false_jump_to}"),
             Instruction::JumpTo(label) => write!(f, "jump {label}"),
-            Instruction::Label(label) => write!(f, "label {label}"),
+            Instruction::Label(label) => Display::fmt(label, f),
             Instruction::Compare {
                 comparison,
                 left,
@@ -445,7 +477,7 @@ impl Display for Instruction {
                 if let Some(function) = function {
                     write!(f, "call {function} {arg_count} {destination}")
                 } else {
-                    write!(f, "recurse-call {arg_count} {destination}")
+                    write!(f, "recurse {arg_count} {destination}")
                 }
             }
             Instruction::CallIntrinsic {
@@ -464,7 +496,7 @@ impl Display for Instruction {
                 if let Some(target) = target {
                     write!(f, "invoke {target} {name} {arg_count} {destination}")
                 } else {
-                    write!(f, "invoke stack {name} {arg_count} {destination}")
+                    write!(f, "invoke $ {name} {arg_count} {destination}")
                 }
             }
         }
@@ -472,7 +504,7 @@ impl Display for Instruction {
 }
 
 /// A literal value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     /// A literal that represents [`Value::Void`].
     Void,
@@ -507,10 +539,10 @@ impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Integer(value) => Display::fmt(value, f),
-            Self::Real(value) => Display::fmt(value, f),
+            Self::Real(value) => write!(f, "{value:?}"),
             Self::Boolean(value) => Display::fmt(value, f),
             Self::String(string) => Display::fmt(&StringLiteralDisplay::new(string), f),
-            Self::Void => f.write_str("Void"),
+            Self::Void => f.write_str("void"),
         }
     }
 }
@@ -527,7 +559,7 @@ pub enum ValueSource {
 impl Display for ValueSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ValueSource::Argument(index) => write!(f, "@{index}"),
+            ValueSource::Argument(arg) => Display::fmt(arg, f),
             ValueSource::Variable(variable) => Display::fmt(variable, f),
         }
     }
@@ -537,18 +569,18 @@ impl<'a> From<&'a ValueSource> for crate::ValueSource {
     fn from(source: &'a ValueSource) -> Self {
         match source {
             ValueSource::Argument(arg) => Self::Argument(*arg),
-            ValueSource::Variable(var) => Self::Variable(var.0),
+            ValueSource::Variable(var) => Self::Variable(var.index),
         }
     }
 }
 
 /// A literal value or a location of a value
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LiteralOrSource {
     /// A literal.
     Literal(Literal),
     /// The value is in an argument at the provided 0-based index.
-    Argument(usize),
+    Argument(Argument), // Make this like Variable
     /// The value is in a variable specified.
     Variable(Variable),
 }
@@ -563,8 +595,8 @@ impl LiteralOrSource {
     {
         match self {
             LiteralOrSource::Literal(literal) => ValueOrSource::Value(literal.instantiate::<Env>()),
-            LiteralOrSource::Argument(index) => ValueOrSource::Argument(*index),
-            LiteralOrSource::Variable(index) => ValueOrSource::Variable(index.0),
+            LiteralOrSource::Argument(index) => ValueOrSource::Argument(index.index),
+            LiteralOrSource::Variable(index) => ValueOrSource::Variable(index.index),
         }
     }
 }
@@ -573,14 +605,14 @@ impl Display for LiteralOrSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LiteralOrSource::Literal(value) => Display::fmt(value, f),
-            LiteralOrSource::Argument(index) => write!(f, "@{index}"),
+            LiteralOrSource::Argument(arg) => Display::fmt(arg, f),
             LiteralOrSource::Variable(variable) => Display::fmt(variable, f),
         }
     }
 }
 
 /// A destination for a value.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Destination {
     /// Store the value in the 0-based variable index provided.
     Variable(Variable),
@@ -594,7 +626,7 @@ impl Display for Destination {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Destination::Variable(variable) => Display::fmt(&variable, f),
-            Destination::Stack => f.write_str("stack"),
+            Destination::Stack => f.write_str("$"),
             Destination::Return => f.write_str("$$"),
         }
     }
@@ -603,7 +635,7 @@ impl Display for Destination {
 impl<'a> From<&'a Destination> for crate::Destination {
     fn from(source: &'a Destination) -> Self {
         match source {
-            Destination::Variable(variable) => Self::Variable(variable.0),
+            Destination::Variable(variable) => Self::Variable(variable.index),
             Destination::Stack => Self::Stack,
             Destination::Return => Self::Return,
         }
@@ -611,7 +643,7 @@ impl<'a> From<&'a Destination> for crate::Destination {
 }
 
 /// An action to take during an [`Instruction::Compare`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CompareAction {
     /// Store the boolean result in the destination indicated.
     Store(Destination),
@@ -639,9 +671,9 @@ impl CompareAction {
             }
             CompareAction::JumpIfFalse(target) => Ok(crate::CompareAction::JumpIfFalse(
                 labels
-                    .get(target.0)
+                    .get(target.index)
                     .and_then(|label| *label)
-                    .ok_or(LinkError::InvalidLabel(*target))?,
+                    .ok_or_else(|| LinkError::InvalidLabel(target.clone()))?,
             )),
         }
     }
@@ -651,21 +683,39 @@ impl CompareAction {
 #[derive(Default)]
 pub struct CodeBlockBuilder {
     label_counter: usize,
+    named_labels: HashMap<Symbol, Label>,
     ops: Vec<Instruction>,
-    args: usize,
+    args: Vec<Argument>,
     temporary_variables: usize,
     scope: HashMap<Symbol, ScopeSymbol>,
-    labels: CodeLabels,
+    loops: LoopLabels,
     variables: HashMap<Symbol, Variable>,
 }
 
 impl CodeBlockBuilder {
-    /// Adds a new symbol to this code block.
-    pub fn add_symbol(&mut self, symbol: impl Into<Symbol>, value: ScopeSymbol) {
-        if matches!(&value, ScopeSymbol::Argument(_)) {
-            self.args += 1;
-        }
+    /// Adds a new argument with the given name.
+    pub fn new_argument(&mut self, name: impl Into<Symbol>) -> Argument {
+        let index = self.args.len();
+        let argument = Argument {
+            index,
+            name: name.into(),
+        };
+        self.args.push(argument.clone());
+        self.add_symbol(
+            argument.name.clone(),
+            ScopeSymbol::Argument(argument.clone()),
+        );
+        argument
+    }
 
+    /// Finds an argument by a given name, or None if not found.
+    #[must_use]
+    pub fn argument(&self, name: &Symbol) -> Option<Argument> {
+        self.args.iter().find(|arg| &arg.name == name).cloned()
+    }
+
+    /// Adds a new symbol to this code block.
+    fn add_symbol(&mut self, symbol: impl Into<Symbol>, value: ScopeSymbol) {
         self.scope.insert(symbol.into(), value);
     }
 
@@ -673,7 +723,23 @@ impl CodeBlockBuilder {
     pub fn new_label(&mut self) -> Label {
         let label_id = self.label_counter;
         self.label_counter += 1;
-        Label(label_id)
+        Label {
+            index: label_id,
+            name: None,
+        }
+    }
+
+    /// Create a new label with a given name.
+    pub fn named_label(&mut self, name: impl Into<Symbol>) -> Label {
+        let name = name.into();
+        if let Some(label) = self.named_labels.get(&name).cloned() {
+            label
+        } else {
+            let mut label = self.new_label();
+            label.name = Some(name.clone());
+            self.named_labels.insert(name, label.clone());
+            label
+        }
     }
 
     /// Push an instruction.
@@ -696,7 +762,7 @@ impl CodeBlockBuilder {
     /// name is provided.
     #[must_use]
     pub fn loop_info(&self, name: Option<&Symbol>) -> Option<&LoopInfo> {
-        self.labels.find(name)
+        self.loops.find(name)
     }
 
     /// Adds the appropriate instruction to store `value` into `destination`.
@@ -723,11 +789,14 @@ impl CodeBlockBuilder {
     ) -> Result<(), LinkError> {
         match self.scope.get(symbol) {
             Some(ScopeSymbol::Argument(index)) => {
-                self.store_into_destination(LiteralOrSource::Argument(*index), destination);
+                self.store_into_destination(LiteralOrSource::Argument(index.clone()), destination);
                 Ok(())
             }
             Some(ScopeSymbol::Variable(variable)) => {
-                self.store_into_destination(LiteralOrSource::Variable(*variable), destination);
+                self.store_into_destination(
+                    LiteralOrSource::Variable(variable.clone()),
+                    destination,
+                );
                 Ok(())
             }
             _ => Err(LinkError::UndefinedIdentifier(symbol.clone())),
@@ -739,12 +808,16 @@ impl CodeBlockBuilder {
     /// it and returned.
     pub fn variable_index_from_name(&mut self, name: &Symbol) -> Variable {
         let new_index = self.variables.len();
-        let variable = *self
+        let variable = self
             .variables
             .entry(name.clone())
-            .or_insert_with(|| Variable(new_index));
-        if variable.0 == new_index {
-            self.add_symbol(name.clone(), ScopeSymbol::Variable(variable));
+            .or_insert_with(|| Variable {
+                index: new_index,
+                name: name.clone(),
+            })
+            .clone();
+        if variable.index == new_index {
+            self.add_symbol(name.clone(), ScopeSymbol::Variable(variable.clone()));
         }
         variable
     }
@@ -765,6 +838,7 @@ impl CodeBlockBuilder {
     #[must_use]
     pub fn finish(self) -> CodeBlock {
         CodeBlock {
+            arguments: self.args.into_iter().map(|arg| arg.name).collect(),
             variables: self.variables.len(),
             code: self.ops,
         }
@@ -776,10 +850,10 @@ impl CodeBlockBuilder {
     pub fn begin_loop(&mut self, name: Option<Symbol>, result: Destination) -> LoopScope<'_, Self> {
         let break_label = self.new_label();
         let continue_label = self.new_label();
-        self.labels.begin(LoopInfo {
+        self.loops.begin(LoopInfo {
             name,
-            break_label,
-            continue_label,
+            break_label: break_label.clone(),
+            continue_label: continue_label.clone(),
             loop_result: result,
         });
         LoopScope {
@@ -816,13 +890,13 @@ where
     /// Marks the next instruction as where the `break` operation should jump
     /// to.
     pub fn label_break(&mut self) {
-        self.owner.borrow_mut().label(self.break_label);
+        self.owner.borrow_mut().label(self.break_label.clone());
     }
 
     /// Marks the next instruction as where the `continue` operation should jump
     /// to.
     pub fn label_continue(&mut self) {
-        self.owner.borrow_mut().label(self.continue_label);
+        self.owner.borrow_mut().label(self.continue_label.clone());
     }
 }
 
@@ -869,16 +943,16 @@ where
     T: BorrowMut<CodeBlockBuilder>,
 {
     fn drop(&mut self) {
-        self.labels.exit_block();
+        self.loops.exit_block();
     }
 }
 
 #[derive(Debug, Default)]
-struct CodeLabels {
+struct LoopLabels {
     scopes: Vec<LoopInfo>,
 }
 
-impl CodeLabels {
+impl LoopLabels {
     fn begin(&mut self, info: LoopInfo) {
         self.scopes.push(info);
     }
@@ -913,8 +987,10 @@ pub struct LoopInfo {
 }
 
 /// A block of intermediate instructions.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct CodeBlock {
+    /// The number of arguments this code block expects to be on the stack.
+    pub arguments: Vec<Symbol>,
     /// The number of variables this code block uses.
     pub variables: usize,
     /// The list of instructions.
@@ -933,10 +1009,10 @@ impl CodeBlock {
         let mut labels_encountered = 0;
         for (index, op) in self.code.iter().enumerate() {
             if let Instruction::Label(label) = op {
-                if labels.len() <= label.0 {
-                    labels.resize(label.0 + 1, None);
+                if labels.len() <= label.index {
+                    labels.resize(label.index + 1, None);
                 }
-                labels[label.0] = Some(index - labels_encountered);
+                labels[label.index] = Some(index - labels_encountered);
                 labels_encountered += 1;
             }
         }
@@ -1093,10 +1169,10 @@ where
             false_jump_to,
         } => crate::Instruction::If {
             condition: condition.instantiate::<S::Environment>(),
-            false_jump_to: labels[false_jump_to.0].expect("label not inserted"),
+            false_jump_to: labels[false_jump_to.index].expect("label not inserted"),
         },
         Instruction::JumpTo(label) => {
-            crate::Instruction::JumpTo(labels[label.0].expect("label not inserted"))
+            crate::Instruction::JumpTo(labels[label.index].expect("label not inserted"))
         }
         Instruction::Label(_label) => return Ok(None), // Labels are no-ops
         Instruction::Compare {
@@ -1117,7 +1193,7 @@ where
                 .map(LiteralOrSource::instantiate::<S::Environment>),
         ),
         Instruction::Load { value, variable } => crate::Instruction::Load {
-            variable_index: variable.0,
+            variable_index: variable.index,
             value: value.instantiate::<S::Environment>(),
         },
         Instruction::Call {
@@ -1216,7 +1292,7 @@ pub enum ScopeSymbolKind {
 #[derive(Debug)]
 pub enum ScopeSymbol {
     /// An argument passed into the executing function.
-    Argument(usize),
+    Argument(Argument),
     /// A local variable.
     Variable(Variable),
     /// A function name.
@@ -1224,22 +1300,19 @@ pub enum ScopeSymbol {
 }
 
 /// A function, in its intermediate form.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Function {
     /// The name of the function, if provided.
-    pub name: Option<Symbol>,
-    /// A list of names of arguments this function is expecting.
-    pub args: Vec<Symbol>,
+    pub name: Symbol,
     /// The body of the function.
     pub body: CodeBlock,
 }
 
 impl Function {
     /// Returns a new function
-    pub fn new(name: impl OptionalSymbol, args: Vec<Symbol>, body: CodeBlock) -> Self {
+    pub fn new(name: impl Into<Symbol>, body: CodeBlock) -> Self {
         Self {
-            name: name.into_symbol(),
-            args,
+            name: name.into(),
             body,
         }
     }
@@ -1250,17 +1323,14 @@ impl Function {
     where
         S: Scope,
     {
-        let name = self
-            .name
-            .clone()
-            .expect("compiling an unnamed function into a context isn't allowed");
+        let name = self.name.clone();
         let block = self.body.link(scope)?;
         if env::var("PRINT_IR").is_ok() {
             println!("{}", block.display_indented("  "));
         }
         let function = crate::Function {
             name,
-            arg_count: self.args.len(),
+            arg_count: self.body.arguments.len(),
             code: block.code,
             variable_count: block.variables,
         };
@@ -1282,8 +1352,22 @@ impl Function {
     }
 }
 
+impl Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "function {}", self.name)?;
+        for arg in &self.body.arguments {
+            write!(f, " @{arg}")?;
+        }
+        f.write_char('\n')?;
+
+        Display::fmt(&self.body, f)?;
+
+        Ok(())
+    }
+}
+
 /// A collection of functions and modules.
-#[derive(Debug)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Module {
     /// A list of functions defined in the module.
     pub vtable: Vec<Function>,
@@ -1304,6 +1388,11 @@ impl Module {
         }
     }
 
+    /// Returns a module parsed from Bud Assembly (`budasm`).
+    pub fn from_asm(assembly: &str) -> Result<Self, asm::AsmError> {
+        asm::Parser::parse(assembly)
+    }
+
     /// Runs all code in this unit in the passed context.
     pub fn load_into<'a, Output: FromStack, Env>(
         &self,
@@ -1320,27 +1409,17 @@ impl Module {
         // Compile each function
         for (index, function) in self.vtable.iter().enumerate() {
             if env::var("PRINT_IR").is_ok() {
-                if let Some(name) = &function.name {
-                    println!(
-                        "function #{index} - {name}({})",
-                        function
-                            .args
-                            .iter()
-                            .map(Symbol::as_str)
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    );
-                } else {
-                    println!(
-                        "function #{index}({})",
-                        function
-                            .args
-                            .iter()
-                            .map(Symbol::as_str)
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    );
-                }
+                println!(
+                    "function #{index} - {}({})",
+                    function.name,
+                    function
+                        .body
+                        .arguments
+                        .iter()
+                        .map(Symbol::as_str)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
             }
             function.link_into(context)?;
         }
@@ -1364,6 +1443,27 @@ impl Module {
         } else {
             Output::from_value(Value::Void).map_err(Error::from)
         }
+    }
+}
+
+impl Display for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut needs_end_of_line = false;
+        if let Some(init) = &self.init {
+            Display::fmt(&init.body, f)?;
+            needs_end_of_line = true;
+        }
+
+        for function in &self.vtable {
+            if needs_end_of_line {
+                f.write_char('\n')?;
+            } else {
+                needs_end_of_line = true;
+            }
+            Display::fmt(function, f)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1393,7 +1493,11 @@ impl Display for LinkError {
                 write!(f, "undefined identifier: {symbol}")
             }
             LinkError::InvalidLabel(label) => {
-                write!(f, "invalid label: {}", label.0)
+                if let Some(name) = &label.name {
+                    write!(f, "invalid label: #{}", name)
+                } else {
+                    write!(f, "invalid label: {}", label.index)
+                }
             }
         }
     }

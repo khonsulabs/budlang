@@ -7,7 +7,7 @@ use crate::ast::BinOpKind;
 
 fn main() {
     let code_unit = ast::CodeUnit::new(|builder| {
-        vec![builder.call(Call::global("fibonacci", [builder.integer(35)]))]
+        vec![builder.call(Call::global("fibonacci", [builder.integer(10)]))]
     })
     .with(
         "fibonacci",
@@ -37,7 +37,7 @@ fn main() {
 
     let mut context = vm::VirtualMachine::empty();
     let result: i64 = code_unit.load_into(&mut context).unwrap();
-    assert_eq!(result, 9227465);
+    assert_eq!(result, 55);
 }
 
 #[test]

@@ -5,7 +5,6 @@
 #![allow(clippy::range_plus_one)]
 
 use std::{
-    borrow::Cow,
     fmt::{Display, Write},
     ops::Range,
     str::CharIndices,
@@ -16,7 +15,13 @@ use crate::ast::{
     NodeId, SyntaxTreeBuilder,
 };
 
-use budvm::{Comparison, Symbol};
+use budvm::{
+    lexer_util::{
+        decode_numeric_literal, decode_string_literal_contents, DecodeNumericError,
+        DecodeStringError, DoublePeekable, Numeric,
+    },
+    Comparison, Symbol,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
@@ -116,119 +121,6 @@ pub enum BracketType {
     Curly,
 }
 
-struct DoublePeekable<I>
-where
-    I: Iterator,
-{
-    iter: I,
-    peeked: Peeked<I::Item>,
-}
-
-impl<I> DoublePeekable<I>
-where
-    I: Iterator,
-{
-    fn peek(&mut self) -> Option<&I::Item> {
-        if self.peeked.len() < 1 {
-            if let Some(next_value) = self.iter.next() {
-                self.peeked = Peeked(Some(PeekedData::One(next_value)));
-            } else {
-                return None;
-            }
-        }
-
-        self.peeked.nth(0)
-    }
-
-    fn peek_second(&mut self) -> Option<&I::Item> {
-        if self.peeked.len() < 2 {
-            if let Some(next_value) = self.iter.next() {
-                self.peeked.0 = match self.peeked.0.take() {
-                    None => match self.iter.next() {
-                        Some(second_value) => Some(PeekedData::Two(next_value, second_value)),
-                        None => Some(PeekedData::One(next_value)),
-                    },
-                    Some(PeekedData::One(existing_value)) => {
-                        Some(PeekedData::Two(existing_value, next_value))
-                    }
-                    Some(PeekedData::Two(first, second)) => Some(PeekedData::Two(first, second)),
-                }
-            }
-        }
-
-        self.peeked.nth(1)
-    }
-}
-
-impl<I> Iterator for DoublePeekable<I>
-where
-    I: Iterator,
-{
-    type Item = I::Item;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(peeked) = self.peeked.next() {
-            Some(peeked)
-        } else {
-            self.iter.next()
-        }
-    }
-}
-
-struct Peeked<T>(Option<PeekedData<T>>);
-
-enum PeekedData<T> {
-    One(T),
-    Two(T, T),
-}
-
-impl<T> Peeked<T> {
-    const fn len(&self) -> usize {
-        match &self.0 {
-            None => 0,
-            Some(PeekedData::One(_)) => 1,
-            Some(PeekedData::Two(_, _)) => 2,
-        }
-    }
-
-    fn nth(&self, index: usize) -> Option<&T> {
-        match &self.0 {
-            None => None,
-            Some(PeekedData::One(value)) => {
-                if index == 0 {
-                    Some(value)
-                } else {
-                    None
-                }
-            }
-            Some(PeekedData::Two(first, second)) => {
-                if index == 0 {
-                    Some(first)
-                } else if index == 1 {
-                    Some(second)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-}
-
-impl<T> Iterator for Peeked<T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.0.take() {
-            None => None,
-            Some(PeekedData::One(value)) => Some(value),
-            Some(PeekedData::Two(first, second)) => {
-                self.0 = Some(PeekedData::One(second));
-                Some(first)
-            }
-        }
-    }
-}
-
 pub struct Lexer<'a> {
     source: &'a str,
     chars: DoublePeekable<CharIndices<'a>>,
@@ -240,10 +132,7 @@ impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
-            chars: DoublePeekable {
-                iter: source.char_indices(),
-                peeked: Peeked(None),
-            },
+            chars: DoublePeekable::new(source.char_indices()),
             peeked_token: None,
         }
     }
@@ -297,58 +186,16 @@ impl<'a> Lexer<'a> {
                         || (char == '-'
                             && self.chars.peek().map_or(false, |(_, ch)| ch.is_numeric())) =>
                 {
-                    let mut end = offset;
-                    while self
-                        .chars
-                        .peek()
-                        .map_or(false, |(_, char)| char.is_numeric() || *char == '_')
-                    {
-                        end = self.chars.next().expect("just peeked").0;
+                    match decode_numeric_literal(&mut self.chars, self.source, offset) {
+                        Ok(numeric) => Some(Ok(Token {
+                            kind: match numeric.contents {
+                                Numeric::Integer(value) => TokenKind::Integer(value),
+                                Numeric::Real(value) => TokenKind::Real(value),
+                            },
+                            range: offset..numeric.last_offset,
+                        })),
+                        Err(err) => Some(Err(ParseError::from(err))),
                     }
-
-                    // If we have a period and another numeric, this is a floating point number.
-                    if self.chars.peek().map_or(false, |(_, ch)| *ch == '.')
-                        && self
-                            .chars
-                            .peek_second()
-                            .map_or(false, |(_, ch)| ch.is_numeric())
-                    {
-                        // Skip the decimal
-                        self.chars.next();
-                        while self
-                            .chars
-                            .peek()
-                            .map_or(false, |(_, char)| char.is_numeric() || *char == '_')
-                        {
-                            end = self.chars.next().expect("just peeked").0;
-                        }
-
-                        let source = &self.source[offset..=end];
-                        let source = if source.find('_').is_some() {
-                            Cow::Owned(source.replace('_', ""))
-                        } else {
-                            Cow::Borrowed(source)
-                        };
-
-                        let value = source.parse::<f64>().unwrap();
-
-                        return Some(Ok(Token {
-                            kind: TokenKind::Real(value),
-                            range: offset..end + 1,
-                        }));
-                    }
-
-                    let source = &self.source[offset..=end];
-                    let source = if source.find('_').is_some() {
-                        Cow::Owned(source.replace('_', ""))
-                    } else {
-                        Cow::Borrowed(source)
-                    };
-                    let value = source.parse::<i64>().unwrap();
-                    Some(Ok(Token {
-                        kind: TokenKind::Integer(value),
-                        range: offset..end + 1,
-                    }))
                 }
                 Some((offset, char)) if char == '+' => {
                     Some(Ok(Token::at_offset(TokenKind::Add, offset)))
@@ -538,94 +385,11 @@ impl<'a> Lexer<'a> {
     }
 
     fn read_string(&mut self, start_offset: usize) -> Result<Token, ParseError> {
-        let mut string = String::new();
-        let mut end_offset = start_offset + 1;
-        loop {
-            let ch = self.chars.next().map(|r| r.1);
-            if ch.is_some() {
-                end_offset += 1;
-            }
-
-            match ch {
-                Some('"') => {
-                    // Final quote
-                    break;
-                }
-                Some('\\') => {
-                    end_offset += 1;
-                    // Escaped character
-                    let unescaped = match self.chars.next() {
-                        Some((_, 't')) => '\t',
-                        Some((_, 'r')) => '\r',
-                        Some((_, 'n')) => '\n',
-                        Some((_, 'u')) => {
-                            end_offset += 1;
-                            match self.chars.next().map(|r| r.1) {
-                                Some('{') => {}
-                                _ => {
-                                    todo!("add error")
-                                }
-                            }
-
-                            let mut codepoint = 0_u32;
-                            for (offset, char) in &mut self.chars {
-                                end_offset = offset + 1;
-                                let nibble_value = match char {
-                                    '}' => {
-                                        break;
-                                    }
-                                    ch if ch.is_numeric() => u32::from(ch) - u32::from(b'0'),
-                                    ch if ('a'..='f').contains(&ch) => {
-                                        u32::from(ch) - u32::from(b'a')
-                                    }
-                                    ch if ('A'..='F').contains(&ch) => {
-                                        u32::from(ch) - u32::from(b'A')
-                                    }
-                                    _ => {
-                                        return Err(ParseError::Unexpected(Token {
-                                            kind: TokenKind::Unknown(char),
-                                            range: offset..offset + 1,
-                                        }))
-                                    }
-                                };
-
-                                codepoint <<= 4;
-                                codepoint |= nibble_value;
-                            }
-
-                            if let Some(ch) = char::from_u32(codepoint) {
-                                ch
-                            } else {
-                                todo!("handle invalid unicode")
-                            }
-                        }
-                        Some((_, other)) => other,
-                        None => {
-                            return Err(ParseError::UnexpectedEof(String::from(
-                                "expected escape character",
-                            )))
-                        }
-                    };
-
-                    string.push(unescaped);
-                }
-                Some(ch) => {
-                    string.push(ch);
-                }
-                None => {
-                    return Err(ParseError::MissingEnd {
-                        kind: '"',
-                        open_offset: start_offset,
-                        error_location: end_offset,
-                    })
-                }
-            }
-        }
-
-        Ok(Token::new(
-            TokenKind::String(string),
-            start_offset..end_offset,
-        ))
+        let literal = decode_string_literal_contents(&mut self.chars, start_offset)?;
+        Ok(Token {
+            kind: TokenKind::String(literal.contents),
+            range: start_offset..literal.end_quote_offset + 1,
+        })
     }
 
     fn expect_next(&mut self, expected: &str) -> Result<Token, ParseError> {
@@ -668,10 +432,7 @@ pub fn parse(source: &str) -> Result<CodeUnit, ParseError> {
 
     let mut unit = CodeUnit::from_tree(statements, init_tree);
     for function in functions {
-        unit = unit.with(
-            function.name().expect("all functions are named").clone(),
-            function,
-        );
+        unit = unit.with(function.name().clone(), function);
     }
 
     Ok(unit)
@@ -1348,6 +1109,8 @@ pub enum ParseError {
         offset: usize,
         found: Option<Token>,
     },
+    String(DecodeStringError),
+    Numeric(DecodeNumericError),
 }
 
 impl ParseError {
@@ -1362,6 +1125,8 @@ impl ParseError {
                 ..
             } => Some(*open_offset..error_location + 1),
             ParseError::ExpectedEndOfLine { offset, .. } => Some(*offset..*offset),
+            ParseError::Numeric(err) => err.location(),
+            ParseError::String(err) => err.location(),
         }
     }
 }
@@ -1391,7 +1156,21 @@ impl Display for ParseError {
                     write!(f, "expected end of line at {offset}")
                 }
             }
+            Self::String(err) => write!(f, "error parsing string literal: {err}"),
+            Self::Numeric(err) => write!(f, "error parsing numeric literal: {err}"),
         }
+    }
+}
+
+impl From<DecodeNumericError> for ParseError {
+    fn from(err: DecodeNumericError) -> Self {
+        Self::Numeric(err)
+    }
+}
+
+impl From<DecodeStringError> for ParseError {
+    fn from(err: DecodeStringError) -> Self {
+        Self::String(err)
     }
 }
 
@@ -1417,17 +1196,13 @@ fn string_parsing() {
         Lexer::new(r#"""#)
             .collect::<Result<Vec<_>, _>>()
             .unwrap_err(),
-        ParseError::MissingEnd {
-            kind: '"',
-            open_offset: 0,
-            error_location: 1,
-        }
+        ParseError::String(DecodeStringError::EndQuoteNotFound)
     ));
     assert!(matches!(
         Lexer::new(r#""\"#)
             .collect::<Result<Vec<_>, _>>()
             .unwrap_err(),
-        ParseError::UnexpectedEof(_)
+        ParseError::String(DecodeStringError::EndQuoteNotFound)
     ));
 }
 

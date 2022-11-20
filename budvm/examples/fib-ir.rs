@@ -4,19 +4,19 @@ use budvm::{
     ir::{
         CodeBlockBuilder, CompareAction, Destination, Instruction, Literal, LiteralOrSource, Scope,
     },
-    Comparison, Function, Value, ValueOrSource, VirtualMachine,
+    Comparison, Function, Symbol, Value, ValueOrSource, VirtualMachine,
 };
 
 fn main() {
-    const ARG_N: usize = 0;
     let mut block = CodeBlockBuilder::default();
-    let if_greater_than_two = block.new_label();
+    let arg_n = block.new_argument("n");
+    let if_greater_than_two = block.named_label("if_greater_than_two");
     // if n <= 2
     block.push(Instruction::Compare {
         comparison: Comparison::LessThanOrEqual,
-        left: LiteralOrSource::Argument(ARG_N),
+        left: LiteralOrSource::Argument(arg_n.clone()),
         right: LiteralOrSource::Literal(Literal::Integer(2)),
-        action: CompareAction::JumpIfFalse(if_greater_than_two),
+        action: CompareAction::JumpIfFalse(if_greater_than_two.clone()),
     });
     // return 1
     block.push(Instruction::Return(Some(LiteralOrSource::Literal(
@@ -26,29 +26,29 @@ fn main() {
     block.label(if_greater_than_two);
     // n - 1, push result to stack
     block.push(Instruction::Sub {
-        left: LiteralOrSource::Argument(ARG_N),
+        left: LiteralOrSource::Argument(arg_n.clone()),
         right: LiteralOrSource::Literal(Literal::Integer(1)),
         destination: Destination::Stack,
     });
     // recurse call, store result in a variable.
-    let n_minus_one = block.new_temporary_variable();
+    let n_minus_one = block.variable_index_from_name(&Symbol::from("n_minus_one"));
     block.push(Instruction::Call {
         function: None,
         arg_count: 1,
-        destination: Destination::Variable(n_minus_one),
+        destination: Destination::Variable(n_minus_one.clone()),
     });
     // n - 2, push result to stack
     block.push(Instruction::Sub {
-        left: LiteralOrSource::Argument(ARG_N),
+        left: LiteralOrSource::Argument(arg_n),
         right: LiteralOrSource::Literal(Literal::Integer(2)),
         destination: Destination::Stack,
     });
     // recurse call, store result in a variable.
-    let n_minus_two = block.new_temporary_variable();
+    let n_minus_two = block.variable_index_from_name(&Symbol::from("n_minus_two"));
     block.push(Instruction::Call {
         function: None,
         arg_count: 1,
-        destination: Destination::Variable(n_minus_two),
+        destination: Destination::Variable(n_minus_two.clone()),
     });
     // Add the two variables together, and return the result.
     block.push(Instruction::Add {
@@ -57,6 +57,7 @@ fn main() {
         destination: Destination::Return,
     });
     let block = block.finish();
+    println!("IR: {block}");
 
     // The code block needs to be linked, which will convert the intermediate
     // representation into virtual machine instructions.
@@ -72,7 +73,7 @@ fn main() {
     let result: i64 = vm
         .run(
             Cow::Borrowed(&[
-                budvm::Instruction::Push(ValueOrSource::Value(Value::Integer(35))),
+                budvm::Instruction::Push(ValueOrSource::Value(Value::Integer(10))),
                 budvm::Instruction::Call {
                     vtable_index: Some(fibonacci_vtable_index),
                     arg_count: 1,
@@ -82,7 +83,7 @@ fn main() {
             0,
         )
         .unwrap();
-    assert_eq!(result, 9227465);
+    assert_eq!(result, 55);
 }
 
 #[test]

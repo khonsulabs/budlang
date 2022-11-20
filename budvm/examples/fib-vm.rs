@@ -54,7 +54,7 @@ fn main() {
     let result: i64 = context
         .run(
             Cow::Borrowed(&[
-                Instruction::Push(ValueOrSource::Value(Value::Integer(35))),
+                Instruction::Push(ValueOrSource::Value(Value::Integer(10))),
                 Instruction::Call {
                     vtable_index: Some(0),
                     arg_count: 1,
@@ -64,7 +64,7 @@ fn main() {
             0,
         )
         .unwrap();
-    assert_eq!(result, 9227465);
+    assert_eq!(result, 55);
 }
 
 #[test]

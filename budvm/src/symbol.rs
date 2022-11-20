@@ -218,27 +218,3 @@ fn basics() {
         }
     });
 }
-
-/// A type that can be converted into `Option<Symbol>`.
-pub trait OptionalSymbol {
-    /// Returns the value as a symbol, if possible.
-    fn into_symbol(self) -> Option<Symbol>;
-}
-
-impl OptionalSymbol for Symbol {
-    fn into_symbol(self) -> Option<Symbol> {
-        Some(self)
-    }
-}
-
-impl OptionalSymbol for Option<Symbol> {
-    fn into_symbol(self) -> Option<Symbol> {
-        self
-    }
-}
-
-impl<'a> OptionalSymbol for &'a str {
-    fn into_symbol(self) -> Option<Symbol> {
-        Some(Symbol::from(self))
-    }
-}

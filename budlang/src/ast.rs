@@ -11,7 +11,7 @@ use budvm::{
         self, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, LinkError, Literal,
         LiteralOrSource, LoopScope, Module, Scope, ScopeSymbol, ScopeSymbolKind,
     },
-    Comparison, Intrinsic, OptionalSymbol, Symbol,
+    Comparison, Intrinsic, Symbol,
 };
 
 pub struct ExpressionTree {
@@ -202,7 +202,11 @@ impl Node {
                 for statement in &statements.0 {
                     let statement = tree.node(*statement);
                     let result = operations.new_temporary_variable();
-                    statement.generate_code(Destination::Variable(result), operations, tree)?;
+                    statement.generate_code(
+                        Destination::Variable(result.clone()),
+                        operations,
+                        tree,
+                    )?;
                     last_result_var = Some(result);
                 }
                 if let Some(last_result) = last_result_var {
@@ -226,8 +230,8 @@ impl Node {
             Node::Call(call) => call.generate_code(result, operations, tree),
             Node::Return(value) => Self::generate_return(*value, operations, tree),
             Node::Loop(l) => l.generate_code(result, operations, tree),
-            Node::Break(l) => l.generate_code(result, operations, tree),
-            Node::Continue(l) => l.generate_code(result, operations, tree),
+            Node::Break(l) => l.generate_code(operations, tree),
+            Node::Continue(l) => l.generate_code(operations, tree),
         }
     }
 
@@ -239,8 +243,8 @@ impl Node {
         match self {
             Node::Literal(literal) => Ok(LiteralOrSource::Literal(literal.clone())),
             Node::Identifier(identifier) => match operations.lookup(identifier) {
-                Some(ScopeSymbol::Argument(arg)) => Ok(LiteralOrSource::Argument(*arg)),
-                Some(ScopeSymbol::Variable(var)) => Ok(LiteralOrSource::Variable(*var)),
+                Some(ScopeSymbol::Argument(arg)) => Ok(LiteralOrSource::Argument(arg.clone())),
+                Some(ScopeSymbol::Variable(var)) => Ok(LiteralOrSource::Variable(var.clone())),
                 Some(ScopeSymbol::Function { .. }) => todo!("attempt to take function as value"),
                 None => Err(CompilationError::UndefinedIdentifier(identifier.clone())),
             },
@@ -251,7 +255,7 @@ impl Node {
             // }
             _ => {
                 let variable = operations.new_temporary_variable();
-                self.generate_code(Destination::Variable(variable), operations, tree)?;
+                self.generate_code(Destination::Variable(variable.clone()), operations, tree)?;
                 Ok(LiteralOrSource::Variable(variable))
             }
         }
@@ -300,7 +304,9 @@ impl If {
         let condition = tree.node(self.condition);
         let after_false_label = operations.new_label();
         let if_false_label = self.else_block.map(|_| operations.new_label());
-        let false_jump_to = if_false_label.unwrap_or(after_false_label);
+        let false_jump_to = if_false_label
+            .clone()
+            .unwrap_or_else(|| after_false_label.clone());
         if let Node::BinOp(BinOp {
             kind: BinOpKind::Compare(comparison),
             left,
@@ -321,16 +327,20 @@ impl If {
         } else {
             // The if statement is a result of something more complex
             let condition_result = operations.new_temporary_variable();
-            condition.generate_code(Destination::Variable(condition_result), operations, tree)?;
+            condition.generate_code(
+                Destination::Variable(condition_result.clone()),
+                operations,
+                tree,
+            )?;
             operations.push(Instruction::If {
                 condition: LiteralOrSource::Variable(condition_result),
                 false_jump_to,
             });
         }
         let true_block = tree.node(self.true_block);
-        true_block.generate_code(result, operations, tree)?;
+        true_block.generate_code(result.clone(), operations, tree)?;
         if let (Some(else_block), Some(if_false_label)) = (self.else_block, if_false_label) {
-            operations.push(Instruction::JumpTo(after_false_label));
+            operations.push(Instruction::JumpTo(after_false_label.clone()));
             operations.label(if_false_label);
             let else_block = tree.node(else_block);
             else_block.generate_code(result, operations, tree)?;
@@ -487,19 +497,19 @@ impl BinOpKind {
                 let store_false = operations.new_label();
                 operations.push(Instruction::If {
                     condition: left,
-                    false_jump_to: store_false,
+                    false_jump_to: store_false.clone(),
                 });
                 // If left was false, we jump over the evaluation of right.
                 let right = right.to_value_or_source(operations, tree)?;
                 operations.push(Instruction::If {
                     condition: right,
-                    false_jump_to: store_false,
+                    false_jump_to: store_false.clone(),
                 });
                 operations.store_into_destination(
                     LiteralOrSource::Literal(Literal::Boolean(true)),
-                    destination,
+                    destination.clone(),
                 );
-                operations.push(Instruction::JumpTo(after_op));
+                operations.push(Instruction::JumpTo(after_op.clone()));
 
                 operations.label(store_false);
                 operations.store_into_destination(
@@ -512,25 +522,25 @@ impl BinOpKind {
                 let store_true = operations.new_label();
                 operations.push(Instruction::If {
                     condition: left,
-                    false_jump_to: check_right,
+                    false_jump_to: check_right.clone(),
                 });
                 // If left was true, we already know we're good
-                operations.push(Instruction::JumpTo(store_true));
+                operations.push(Instruction::JumpTo(store_true.clone()));
 
                 operations.label(check_right);
                 let right = right.to_value_or_source(operations, tree)?;
                 let store_false = operations.new_label();
                 operations.push(Instruction::If {
                     condition: right,
-                    false_jump_to: store_false,
+                    false_jump_to: store_false.clone(),
                 });
 
                 operations.label(store_true);
                 operations.store_into_destination(
                     LiteralOrSource::Literal(Literal::Boolean(true)),
-                    destination,
+                    destination.clone(),
                 );
-                operations.push(Instruction::JumpTo(after_op));
+                operations.push(Instruction::JumpTo(after_op.clone()));
 
                 operations.label(store_false);
                 operations.store_into_destination(
@@ -570,7 +580,7 @@ impl Not {
             }
             other => {
                 let expr = operations.new_temporary_variable();
-                other.generate_code(Destination::Variable(expr), operations, tree)?;
+                other.generate_code(Destination::Variable(expr.clone()), operations, tree)?;
                 operations.push(Instruction::Not {
                     value: LiteralOrSource::Variable(expr),
                     destination: result,
@@ -667,14 +677,18 @@ impl Call {
                 let target = tree.node(target);
                 let target = if let Node::Identifier(name) = target {
                     match operations.lookup(name) {
-                        Some(ScopeSymbol::Argument(arg)) => LiteralOrSource::Argument(*arg),
-                        Some(ScopeSymbol::Variable(var)) => LiteralOrSource::Variable(*var),
+                        Some(ScopeSymbol::Argument(arg)) => LiteralOrSource::Argument(arg.clone()),
+                        Some(ScopeSymbol::Variable(var)) => LiteralOrSource::Variable(var.clone()),
                         Some(ScopeSymbol::Function { .. }) => todo!("can't invoke on a function"),
                         None => todo!("unknown identifier"),
                     }
                 } else {
                     let target_result = operations.new_temporary_variable();
-                    target.generate_code(Destination::Variable(target_result), operations, tree)?;
+                    target.generate_code(
+                        Destination::Variable(target_result.clone()),
+                        operations,
+                        tree,
+                    )?;
                     LiteralOrSource::Variable(target_result)
                 };
 
@@ -715,7 +729,7 @@ impl Assign {
             Node::Identifier(name) => {
                 let variable = operations.variable_index_from_name(name);
                 let value = tree.node(self.value);
-                value.generate_code(Destination::Variable(variable), operations, tree)?;
+                value.generate_code(Destination::Variable(variable.clone()), operations, tree)?;
                 operations.store_into_destination(LiteralOrSource::Variable(variable), result);
             }
             _ => todo!("not a variable name"),
@@ -798,10 +812,10 @@ impl Loop {
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
-        let mut scope = operations.begin_loop(self.name.clone(), result);
+        let mut scope = operations.begin_loop(self.name.clone(), result.clone());
 
-        let continue_label = scope.continue_label;
-        let break_label = scope.break_label;
+        let continue_label = scope.continue_label.clone();
+        let break_label = scope.break_label.clone();
 
         match &self.parameters {
             Some(LoopParameters::Until(expr)) => {
@@ -822,7 +836,7 @@ impl Loop {
                 let variable = scope.variable_index_from_name(var_name);
                 if let Some(initial_value) = *initial_value {
                     tree.node(initial_value).generate_code(
-                        Destination::Variable(variable),
+                        Destination::Variable(variable.clone()),
                         &mut scope,
                         tree,
                     )?;
@@ -830,7 +844,7 @@ impl Loop {
 
                 // On the first pass, we skip executing the step instructions
                 let after_step = scope.new_label();
-                scope.push(Instruction::JumpTo(after_step));
+                scope.push(Instruction::JumpTo(after_step.clone()));
 
                 // We evaluate the value of the step once at the start of the loop, not on each iteration.
 
@@ -839,7 +853,7 @@ impl Loop {
                     other => {
                         let stop_result = scope.new_temporary_variable();
                         other.generate_code(
-                            Destination::Variable(stop_result),
+                            Destination::Variable(stop_result.clone()),
                             &mut scope,
                             tree,
                         )?;
@@ -850,7 +864,7 @@ impl Loop {
                 let step = if let Some(step) = step {
                     let step_result = scope.new_temporary_variable();
                     tree.node(*step).generate_code(
-                        Destination::Variable(step_result),
+                        Destination::Variable(step_result.clone()),
                         &mut scope,
                         tree,
                     )?;
@@ -865,9 +879,9 @@ impl Loop {
                 scope.label_continue();
                 // Step
                 scope.push(Instruction::Add {
-                    left: LiteralOrSource::Variable(variable),
+                    left: LiteralOrSource::Variable(variable.clone()),
                     right: step,
-                    destination: Destination::Variable(variable),
+                    destination: Destination::Variable(variable.clone()),
                 });
                 scope.label(after_step);
 
@@ -922,11 +936,14 @@ impl Loop {
 
         let condition_result = scope.new_temporary_variable();
         let continue_evaluation = scope.new_label();
-        tree.node(condition)
-            .generate_code(Destination::Variable(condition_result), scope, tree)?;
+        tree.node(condition).generate_code(
+            Destination::Variable(condition_result.clone()),
+            scope,
+            tree,
+        )?;
         scope.push(Instruction::If {
             condition: LiteralOrSource::Variable(condition_result),
-            false_jump_to: continue_evaluation,
+            false_jump_to: continue_evaluation.clone(),
         });
         scope.push(Instruction::JumpTo(break_label));
 
@@ -943,8 +960,11 @@ impl Loop {
         scope.label_continue();
 
         let condition_result = scope.new_temporary_variable();
-        tree.node(condition)
-            .generate_code(Destination::Variable(condition_result), scope, tree)?;
+        tree.node(condition).generate_code(
+            Destination::Variable(condition_result.clone()),
+            scope,
+            tree,
+        )?;
         scope.push(Instruction::If {
             condition: LiteralOrSource::Variable(condition_result),
             false_jump_to: break_label,
@@ -976,14 +996,13 @@ pub struct Break {
 impl Break {
     fn generate_code(
         &self,
-        _result: Destination,
         operations: &mut CodeBlockBuilder,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         if let Some(loop_info) = operations.loop_info(self.name.as_ref()) {
-            let break_label = loop_info.break_label;
+            let break_label = loop_info.break_label.clone();
             if let Some(value) = self.value {
-                let result = loop_info.loop_result;
+                let result = loop_info.loop_result.clone();
                 let value = tree.node(value);
                 value.generate_code(result, operations, tree)?;
             }
@@ -1003,12 +1022,11 @@ pub struct Continue {
 impl Continue {
     fn generate_code(
         &self,
-        _result: Destination,
         operations: &mut CodeBlockBuilder,
         _tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         if let Some(loop_info) = operations.loop_info(self.name.as_ref()) {
-            let continue_label = loop_info.continue_label;
+            let continue_label = loop_info.continue_label.clone();
             operations.push(Instruction::JumpTo(continue_label));
             Ok(())
         } else {
@@ -1178,11 +1196,11 @@ impl CodeUnit {
             .into_iter()
             .map(|f| {
                 let mut block = CodeBlockBuilder::default();
-                for (index, arg) in f.args.iter().enumerate() {
-                    block.add_symbol(arg.clone(), ScopeSymbol::Argument(index));
+                for arg in &f.args {
+                    block.new_argument(arg.clone());
                 }
                 f.body.generate_code(&mut block)?;
-                Ok(ir::Function::new(f.name, f.args, block.finish()))
+                Ok(ir::Function::new(f.name, block.finish()))
             })
             .collect::<Result<_, CompilationError>>()?;
 
@@ -1197,10 +1215,10 @@ impl CodeUnit {
             });
             self.init_tree.finish(body).generate_code(&mut block)?;
             for (symbol, variable) in block.variables() {
-                scope.define_persistent_variable(symbol.clone(), *variable);
+                scope.define_persistent_variable(symbol.clone(), variable.clone());
             }
 
-            Some(ir::Function::new("__init", Vec::new(), block.finish()))
+            Some(ir::Function::new("__init", block.finish()))
         } else {
             None
         };
@@ -1242,23 +1260,23 @@ enum DeclaredSymbol {
 
 #[derive(Debug)]
 pub struct Function {
-    name: Option<Symbol>,
+    name: Symbol,
     args: Vec<Symbol>,
     body: ExpressionTree,
 }
 
 impl Function {
-    pub fn new(name: impl OptionalSymbol, args: Vec<Symbol>, body: ExpressionTree) -> Self {
+    pub fn new(name: impl Into<Symbol>, args: Vec<Symbol>, body: ExpressionTree) -> Self {
         Self {
-            name: name.into_symbol(),
+            name: name.into(),
             args,
             body,
         }
     }
 
     #[must_use]
-    pub fn name(&self) -> Option<&Symbol> {
-        self.name.as_ref()
+    pub fn name(&self) -> &Symbol {
+        &self.name
     }
 }
 

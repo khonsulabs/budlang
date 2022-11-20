@@ -13,11 +13,11 @@ fn main() {
                     end
                 end
 
-                fibonacci(35)
+                fibonacci(10)
             "#,
         )
         .unwrap();
-    assert_eq!(result, 9227465);
+    assert_eq!(result, 55);
 }
 
 #[test]

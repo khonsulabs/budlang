@@ -206,15 +206,15 @@ where
         let previous_variable_count = self.persistent_variables().len();
         let unit = parse(source)?.compile(&mut self.0)?;
         for function in unit.vtable {
-            if let (Some(name), Ok(_)) = (&function.name, env::var("PRINT_IR")) {
-                println!("function {}", name);
+            if env::var("PRINT_IR").is_ok() {
+                println!("function {}", function.name);
             }
             function.link_into(&mut self.0)?;
         }
 
         if let Some(init) = &unit.init {
             if env::var("PRINT_IR").is_ok() {
-                println!("function init");
+                println!("function __init");
             }
 
             let function = init.link(&mut self.0)?;
