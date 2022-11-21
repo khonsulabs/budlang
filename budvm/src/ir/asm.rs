@@ -217,6 +217,7 @@ impl<'a> Parser<'a> {
                                 self.parse_comparison(symbol)?;
                             }
                             "not" => self.parse_not()?,
+                            "bitnot" => self.parse_bitnot()?,
                             "ifnot" => self.parse_ifnot()?,
                             "jump" => self.parse_jump()?,
                             "push" => self.parse_push()?,
@@ -559,7 +560,15 @@ impl<'a> Parser<'a> {
         let value = self.expect_literal_or_source()?;
         let destination = self.expect_destination()?;
         self.current_function
-            .push(Instruction::Not { value, destination });
+            .push(Instruction::LogicalNot { value, destination });
+        Ok(())
+    }
+
+    fn parse_bitnot(&mut self) -> Result<(), AsmError> {
+        let value = self.expect_literal_or_source()?;
+        let destination = self.expect_destination()?;
+        self.current_function
+            .push(Instruction::BitwiseNot { value, destination });
         Ok(())
     }
 
@@ -764,7 +773,11 @@ fn roundtrip_all_instructions() {
         right: LiteralOrSource::Literal(Literal::Void),
         destination: Destination::Stack,
     });
-    block.push(Instruction::Not {
+    block.push(Instruction::LogicalNot {
+        value: LiteralOrSource::Literal(Literal::Void),
+        destination: Destination::Stack,
+    });
+    block.push(Instruction::BitwiseNot {
         value: LiteralOrSource::Literal(Literal::Void),
         destination: Destination::Stack,
     });

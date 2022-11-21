@@ -593,7 +593,7 @@ fn logic() {
         bud.run_source::<i64>(
             r#"
                 a := 0
-                not a
+                ~a
             "#,
         )
         .unwrap(),

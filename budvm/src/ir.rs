@@ -179,10 +179,21 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
+    /// Performs a logical `not` operation for `value`, storing the result in
+    /// `destination`.
+    ///
+    /// If the value is truthy, false will be stored in the destination. If the
+    /// value is falsey, true will be stored in the destination.
+    LogicalNot {
+        /// The left hand side of the operation.
+        value: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
     /// Performs a bitwise and of `left` and `right` and places the result in
     /// `destination`. This operation always results in a [`Value::Integer`].
     ///
-    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// If either `left` or `right ` cannot be coerced to an integer, a fault will be
     /// returned.
     ///
     /// The result will have each bit set based on whether the corresponding bit
@@ -198,7 +209,7 @@ pub enum Instruction {
     /// Performs a bitwise or of `left` and `right` and places the result in
     /// `destination`. This operation always results in a [`Value::Integer`].
     ///
-    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// If either `left` or `right ` cannot be coerced to an integer, a fault will be
     /// returned.
     ///
     /// The result will have each bit set based on whether either corresponding bit
@@ -215,7 +226,7 @@ pub enum Instruction {
     /// result in `destination`. This operation always results in a
     /// [`Value::Integer`].
     ///
-    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// If either `left` or `right ` cannot be coerced to an integer, a fault will be
     /// returned.
     ///
     /// The result will have each bit set based on whether only one
@@ -225,6 +236,18 @@ pub enum Instruction {
         left: LiteralOrSource,
         /// The right hand side of the operation.
         right: LiteralOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a bitwise not operation for `value`, storing the result in
+    /// `destination`. This operation always results in a [`Value::Integer`].
+    ///
+    /// If `value` cannot be coerced to an integer, a fault will be returned.
+    ///
+    /// The result will be `value` with each bit flipped.
+    BitwiseNot {
+        /// The left hand side of the operation.
+        value: LiteralOrSource,
         /// The destination for the result to be stored in.
         destination: Destination,
     },
@@ -251,20 +274,6 @@ pub enum Instruction {
         left: LiteralOrSource,
         /// The number of bits to shift by
         right: LiteralOrSource,
-        /// The destination for the result to be stored in.
-        destination: Destination,
-    },
-    /// Performs a `not` operation for `value`, storing the result in
-    /// `destination`.
-    ///
-    /// If the operands is an integer, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
-    ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `not value.is_truthy()`.
-    Not {
-        /// The left hand side of the operation.
-        value: LiteralOrSource,
         /// The destination for the result to be stored in.
         destination: Destination,
     },
@@ -447,7 +456,12 @@ impl Display for Instruction {
                 right,
                 destination,
             } => write!(f, "shr {left} {right} {destination}"),
-            Instruction::Not { value, destination } => write!(f, "not {value} {destination}"),
+            Instruction::LogicalNot { value, destination } => {
+                write!(f, "not {value} {destination}")
+            }
+            Instruction::BitwiseNot { value, destination } => {
+                write!(f, "bitnot {value} {destination}")
+            }
             Instruction::If {
                 condition,
                 false_jump_to,
@@ -1160,7 +1174,11 @@ where
             right: right.instantiate::<S::Environment>(),
             destination: destination.into(),
         },
-        Instruction::Not { value, destination } => crate::Instruction::Not {
+        Instruction::LogicalNot { value, destination } => crate::Instruction::LogicalNot {
+            value: value.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::BitwiseNot { value, destination } => crate::Instruction::BitwiseNot {
             value: value.instantiate::<S::Environment>(),
             destination: destination.into(),
         },

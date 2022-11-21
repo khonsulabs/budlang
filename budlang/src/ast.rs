@@ -558,6 +558,7 @@ impl BinOpKind {
 #[derive(Debug)]
 pub struct Not {
     expr: NodeId,
+    bitwise: bool,
 }
 
 impl Not {
@@ -579,12 +580,20 @@ impl Not {
                 operations.store_into_destination(expr, result);
             }
             other => {
-                let expr = operations.new_temporary_variable();
-                other.generate_code(Destination::Variable(expr.clone()), operations, tree)?;
-                operations.push(Instruction::Not {
-                    value: LiteralOrSource::Variable(expr),
-                    destination: result,
-                });
+                let value = operations.new_temporary_variable();
+                other.generate_code(Destination::Variable(value.clone()), operations, tree)?;
+                let value = LiteralOrSource::Variable(value);
+                if self.bitwise {
+                    operations.push(Instruction::BitwiseNot {
+                        value,
+                        destination: result,
+                    });
+                } else {
+                    operations.push(Instruction::LogicalNot {
+                        value,
+                        destination: result,
+                    });
+                }
             }
         }
         Ok(())
@@ -1103,8 +1112,8 @@ impl SyntaxTreeBuilder {
         self.push(Node::Literal(Literal::Boolean(boolean)))
     }
 
-    pub fn not_node(&self, expr: NodeId) -> NodeId {
-        self.push(Node::Not(Not { expr }))
+    pub fn not_node(&self, expr: NodeId, bitwise: bool) -> NodeId {
+        self.push(Node::Not(Not { expr, bitwise }))
     }
 
     pub fn call(&self, call: Call) -> NodeId {

@@ -71,6 +71,7 @@ pub enum TokenKind {
     Ampersand,
     Pipe,
     Caret,
+    Tilde,
     Unknown(char),
 }
 
@@ -108,6 +109,7 @@ impl Display for TokenKind {
             TokenKind::Ampersand => f.write_char('&'),
             TokenKind::Pipe => f.write_char('|'),
             TokenKind::Caret => f.write_char('^'),
+            TokenKind::Tilde => f.write_char('~'),
             TokenKind::Unknown(token) => Display::fmt(token, f),
             TokenKind::Comment(value) => write!(f, "// {value}"),
         }
@@ -300,6 +302,9 @@ impl<'a> Lexer<'a> {
                 }
                 Some((offset, char)) if char == '&' => {
                     Some(Ok(Token::at_offset(TokenKind::Ampersand, offset)))
+                }
+                Some((offset, char)) if char == '~' => {
+                    Some(Ok(Token::at_offset(TokenKind::Tilde, offset)))
                 }
                 Some((offset, char)) if char == '|' => {
                     Some(Ok(Token::at_offset(TokenKind::Pipe, offset)))
@@ -938,10 +943,19 @@ fn parse_term(
                     tokens,
                     owning_function_name,
                 )?;
-                Ok(tree.not_node(expr))
+                Ok(tree.not_node(expr, false))
             }
             _ => parse_lookup(lookup_base, tree, tokens, owning_function_name),
         },
+        TokenKind::Tilde => {
+            let expr = parse_term(
+                tokens.expect_next("expression")?,
+                tree,
+                tokens,
+                owning_function_name,
+            )?;
+            Ok(tree.not_node(expr, true))
+        }
         TokenKind::Integer(integer) => Ok(tree.integer(integer)),
         TokenKind::Real(integer) => Ok(tree.real(integer)),
         TokenKind::String(string) => Ok(tree.string(string)),

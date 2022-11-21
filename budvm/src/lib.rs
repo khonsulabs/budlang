@@ -227,15 +227,24 @@ pub enum Instruction {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
-    /// Performs a `not` operation for `value`, storing the result in
+    /// Performs a logical `not` operation for `value`, storing the result in
     /// `destination`.
     ///
-    /// If the operands is an integer, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
+    /// If the value is truthy, false will be stored in the destination. If the
+    /// value is falsey, true will be stored in the destination.
+    LogicalNot {
+        /// The left hand side of the operation.
+        value: ValueOrSource,
+        /// The destination for the result to be stored in.
+        destination: Destination,
+    },
+    /// Performs a bitwise not operation for `value`, storing the result in
+    /// `destination`. This operation always results in a [`Value::Integer`].
     ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `not value.is_truthy()`.
-    Not {
+    /// If `value` cannot be coerced to an integer, a fault will be returned.
+    ///
+    /// The result will be `value` with each bit flipped.
+    BitwiseNot {
         /// The left hand side of the operation.
         value: ValueOrSource,
         /// The destination for the result to be stored in.
@@ -439,7 +448,12 @@ impl Display for Instruction {
                 right,
                 destination,
             } => write!(f, "shr {left} {right} {destination}"),
-            Instruction::Not { value, destination } => write!(f, "not {value} {destination}"),
+            Instruction::LogicalNot { value, destination } => {
+                write!(f, "not {value} {destination}")
+            }
+            Instruction::BitwiseNot { value, destination } => {
+                write!(f, "bitnot {value} {destination}")
+            }
             Instruction::If {
                 condition,
                 false_jump_to,
@@ -735,10 +749,10 @@ impl Value {
     /// contained value. Otherwise, `None` is returned.
     #[must_use]
     pub fn as_i64(&self) -> Option<i64> {
-        if let Value::Integer(value) = self {
-            Some(*value)
-        } else {
-            None
+        match self {
+            Value::Integer(value) => Some(*value),
+            Value::Dynamic(dynamic) => dynamic.as_i64(),
+            _ => None,
         }
     }
 
@@ -764,7 +778,7 @@ impl Value {
     pub fn is_truthy(&self) -> bool {
         match self {
             Value::Integer(value) => *value != 0,
-            Value::Real(value) => value.abs() < f64::EPSILON,
+            Value::Real(value) => value.abs() >= f64::EPSILON,
             Value::Boolean(value) => *value,
             Value::Dynamic(value) => value.is_truthy(),
             Value::Void => false,
@@ -1766,10 +1780,14 @@ where
                     Ok(0)
                 }
             }),
-            Instruction::Not {
+            Instruction::LogicalNot {
                 value: left,
                 destination,
             } => self.not(left, *destination),
+            Instruction::BitwiseNot {
+                value: left,
+                destination,
+            } => self.bitnot(left, *destination),
             Instruction::If {
                 condition: value,
                 false_jump_to,
@@ -2238,27 +2256,28 @@ where
         destination: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
         let value = self.resolve_value_or_source(value)?;
-        let produced_value = match value {
-            Value::Void => Value::Boolean(true),
-            Value::Integer(value) => Value::Integer(!value),
-            Value::Real(value) => Value::Boolean(real_eq(*value, 0.0)),
-            Value::Boolean(value) => Value::Boolean(!*value),
-            Value::Dynamic(dynamic) => {
-                if let Some(not) = dynamic.not() {
-                    not
-                } else {
-                    Value::Boolean(dynamic.is_falsey())
-                }
-            }
-        };
-        *self.resolve_value_source_mut(destination)? = produced_value;
+
+        *self.resolve_value_source_mut(destination)? = Value::Boolean(value.is_falsey());
+
+        Ok(None)
+    }
+
+    fn bitnot(
+        &mut self,
+        value: &ValueOrSource,
+        destination: Destination,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let value = self.resolve_value_or_source(value)?;
+        let value = Self::extract_integer(value)?;
+
+        *self.resolve_value_source_mut(destination)? = Value::Integer(!value);
 
         Ok(None)
     }
 
     fn extract_integer(value: &Value) -> Result<i64, Fault<'static, Env, Output>> {
-        if let Value::Integer(value) = value {
-            Ok(*value)
+        if let Some(value) = value.as_i64() {
+            Ok(value)
         } else {
             Err(Fault::from(FaultKind::type_mismatch(
                 "operation only supports @expected, received @receoved-value (@received-kind)",
