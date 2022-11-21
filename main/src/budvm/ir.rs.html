@@ -1525,6 +1525,24 @@
 <span id="1525">1525</span>
 <span id="1526">1526</span>
 <span id="1527">1527</span>
+<span id="1528">1528</span>
+<span id="1529">1529</span>
+<span id="1530">1530</span>
+<span id="1531">1531</span>
+<span id="1532">1532</span>
+<span id="1533">1533</span>
+<span id="1534">1534</span>
+<span id="1535">1535</span>
+<span id="1536">1536</span>
+<span id="1537">1537</span>
+<span id="1538">1538</span>
+<span id="1539">1539</span>
+<span id="1540">1540</span>
+<span id="1541">1541</span>
+<span id="1542">1542</span>
+<span id="1543">1543</span>
+<span id="1544">1544</span>
+<span id="1545">1545</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An intermediate representation of virtual machine instructions.
 //!
 //! This intermediate representation provides conveniences for handling
@@ -1706,10 +1724,21 @@
         <span class="doccomment">/// The destination for the result to be stored in.
         </span>destination: Destination,
     },
+    <span class="doccomment">/// Performs a logical `not` operation for `value`, storing the result in
+    /// `destination`.
+    ///
+    /// If the value is truthy, false will be stored in the destination. If the
+    /// value is falsey, true will be stored in the destination.
+    </span>LogicalNot {
+        <span class="doccomment">/// The left hand side of the operation.
+        </span>value: LiteralOrSource,
+        <span class="doccomment">/// The destination for the result to be stored in.
+        </span>destination: Destination,
+    },
     <span class="doccomment">/// Performs a bitwise and of `left` and `right` and places the result in
     /// `destination`. This operation always results in a [`Value::Integer`].
     ///
-    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// If either `left` or `right ` cannot be coerced to an integer, a fault will be
     /// returned.
     ///
     /// The result will have each bit set based on whether the corresponding bit
@@ -1725,7 +1754,7 @@
     <span class="doccomment">/// Performs a bitwise or of `left` and `right` and places the result in
     /// `destination`. This operation always results in a [`Value::Integer`].
     ///
-    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// If either `left` or `right ` cannot be coerced to an integer, a fault will be
     /// returned.
     ///
     /// The result will have each bit set based on whether either corresponding bit
@@ -1742,7 +1771,7 @@
     /// result in `destination`. This operation always results in a
     /// [`Value::Integer`].
     ///
-    /// If either `left` or `right ` are not [`Value::Integer`], a fault will be
+    /// If either `left` or `right ` cannot be coerced to an integer, a fault will be
     /// returned.
     ///
     /// The result will have each bit set based on whether only one
@@ -1752,6 +1781,18 @@
         </span>left: LiteralOrSource,
         <span class="doccomment">/// The right hand side of the operation.
         </span>right: LiteralOrSource,
+        <span class="doccomment">/// The destination for the result to be stored in.
+        </span>destination: Destination,
+    },
+    <span class="doccomment">/// Performs a bitwise not operation for `value`, storing the result in
+    /// `destination`. This operation always results in a [`Value::Integer`].
+    ///
+    /// If `value` cannot be coerced to an integer, a fault will be returned.
+    ///
+    /// The result will be `value` with each bit flipped.
+    </span>BitwiseNot {
+        <span class="doccomment">/// The left hand side of the operation.
+        </span>value: LiteralOrSource,
         <span class="doccomment">/// The destination for the result to be stored in.
         </span>destination: Destination,
     },
@@ -1778,20 +1819,6 @@
         </span>left: LiteralOrSource,
         <span class="doccomment">/// The number of bits to shift by
         </span>right: LiteralOrSource,
-        <span class="doccomment">/// The destination for the result to be stored in.
-        </span>destination: Destination,
-    },
-    <span class="doccomment">/// Performs a `not` operation for `value`, storing the result in
-    /// `destination`.
-    ///
-    /// If the operands is an integer, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
-    ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `not value.is_truthy()`.
-    </span>Not {
-        <span class="doccomment">/// The left hand side of the operation.
-        </span>value: LiteralOrSource,
         <span class="doccomment">/// The destination for the result to be stored in.
         </span>destination: Destination,
     },
@@ -1974,7 +2001,12 @@
                 right,
                 destination,
             } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;shr {left} {right} {destination}&quot;</span>),
-            Instruction::Not { value, destination } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;not {value} {destination}&quot;</span>),
+            Instruction::LogicalNot { value, destination } =&gt; {
+                <span class="macro">write!</span>(f, <span class="string">&quot;not {value} {destination}&quot;</span>)
+            }
+            Instruction::BitwiseNot { value, destination } =&gt; {
+                <span class="macro">write!</span>(f, <span class="string">&quot;bitnot {value} {destination}&quot;</span>)
+            }
             Instruction::If {
                 condition,
                 false_jump_to,
@@ -2687,7 +2719,11 @@
             right: right.instantiate::&lt;S::Environment&gt;(),
             destination: destination.into(),
         },
-        Instruction::Not { value, destination } =&gt; <span class="kw">crate</span>::Instruction::Not {
+        Instruction::LogicalNot { value, destination } =&gt; <span class="kw">crate</span>::Instruction::LogicalNot {
+            value: value.instantiate::&lt;S::Environment&gt;(),
+            destination: destination.into(),
+        },
+        Instruction::BitwiseNot { value, destination } =&gt; <span class="kw">crate</span>::Instruction::BitwiseNot {
             value: value.instantiate::&lt;S::Environment&gt;(),
             destination: destination.into(),
         },

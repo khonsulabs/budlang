@@ -468,64 +468,6 @@
 <span id="468">468</span>
 <span id="469">469</span>
 <span id="470">470</span>
-<span id="471">471</span>
-<span id="472">472</span>
-<span id="473">473</span>
-<span id="474">474</span>
-<span id="475">475</span>
-<span id="476">476</span>
-<span id="477">477</span>
-<span id="478">478</span>
-<span id="479">479</span>
-<span id="480">480</span>
-<span id="481">481</span>
-<span id="482">482</span>
-<span id="483">483</span>
-<span id="484">484</span>
-<span id="485">485</span>
-<span id="486">486</span>
-<span id="487">487</span>
-<span id="488">488</span>
-<span id="489">489</span>
-<span id="490">490</span>
-<span id="491">491</span>
-<span id="492">492</span>
-<span id="493">493</span>
-<span id="494">494</span>
-<span id="495">495</span>
-<span id="496">496</span>
-<span id="497">497</span>
-<span id="498">498</span>
-<span id="499">499</span>
-<span id="500">500</span>
-<span id="501">501</span>
-<span id="502">502</span>
-<span id="503">503</span>
-<span id="504">504</span>
-<span id="505">505</span>
-<span id="506">506</span>
-<span id="507">507</span>
-<span id="508">508</span>
-<span id="509">509</span>
-<span id="510">510</span>
-<span id="511">511</span>
-<span id="512">512</span>
-<span id="513">513</span>
-<span id="514">514</span>
-<span id="515">515</span>
-<span id="516">516</span>
-<span id="517">517</span>
-<span id="518">518</span>
-<span id="519">519</span>
-<span id="520">520</span>
-<span id="521">521</span>
-<span id="522">522</span>
-<span id="523">523</span>
-<span id="524">524</span>
-<span id="525">525</span>
-<span id="526">526</span>
-<span id="527">527</span>
-<span id="528">528</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     any::{Any, TypeId},
     cmp::Ordering,
@@ -551,10 +493,12 @@
     /// virtual machine uses this string only when creating error messages.
     </span><span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str;
 
-    <span class="doccomment">/// Returns the logical or bitwise inverse for this value. If none is
-    /// returned, the virtual machine will use `!self.is_truthy()`.
+    <span class="doccomment">/// Returns this value as an `i64`, if possible.
+    ///
+    /// Implementhing this function enables this type to be used in integer
+    /// operations such as bitwise operations.
     </span><span class="attribute">#[must_use]
-    </span><span class="kw">fn </span>not(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
+    </span><span class="kw">fn </span>as_i64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;i64&gt; {
         <span class="prelude-val">None
     </span>}
 
@@ -631,33 +575,6 @@
     </span><span class="kw">fn </span>checked_div(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt; {
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
-
-    <span class="doccomment">/// Returns the &quot;logical and&quot; or &quot;bitwise and&quot; result of `self and other`.
-    /// If none is returned, the virtual machine will create a boolean result
-    /// from `self.is_truthy() and self.is_truthy()`.
-    </span><span class="attribute">#[must_use]
-    #[allow(unused_variables)]
-    </span><span class="kw">fn </span>and(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="prelude-val">None
-    </span>}
-
-    <span class="doccomment">/// Returns the &quot;logical or&quot; or &quot;bitwise or&quot; result of `self or other`. If
-    /// none is returned, the virtual machine will create a boolean result from
-    /// `self.is_truthy() or self.is_truthy()`.
-    </span><span class="attribute">#[must_use]
-    #[allow(unused_variables)]
-    </span><span class="kw">fn </span>or(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="prelude-val">None
-    </span>}
-
-    <span class="doccomment">/// Returns the &quot;logical xor&quot; or &quot;bitwise xor&quot; result of `self xor other`.
-    /// If none is returned, the virtual machine will create a boolean result
-    /// from `self.is_truthy() xor self.is_truthy()`.
-    </span><span class="attribute">#[must_use]
-    #[allow(unused_variables)]
-    </span><span class="kw">fn </span>xor(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="prelude-val">None
-    </span>}
 
     <span class="doccomment">/// Calls a function by `name` with `args`.
     </span><span class="attribute">#[allow(unused_variables)]
@@ -802,10 +719,10 @@
         <span class="self">self</span>.<span class="number">0</span>.is_truthy()
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::not()`] for the wrapped value.
+    <span class="doccomment">/// Returns the result of [`DynamicValue::as_i64()`] for the wrapped value.
     </span><span class="attribute">#[must_use]
-    </span><span class="kw">pub fn </span>not(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="self">self</span>.<span class="number">0</span>.not()
+    </span><span class="kw">pub fn </span>as_i64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;i64&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.as_i64()
     }
 
     <span class="doccomment">/// Returns the inverse of [`DynamicValue::is_truthy()`] for the wrapped
@@ -853,24 +770,6 @@
         <span class="self">self</span>.<span class="number">0</span>.checked_div(other, is_reverse)
     }
 
-    <span class="doccomment">/// Returns the result of [`DynamicValue::and()`] for the wrapped value.
-    </span><span class="attribute">#[must_use]
-    </span><span class="kw">pub fn </span>and(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="self">self</span>.<span class="number">0</span>.and(other)
-    }
-
-    <span class="doccomment">/// Returns the result of [`DynamicValue::or()`] for the wrapped value.
-    </span><span class="attribute">#[must_use]
-    </span><span class="kw">pub fn </span>or(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="self">self</span>.<span class="number">0</span>.or(other)
-    }
-
-    <span class="doccomment">/// Returns the result of [`DynamicValue::xor()`] for the wrapped value.
-    </span><span class="attribute">#[must_use]
-    </span><span class="kw">pub fn </span>xor(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="self">self</span>.<span class="number">0</span>.xor(other)
-    }
-
     <span class="doccomment">/// Invokes [`DynamicValue::call`] with the given parameters.
     </span><span class="kw">pub fn </span>call(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol, args: PoppedValues&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt; {
         <span class="self">self</span>.<span class="number">0</span>.call(name, args)
@@ -906,7 +805,7 @@
     <span class="kw">fn </span>as_opt_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Any;
 
     <span class="kw">fn </span>is_truthy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
-    <span class="kw">fn </span>not(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt;;
+    <span class="kw">fn </span>as_i64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;i64&gt;;
     <span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str;
     <span class="kw">fn </span>partial_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt;;
     <span class="kw">fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt;;
@@ -914,9 +813,6 @@
     <span class="kw">fn </span>checked_sub(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt;;
     <span class="kw">fn </span>checked_mul(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt;;
     <span class="kw">fn </span>checked_div(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value, is_reverse: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Value&gt;, FaultKind&gt;;
-    <span class="kw">fn </span>and(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt;;
-    <span class="kw">fn </span>or(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt;;
-    <span class="kw">fn </span>xor(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt;;
     <span class="kw">fn </span>to_source(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt;;
     <span class="kw">fn </span>hash(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Hasher) -&gt; bool;
     <span class="kw">fn </span>call(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol, arguments: PoppedValues&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt;;
@@ -958,8 +854,8 @@
         <span class="self">self</span>.value().is_truthy()
     }
 
-    <span class="kw">fn </span>not(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="self">self</span>.value().not()
+    <span class="kw">fn </span>as_i64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;i64&gt; {
+        <span class="self">self</span>.value().as_i64()
     }
 
     <span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
@@ -1004,18 +900,6 @@
 
     <span class="kw">fn </span>call(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>Symbol, <span class="kw-2">mut </span>arguments: PoppedValues&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Value, FaultKind&gt; {
         <span class="self">self</span>.value().call(name, <span class="kw-2">&amp;mut </span>arguments)
-    }
-
-    <span class="kw">fn </span>and(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="self">self</span>.value().and(other)
-    }
-
-    <span class="kw">fn </span>or(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="self">self</span>.value().or(other)
-    }
-
-    <span class="kw">fn </span>xor(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
-        <span class="self">self</span>.value().xor(other)
     }
 }
 

@@ -3694,6 +3694,25 @@
 <span id="3694">3694</span>
 <span id="3695">3695</span>
 <span id="3696">3696</span>
+<span id="3697">3697</span>
+<span id="3698">3698</span>
+<span id="3699">3699</span>
+<span id="3700">3700</span>
+<span id="3701">3701</span>
+<span id="3702">3702</span>
+<span id="3703">3703</span>
+<span id="3704">3704</span>
+<span id="3705">3705</span>
+<span id="3706">3706</span>
+<span id="3707">3707</span>
+<span id="3708">3708</span>
+<span id="3709">3709</span>
+<span id="3710">3710</span>
+<span id="3711">3711</span>
+<span id="3712">3712</span>
+<span id="3713">3713</span>
+<span id="3714">3714</span>
+<span id="3715">3715</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -3923,15 +3942,24 @@
         <span class="doccomment">/// The destination for the result to be stored in.
         </span>destination: Destination,
     },
-    <span class="doccomment">/// Performs a `not` operation for `value`, storing the result in
+    <span class="doccomment">/// Performs a logical `not` operation for `value`, storing the result in
     /// `destination`.
     ///
-    /// If the operands is an integer, this performs a bitwise operation.
-    /// Dynamic types can also implement custom behaviors for this operation.
+    /// If the value is truthy, false will be stored in the destination. If the
+    /// value is falsey, true will be stored in the destination.
+    </span>LogicalNot {
+        <span class="doccomment">/// The left hand side of the operation.
+        </span>value: ValueOrSource,
+        <span class="doccomment">/// The destination for the result to be stored in.
+        </span>destination: Destination,
+    },
+    <span class="doccomment">/// Performs a bitwise not operation for `value`, storing the result in
+    /// `destination`. This operation always results in a [`Value::Integer`].
     ///
-    /// If no other implementations are provided for the given types, the result
-    /// will be a boolean evaluation of `not value.is_truthy()`.
-    </span>Not {
+    /// If `value` cannot be coerced to an integer, a fault will be returned.
+    ///
+    /// The result will be `value` with each bit flipped.
+    </span>BitwiseNot {
         <span class="doccomment">/// The left hand side of the operation.
         </span>value: ValueOrSource,
         <span class="doccomment">/// The destination for the result to be stored in.
@@ -4135,7 +4163,12 @@
                 right,
                 destination,
             } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;shr {left} {right} {destination}&quot;</span>),
-            Instruction::Not { value, destination } =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;not {value} {destination}&quot;</span>),
+            Instruction::LogicalNot { value, destination } =&gt; {
+                <span class="macro">write!</span>(f, <span class="string">&quot;not {value} {destination}&quot;</span>)
+            }
+            Instruction::BitwiseNot { value, destination } =&gt; {
+                <span class="macro">write!</span>(f, <span class="string">&quot;bitnot {value} {destination}&quot;</span>)
+            }
             Instruction::If {
                 condition,
                 false_jump_to,
@@ -4431,11 +4464,11 @@
     /// contained value. Otherwise, `None` is returned.
     </span><span class="attribute">#[must_use]
     </span><span class="kw">pub fn </span>as_i64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;i64&gt; {
-        <span class="kw">if let </span>Value::Integer(value) = <span class="self">self </span>{
-            <span class="prelude-val">Some</span>(<span class="kw-2">*</span>value)
-        } <span class="kw">else </span>{
-            <span class="prelude-val">None
-        </span>}
+        <span class="kw">match </span><span class="self">self </span>{
+            Value::Integer(value) =&gt; <span class="prelude-val">Some</span>(<span class="kw-2">*</span>value),
+            Value::Dynamic(dynamic) =&gt; dynamic.as_i64(),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
+        }
     }
 
     <span class="doccomment">/// If this value is a [`Value::Real`], this function returns the
@@ -4460,7 +4493,7 @@
     </span><span class="kw">pub fn </span>is_truthy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">match </span><span class="self">self </span>{
             Value::Integer(value) =&gt; <span class="kw-2">*</span>value != <span class="number">0</span>,
-            Value::Real(value) =&gt; value.abs() &lt; f64::EPSILON,
+            Value::Real(value) =&gt; value.abs() &gt;= f64::EPSILON,
             Value::Boolean(value) =&gt; <span class="kw-2">*</span>value,
             Value::Dynamic(value) =&gt; value.is_truthy(),
             Value::Void =&gt; <span class="bool-val">false</span>,
@@ -5462,10 +5495,14 @@
                     <span class="prelude-val">Ok</span>(<span class="number">0</span>)
                 }
             }),
-            Instruction::Not {
+            Instruction::LogicalNot {
                 value: left,
                 destination,
             } =&gt; <span class="self">self</span>.not(left, <span class="kw-2">*</span>destination),
+            Instruction::BitwiseNot {
+                value: left,
+                destination,
+            } =&gt; <span class="self">self</span>.bitnot(left, <span class="kw-2">*</span>destination),
             Instruction::If {
                 condition: value,
                 false_jump_to,
@@ -5934,27 +5971,28 @@
         destination: Destination,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
         <span class="kw">let </span>value = <span class="self">self</span>.resolve_value_or_source(value)<span class="question-mark">?</span>;
-        <span class="kw">let </span>produced_value = <span class="kw">match </span>value {
-            Value::Void =&gt; Value::Boolean(<span class="bool-val">true</span>),
-            Value::Integer(value) =&gt; Value::Integer(!value),
-            Value::Real(value) =&gt; Value::Boolean(real_eq(<span class="kw-2">*</span>value, <span class="number">0.0</span>)),
-            Value::Boolean(value) =&gt; Value::Boolean(!<span class="kw-2">*</span>value),
-            Value::Dynamic(dynamic) =&gt; {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(not) = dynamic.not() {
-                    not
-                } <span class="kw">else </span>{
-                    Value::Boolean(dynamic.is_falsey())
-                }
-            }
-        };
-        <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= produced_value;
+
+        <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= Value::Boolean(value.is_falsey());
+
+        <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+    }
+
+    <span class="kw">fn </span>bitnot(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        value: <span class="kw-2">&amp;</span>ValueOrSource,
+        destination: Destination,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
+        <span class="kw">let </span>value = <span class="self">self</span>.resolve_value_or_source(value)<span class="question-mark">?</span>;
+        <span class="kw">let </span>value = <span class="self">Self</span>::extract_integer(value)<span class="question-mark">?</span>;
+
+        <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= Value::Integer(!value);
 
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
 
     <span class="kw">fn </span>extract_integer(value: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Result</span>&lt;i64, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
-        <span class="kw">if let </span>Value::Integer(value) = value {
-            <span class="prelude-val">Ok</span>(<span class="kw-2">*</span>value)
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(value) = value.as_i64() {
+            <span class="prelude-val">Ok</span>(value)
         } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(Fault::from(FaultKind::type_mismatch(
                 <span class="string">&quot;operation only supports @expected, received @receoved-value (@received-kind)&quot;</span>,

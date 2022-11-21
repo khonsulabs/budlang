@@ -861,6 +861,19 @@
 <span id="861">861</span>
 <span id="862">862</span>
 <span id="863">863</span>
+<span id="864">864</span>
+<span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
+<span id="873">873</span>
+<span id="874">874</span>
+<span id="875">875</span>
+<span id="876">876</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)]
 </span><span class="doccomment">//! Bud Assembly Language
 //!
@@ -1080,6 +1093,7 @@
                                 <span class="self">self</span>.parse_comparison(symbol)<span class="question-mark">?</span>;
                             }
                             <span class="string">&quot;not&quot; </span>=&gt; <span class="self">self</span>.parse_not()<span class="question-mark">?</span>,
+                            <span class="string">&quot;bitnot&quot; </span>=&gt; <span class="self">self</span>.parse_bitnot()<span class="question-mark">?</span>,
                             <span class="string">&quot;ifnot&quot; </span>=&gt; <span class="self">self</span>.parse_ifnot()<span class="question-mark">?</span>,
                             <span class="string">&quot;jump&quot; </span>=&gt; <span class="self">self</span>.parse_jump()<span class="question-mark">?</span>,
                             <span class="string">&quot;push&quot; </span>=&gt; <span class="self">self</span>.parse_push()<span class="question-mark">?</span>,
@@ -1422,7 +1436,15 @@
         <span class="kw">let </span>value = <span class="self">self</span>.expect_literal_or_source()<span class="question-mark">?</span>;
         <span class="kw">let </span>destination = <span class="self">self</span>.expect_destination()<span class="question-mark">?</span>;
         <span class="self">self</span>.current_function
-            .push(Instruction::Not { value, destination });
+            .push(Instruction::LogicalNot { value, destination });
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">fn </span>parse_bitnot(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), AsmError&gt; {
+        <span class="kw">let </span>value = <span class="self">self</span>.expect_literal_or_source()<span class="question-mark">?</span>;
+        <span class="kw">let </span>destination = <span class="self">self</span>.expect_destination()<span class="question-mark">?</span>;
+        <span class="self">self</span>.current_function
+            .push(Instruction::BitwiseNot { value, destination });
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -1627,7 +1649,11 @@
         right: LiteralOrSource::Literal(Literal::Void),
         destination: Destination::Stack,
     });
-    block.push(Instruction::Not {
+    block.push(Instruction::LogicalNot {
+        value: LiteralOrSource::Literal(Literal::Void),
+        destination: Destination::Stack,
+    });
+    block.push(Instruction::BitwiseNot {
         value: LiteralOrSource::Literal(Literal::Void),
         destination: Destination::Stack,
     });
