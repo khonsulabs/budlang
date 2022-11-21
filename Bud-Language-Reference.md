@@ -361,19 +361,29 @@ This code produces 42:
 84 / 2
 ```
 
-### Not expression
+### Logical Not expression
 
-The `not` operator is a prefix operator that performs either a logical or
-bitwise not depending on the type of the operand. If the operand is an integer,
-the result will be the bitwise not (flipping all bits). If the operand is a
-dynamic value, it may implement its own functionality for this operator. If no
-other rules apply, the operand's truthiness will be evaluated and the inverse
-will be returned.
+The `not` operator is a prefix operator that performs either a logical not on
+the operand. The operand's truthyness is determined and the opposite value is
+returned.
 
 ```bud
-not 0 // produces -1
+not true // produces false
 not false // produces true
+not 0 // produces true
+not 1 // produces false
 not 0.0 // produces true
+```
+
+### Bitwise Not expression
+
+The `~` operator is a prefix operator that performs either a bitwise not on the
+operand. The operand is coerced to an integer, and the result will be the
+bitwise not (flipping all bits). If the operand is not able to be coerced to an
+integer, a fault will be returned by the virtual machine.
+
+```bud
+~0 // produces -1
 ```
 
 ### Terms

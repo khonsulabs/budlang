@@ -75,49 +75,65 @@ Evaluates the truthiness of the first argument and the truthiness of the second
 argument, and stores a boolean result of performing a logical xor of the two
 values.
 
+## Logical Not
+
+`not <LiteralOrSource> <Destination>`
+
+The first argument's truthiness is evaluated and the opposite boolean value is
+stored in the destination.
+
 ## Bitwise And
 
 `bitand <LiteralOrSource> <LiteralOrSource> <Destination>`
 
-Performs a bitwise and between two integer values. If either argument is not an integer, a fault will be returned from the virtual machine.
+Performs a bitwise and between two integer values. If either argument is not an
+integer, a fault will be returned from the virtual machine.
 
 ## Bitwise Or
 
 `bitor <LiteralOrSource> <LiteralOrSource> <Destination>`
 
-Performs a bitwise or between two integer values. If either argument is not an integer, a fault will be returned from the virtual machine.
+Performs a bitwise or between two integer values. If either argument is not an
+integer, a fault will be returned from the virtual machine.
 
 ## Bitwise Xor
 
 `bitxor <LiteralOrSource> <LiteralOrSource> <Destination>`
 
-Performs a bitwise exclusive-or between two integer values. If either argument is not an integer, a fault will be returned from the virtual machine.
+Performs a bitwise exclusive-or between two integer values. If either argument
+is not an integer, a fault will be returned from the virtual machine.
+
+## Bitwise Not
+
+`bitnot <LiteralOrSource> <Destination>`
+
+The first argument is coerced to an integer and each bit is flipped. The result
+is stored in the destination. If the first argument cannot be coerced to an
+integer, a fault will be returned from the virtual machine.
 
 ## Bitwise Shift Left
 
 `shl <LiteralOrSource> <LiteralOrSource> <Destination>`
 
-Performs a bitwise shift left of the first argument by the second argument. If either argument is not an integer, a fault will be returned from the virtual machine.
+Performs a bitwise shift left of the first argument by the second argument. If
+either argument is not an integer, a fault will be returned from the virtual
+machine.
 
 ## Bitwise Shift Right
 
 `shr <LiteralOrSource> <LiteralOrSource> <Destination>`
 
-Performs a bitwise shift right of the first argument by the second argument. If either argument is not an integer, a fault will be returned from the virtual machine.
-
-## Not (Logical and Bitwise)
-
-`not <LiteralOrSource> <Destination>`
-
-If the argument is an integer, the bitwise not of the value is stored in the
-destination. Otherwise, the argument's truthiness is evaluated and the opposite
-boolean value is stored in the destination.
+Performs a bitwise shift right of the first argument by the second argument. If
+either argument is not an integer, a fault will be returned from the virtual
+machine.
 
 ## Conditional Jump
 
 `ifnot <LiteralOrSource> <Label>`
 
-The `ifnot` instruction evaluates the first argument's truthiness. If the argument is not truthy, execution is jumped to the label. If the argument is truthy, execution continues to the next instruction.
+The `ifnot` instruction evaluates the first argument's truthiness. If the
+argument is not truthy, execution is jumped to the label. If the argument is
+truthy, execution continues to the next instruction.
 
 ## Jump
 
@@ -143,9 +159,11 @@ representation and are replaced with absolute instruction offsets when linked.
 The available comparison instructions are:
 
 - `lt`: True if the first argument is less than the second argument.
-- `lte`: True if the first argument is less than or equal to the second argument.
+- `lte`: True if the first argument is less than or equal to the second
+  argument.
 - `gt`: True if the first argument is greater than the second argument.
-- `gte`: True if the first argument is greater than or equal to the second argument.
+- `gte`: True if the first argument is greater than or equal to the second
+  argument.
 - `eq`: True if the first and second argument are equal.
 - `neq`: True if the first and second argument are not equal.
 
@@ -153,13 +171,15 @@ If the form with a `<Destination>` is used, the boolean result of the comparison
 will be stored in the destination.
 
 If `jump` is used, the label will be jumped to if the comparison is not true,
-acting as a conditional jump. If the comparison is true, execution will continue to the next instruction.
+acting as a conditional jump. If the comparison is true, execution will continue
+to the next instruction.
 
 ## Push
 
 `push <LiteralOrSource>`
 
-Pushes a value to the stack from another location. This is primarily used when passing arguments to functions.
+Pushes a value to the stack from another location. This is primarily used when
+passing arguments to functions.
 
 ## Load
 
@@ -224,7 +244,8 @@ When a `function` instruction is encountered, the current function is finished
 and a new function is created. All future instructions will be long to this
 function, until another `function` instruction is encountered.
 
-Each function has a name and optionally a list of arguments. Here's an example function definition that multiplies the two arguments together:
+Each function has a name and optionally a list of arguments. Here's an example
+function definition that multiplies the two arguments together:
 
 ```budasm
 function multiply @a @b
