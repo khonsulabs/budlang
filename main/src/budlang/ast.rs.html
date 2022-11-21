@@ -1324,6 +1324,14 @@
 <span id="1324">1324</span>
 <span id="1325">1325</span>
 <span id="1326">1326</span>
+<span id="1327">1327</span>
+<span id="1328">1328</span>
+<span id="1329">1329</span>
+<span id="1330">1330</span>
+<span id="1331">1331</span>
+<span id="1332">1332</span>
+<span id="1333">1333</span>
+<span id="1334">1334</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)] </span><span class="comment">// TODO docs and panics for ast
 
 </span><span class="kw">use </span>std::{
@@ -1337,8 +1345,10 @@
         <span class="self">self</span>, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, LinkError, Literal,
         LiteralOrSource, LoopScope, Module, Scope, ScopeSymbol, ScopeSymbolKind,
     },
-    Comparison, Intrinsic, Symbol,
+    Comparison, Symbol,
 };
+
+<span class="kw">use </span><span class="kw">crate</span>::Intrinsic;
 
 <span class="kw">pub struct </span>ExpressionTree {
     nodes: Vec&lt;Node&gt;,
@@ -1360,7 +1370,10 @@
         <span class="self">self</span>.node(<span class="self">self</span>.root)
     }
 
-    <span class="kw">pub fn </span>generate_code(<span class="kw-2">&amp;</span><span class="self">self</span>, block: <span class="kw-2">&amp;mut </span>CodeBlockBuilder) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
+    <span class="kw">pub fn </span>generate_code(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        block: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="self">self</span>.root().generate_code(Destination::Return, block, <span class="self">self</span>)
     }
 }
@@ -1516,7 +1529,7 @@
     <span class="kw">pub fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         result: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">match </span><span class="self">self </span>{
@@ -1563,7 +1576,7 @@
 
     <span class="kw">pub fn </span>to_value_or_source(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;LiteralOrSource, CompilationError&gt; {
         <span class="kw">match </span><span class="self">self </span>{
@@ -1589,7 +1602,7 @@
 
     <span class="kw">fn </span>generate_return(
         value_to_return: NodeId,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">let </span>value_to_return = tree.node(value_to_return);
@@ -1624,7 +1637,7 @@
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         result: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">let </span>condition = tree.node(<span class="self">self</span>.condition);
@@ -1690,7 +1703,7 @@
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         result: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="self">self</span>.kind
@@ -1721,7 +1734,7 @@
         left: NodeId,
         right: NodeId,
         destination: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">let </span>left = tree.node(left);
@@ -1814,7 +1827,7 @@
         left: LiteralOrSource,
         right: <span class="kw-2">&amp;</span>Node,
         destination: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">let </span>after_op = operations.new_label();
@@ -1891,7 +1904,7 @@
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         result: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">match </span>tree.node(<span class="self">self</span>.expr) {
@@ -1965,7 +1978,7 @@
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         destination: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">match </span>(<span class="self">self</span>.target, <span class="self">self</span>.name.as_ref()) {
@@ -2057,7 +2070,7 @@
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         result: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">match </span>tree.node(<span class="self">self</span>.target) {
@@ -2082,7 +2095,7 @@
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         result: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">for </span>mapping <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.mappings {
@@ -2116,7 +2129,7 @@
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         result: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">for </span>value <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.values {
@@ -2144,7 +2157,7 @@
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         result: Destination,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>scope = operations.begin_loop(<span class="self">self</span>.name.clone(), result.clone());
@@ -2264,7 +2277,7 @@
     <span class="kw">fn </span>generate_until_preamble(
         condition: NodeId,
         break_label: Label,
-        scope: <span class="kw-2">&amp;mut </span>LoopScope&lt;<span class="lifetime">&#39;_</span>, CodeBlockBuilder&gt;,
+        scope: <span class="kw-2">&amp;mut </span>LoopScope&lt;<span class="lifetime">&#39;_</span>, CodeBlockBuilder&lt;Intrinsic&gt;, Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         scope.label_continue();
@@ -2289,7 +2302,7 @@
     <span class="kw">fn </span>generate_while_preamble(
         condition: NodeId,
         break_label: Label,
-        scope: <span class="kw-2">&amp;mut </span>LoopScope&lt;<span class="lifetime">&#39;_</span>, CodeBlockBuilder&gt;,
+        scope: <span class="kw-2">&amp;mut </span>LoopScope&lt;<span class="lifetime">&#39;_</span>, CodeBlockBuilder&lt;Intrinsic&gt;, Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         scope.label_continue();
@@ -2331,7 +2344,7 @@
 <span class="kw">impl </span>Break {
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(loop_info) = operations.loop_info(<span class="self">self</span>.name.as_ref()) {
@@ -2357,7 +2370,7 @@
 <span class="kw">impl </span>Continue {
     <span class="kw">fn </span>generate_code(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
         _tree: <span class="kw-2">&amp;</span>ExpressionTree,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(loop_info) = operations.loop_info(<span class="self">self</span>.name.as_ref()) {
@@ -2517,10 +2530,13 @@
         <span class="self">self
     </span>}
 
-    <span class="kw">pub fn </span>compile&lt;InitScope: Scope&gt;(
+    <span class="kw">pub fn </span>compile&lt;
+        InitScope: Scope&lt;Environment = E&gt;,
+        E: budvm::Environment&lt;Intrinsic = Intrinsic&gt;,
+    &gt;(
         <span class="self">self</span>,
         scope: <span class="kw-2">&amp;mut </span>InitScope,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;Module, CompilationError&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Module&lt;Intrinsic&gt;, CompilationError&gt; {
         <span class="kw">let </span>init = <span class="kw">match </span><span class="self">self</span>.init_statements.len() {
             <span class="number">0 </span>=&gt; <span class="prelude-val">None</span>,
             <span class="number">1 </span>=&gt; <span class="prelude-val">Some</span>(<span class="self">self</span>.init_statements[<span class="number">0</span>]),

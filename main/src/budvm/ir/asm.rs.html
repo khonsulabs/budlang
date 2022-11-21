@@ -873,7 +873,6 @@
 <span id="873">873</span>
 <span id="874">874</span>
 <span id="875">875</span>
-<span id="876">876</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)]
 </span><span class="doccomment">//! Bud Assembly Language
 //!
@@ -896,7 +895,12 @@
 // helper function to appease clippy.
 </span><span class="attribute">#![allow(clippy::range_plus_one)]
 
-</span><span class="kw">use </span>std::{iter::Peekable, ops::Range, str::CharIndices};
+</span><span class="kw">use </span>std::{
+    fmt::Display,
+    iter::Peekable,
+    ops::Range,
+    str::{CharIndices, FromStr},
+};
 
 <span class="kw">use crate</span>::{
     ir::{
@@ -907,7 +911,7 @@
         decode_numeric_literal, decode_string_literal_contents, DecodeNumericError,
         DecodeStringError, DoublePeekable, Numeric,
     },
-    Comparison, Intrinsic, Symbol,
+    Comparison, Symbol,
 };
 
 <span class="attribute">#[derive(PartialEq, Debug)]
@@ -1058,15 +1062,18 @@
     }
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Parser&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Parser&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; {
     tokens: Peekable&lt;Lexer&lt;<span class="lifetime">&#39;a</span>&gt;&gt;,
     current_function_name: <span class="prelude-ty">Option</span>&lt;Symbol&gt;,
-    current_function: CodeBlockBuilder,
-    module: Module,
+    current_function: CodeBlockBuilder&lt;Intrinsic&gt;,
+    module: Module&lt;Intrinsic&gt;,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Parser&lt;<span class="lifetime">&#39;a</span>&gt; {
-    <span class="kw">pub fn </span>parse(asm: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Module, AsmError&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; Parser&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt;
+<span class="kw">where
+    </span>Intrinsic: FromStr + Display,
+{
+    <span class="kw">pub fn </span>parse(asm: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Module&lt;Intrinsic&gt;, AsmError&gt; {
         <span class="self">Self </span>{
             tokens: Lexer::new(asm).peekable(),
             current_function_name: <span class="prelude-val">None</span>,
@@ -1076,7 +1083,7 @@
         .parse_asm()
     }
 
-    <span class="kw">fn </span>parse_asm(<span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Module, AsmError&gt; {
+    <span class="kw">fn </span>parse_asm(<span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Module&lt;Intrinsic&gt;, AsmError&gt; {
         <span class="kw">while let </span><span class="prelude-val">Some</span>(token) = <span class="self">self</span>.tokens.next().transpose()<span class="question-mark">? </span>{
             <span class="kw">match </span><span class="kw-2">&amp;</span>token.kind {
                 TokenKind::Identifier(symbol) =&gt; {
@@ -1507,16 +1514,12 @@
 
     <span class="kw">fn </span>parse_intrinsic(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), AsmError&gt; {
         <span class="kw">let </span>(name, range) = <span class="self">self</span>.expect_identifier(<span class="string">&quot;intrinsic name&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>intrinsic = <span class="kw">match </span><span class="kw-2">&amp;*</span>name {
-            <span class="string">&quot;NewMap&quot; </span>=&gt; Intrinsic::NewMap,
-            <span class="string">&quot;NewList&quot; </span>=&gt; Intrinsic::NewList,
-            <span class="kw">_ </span>=&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(AsmError::UnknownIntrinsic(Token {
-                    kind: TokenKind::Identifier(name),
-                    range,
-                }));
-            }
-        };
+        <span class="kw">let </span>intrinsic = &lt;Intrinsic <span class="kw">as </span>FromStr&gt;::from_str(<span class="kw-2">&amp;</span>name).map_err(|<span class="kw">_</span>| {
+            AsmError::UnknownIntrinsic(Token {
+                kind: TokenKind::Identifier(name),
+                range,
+            })
+        })<span class="question-mark">?</span>;
 
         <span class="kw">let </span>arg_count = <span class="self">self</span>.expect_arg_count()<span class="question-mark">?</span>;
         <span class="kw">let </span>destination = <span class="self">self</span>.expect_destination()<span class="question-mark">?</span>;
@@ -1558,7 +1561,7 @@
 
 <span class="attribute">#[test]
 </span><span class="kw">fn </span>basic() {
-    <span class="kw">let </span>block = Parser::parse(
+    <span class="kw">let </span>block: Module&lt;<span class="kw">crate</span>::Noop&gt; = Parser::parse(
         <span class="string">r#&quot;
             // This is a comment.
             return 42
@@ -1729,12 +1732,7 @@
         destination: Destination::Stack,
     });
     block.push(Instruction::CallIntrinsic {
-        intrinsic: Intrinsic::NewList,
-        arg_count: <span class="number">1</span>,
-        destination: Destination::Stack,
-    });
-    block.push(Instruction::CallIntrinsic {
-        intrinsic: Intrinsic::NewMap,
+        intrinsic: <span class="kw">crate</span>::Noop,
         arg_count: <span class="number">1</span>,
         destination: Destination::Stack,
     });
