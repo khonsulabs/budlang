@@ -7,12 +7,14 @@ use std::{
     collections::HashMap,
     env,
     fmt::{Display, Write},
+    marker::PhantomData,
     ops::{Deref, DerefMut},
+    str::FromStr,
 };
 
 use crate::{
-    symbol::Symbol, Comparison, Environment, Error, FromStack, Intrinsic, StringLiteralDisplay,
-    Value, ValueOrSource, VirtualMachine,
+    symbol::Symbol, Comparison, Environment, Error, FromStack, Noop, StringLiteralDisplay, Value,
+    ValueOrSource, VirtualMachine,
 };
 
 pub mod asm;
@@ -78,7 +80,7 @@ impl Display for Argument {
 
 /// An intermediate representation of an [`crate::Instruction`].
 #[derive(Debug, Clone, PartialEq)]
-pub enum Instruction {
+pub enum Instruction<Intrinsic> {
     /// Adds `left` and `right` and places the result in `destination`.
     ///
     /// If this operation causes an overflow, [`Value::Void`] will be stored in
@@ -392,7 +394,10 @@ pub enum Instruction {
     },
 }
 
-impl Display for Instruction {
+impl<Intrinsic> Display for Instruction<Intrinsic>
+where
+    Intrinsic: Display,
+{
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -694,11 +699,10 @@ impl CompareAction {
 }
 
 /// A type that helps build [`CodeBlock`]s.
-#[derive(Default)]
-pub struct CodeBlockBuilder {
+pub struct CodeBlockBuilder<Intrinsic> {
     label_counter: usize,
     named_labels: HashMap<Symbol, Label>,
-    ops: Vec<Instruction>,
+    ops: Vec<Instruction<Intrinsic>>,
     args: Vec<Argument>,
     temporary_variables: usize,
     scope: HashMap<Symbol, ScopeSymbol>,
@@ -706,7 +710,22 @@ pub struct CodeBlockBuilder {
     variables: HashMap<Symbol, Variable>,
 }
 
-impl CodeBlockBuilder {
+impl<Intrinsic> Default for CodeBlockBuilder<Intrinsic> {
+    fn default() -> Self {
+        Self {
+            label_counter: 0,
+            named_labels: HashMap::default(),
+            ops: Vec::default(),
+            args: Vec::default(),
+            temporary_variables: 0,
+            scope: HashMap::default(),
+            loops: LoopLabels::default(),
+            variables: HashMap::default(),
+        }
+    }
+}
+
+impl<Intrinsic> CodeBlockBuilder<Intrinsic> {
     /// Adds a new argument with the given name.
     pub fn new_argument(&mut self, name: impl Into<Symbol>) -> Argument {
         let index = self.args.len();
@@ -757,7 +776,7 @@ impl CodeBlockBuilder {
     }
 
     /// Push an instruction.
-    pub fn push(&mut self, operation: Instruction) {
+    pub fn push(&mut self, operation: Instruction<Intrinsic>) {
         self.ops.push(operation);
     }
 
@@ -850,7 +869,7 @@ impl CodeBlockBuilder {
 
     /// Returns the completed code block.
     #[must_use]
-    pub fn finish(self) -> CodeBlock {
+    pub fn finish(self) -> CodeBlock<Intrinsic> {
         CodeBlock {
             arguments: self.args.into_iter().map(|arg| arg.name).collect(),
             variables: self.variables.len(),
@@ -861,7 +880,11 @@ impl CodeBlockBuilder {
     /// Begins a loop with the given `name`. The result of the loop will be
     /// stored in `result`. If the loop does not return a result, the
     /// destination will be untouched.
-    pub fn begin_loop(&mut self, name: Option<Symbol>, result: Destination) -> LoopScope<'_, Self> {
+    pub fn begin_loop(
+        &mut self,
+        name: Option<Symbol>,
+        result: Destination,
+    ) -> LoopScope<'_, Self, Intrinsic> {
         let break_label = self.new_label();
         let continue_label = self.new_label();
         self.loops.begin(LoopInfo {
@@ -874,6 +897,7 @@ impl CodeBlockBuilder {
             owner: self,
             break_label,
             continue_label,
+            _intrinsic: PhantomData,
         }
     }
 
@@ -886,20 +910,22 @@ impl CodeBlockBuilder {
 
 /// A loop within a [`CodeBlockBuilder`].
 #[must_use]
-pub struct LoopScope<'a, T>
+pub struct LoopScope<'a, T, Intrinsic>
 where
-    T: BorrowMut<CodeBlockBuilder>,
+    T: BorrowMut<CodeBlockBuilder<Intrinsic>>,
 {
     owner: &'a mut T,
     /// The label for a `break` operation.
     pub break_label: Label,
     /// The label for a `continue` operation.
     pub continue_label: Label,
+
+    _intrinsic: PhantomData<Intrinsic>,
 }
 
-impl<'a, T> LoopScope<'a, T>
+impl<'a, T, Intrinsic> LoopScope<'a, T, Intrinsic>
 where
-    T: BorrowMut<CodeBlockBuilder>,
+    T: BorrowMut<CodeBlockBuilder<Intrinsic>>,
 {
     /// Marks the next instruction as where the `break` operation should jump
     /// to.
@@ -914,47 +940,47 @@ where
     }
 }
 
-impl<'a, T> Borrow<CodeBlockBuilder> for LoopScope<'a, T>
+impl<'a, T, Intrinsic> Borrow<CodeBlockBuilder<Intrinsic>> for LoopScope<'a, T, Intrinsic>
 where
-    T: BorrowMut<CodeBlockBuilder>,
+    T: BorrowMut<CodeBlockBuilder<Intrinsic>>,
 {
-    fn borrow(&self) -> &CodeBlockBuilder {
+    fn borrow(&self) -> &CodeBlockBuilder<Intrinsic> {
         (*self.owner).borrow()
     }
 }
 
-impl<'a, T> BorrowMut<CodeBlockBuilder> for LoopScope<'a, T>
+impl<'a, T, Intrinsic> BorrowMut<CodeBlockBuilder<Intrinsic>> for LoopScope<'a, T, Intrinsic>
 where
-    T: BorrowMut<CodeBlockBuilder>,
+    T: BorrowMut<CodeBlockBuilder<Intrinsic>>,
 {
-    fn borrow_mut(&mut self) -> &mut CodeBlockBuilder {
+    fn borrow_mut(&mut self) -> &mut CodeBlockBuilder<Intrinsic> {
         self.owner.borrow_mut()
     }
 }
 
-impl<'a, T> Deref for LoopScope<'a, T>
+impl<'a, T, Intrinsic> Deref for LoopScope<'a, T, Intrinsic>
 where
-    T: BorrowMut<CodeBlockBuilder>,
+    T: BorrowMut<CodeBlockBuilder<Intrinsic>>,
 {
-    type Target = CodeBlockBuilder;
+    type Target = CodeBlockBuilder<Intrinsic>;
 
     fn deref(&self) -> &Self::Target {
         self.borrow()
     }
 }
 
-impl<'a, T> DerefMut for LoopScope<'a, T>
+impl<'a, T, Intrinsic> DerefMut for LoopScope<'a, T, Intrinsic>
 where
-    T: BorrowMut<CodeBlockBuilder>,
+    T: BorrowMut<CodeBlockBuilder<Intrinsic>>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.owner.borrow_mut()
     }
 }
 
-impl<'a, T> Drop for LoopScope<'a, T>
+impl<'a, T, Intrinsic> Drop for LoopScope<'a, T, Intrinsic>
 where
-    T: BorrowMut<CodeBlockBuilder>,
+    T: BorrowMut<CodeBlockBuilder<Intrinsic>>,
 {
     fn drop(&mut self) {
         self.loops.exit_block();
@@ -1002,22 +1028,23 @@ pub struct LoopInfo {
 
 /// A block of intermediate instructions.
 #[derive(Debug, PartialEq)]
-pub struct CodeBlock {
+pub struct CodeBlock<Intrinsic> {
     /// The number of arguments this code block expects to be on the stack.
     pub arguments: Vec<Symbol>,
     /// The number of variables this code block uses.
     pub variables: usize,
     /// The list of instructions.
-    pub code: Vec<Instruction>,
+    pub code: Vec<Instruction<Intrinsic>>,
 }
 
-impl CodeBlock {
+impl<Intrinsic> CodeBlock<Intrinsic> {
     /// Links the code block against `scope`, resolving all labels and function
     /// calls.
     #[allow(clippy::too_many_lines)]
-    pub fn link<S>(&self, scope: &S) -> Result<crate::CodeBlock, LinkError>
+    pub fn link<S, E>(&self, scope: &S) -> Result<crate::CodeBlock<Intrinsic>, LinkError>
     where
-        S: Scope,
+        S: Scope<Environment = E>,
+        E: Environment<Intrinsic = Intrinsic>,
     {
         let mut labels = Vec::new();
         let mut labels_encountered = 0;
@@ -1041,7 +1068,10 @@ impl CodeBlock {
     }
 }
 
-impl Display for CodeBlock {
+impl<Intrinsic> Display for CodeBlock<Intrinsic>
+where
+    Intrinsic: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut is_first = true;
         for i in &self.code {
@@ -1058,10 +1088,10 @@ impl Display for CodeBlock {
 
 #[allow(clippy::too_many_lines)] // Most are straight mappings...
 fn compile_instruction<S>(
-    op: &Instruction,
+    op: &Instruction<<S::Environment as Environment>::Intrinsic>,
     labels: &[Option<usize>],
     scope: &S,
-) -> Result<Option<crate::Instruction>, LinkError>
+) -> Result<Option<crate::Instruction<<S::Environment as Environment>::Intrinsic>>, LinkError>
 where
     S: Scope,
 {
@@ -1251,7 +1281,7 @@ where
             arg_count,
             destination,
         } => crate::Instruction::CallIntrinsic {
-            intrinsic: *intrinsic,
+            intrinsic: intrinsic.clone(),
             arg_count: *arg_count,
             destination: destination.into(),
         },
@@ -1271,7 +1301,10 @@ pub trait Scope {
     fn map_each_symbol(&self, callback: &mut impl FnMut(Symbol, ScopeSymbolKind));
 
     /// Defines a function with the provided name.
-    fn define_function(&mut self, function: crate::Function) -> Option<usize>;
+    fn define_function(
+        &mut self,
+        function: crate::Function<<Self::Environment as Environment>::Intrinsic>,
+    ) -> Option<usize>;
 
     /// Defines a persistent variable.
     ///
@@ -1288,7 +1321,7 @@ impl Scope for () {
 
     fn map_each_symbol(&self, _callback: &mut impl FnMut(Symbol, ScopeSymbolKind)) {}
 
-    fn define_function(&mut self, _function: crate::Function) -> Option<usize> {
+    fn define_function(&mut self, _function: crate::Function<Noop>) -> Option<usize> {
         None
     }
 
@@ -1319,16 +1352,19 @@ pub enum ScopeSymbol {
 
 /// A function, in its intermediate form.
 #[derive(Debug, PartialEq)]
-pub struct Function {
+pub struct Function<Intrinsic> {
     /// The name of the function, if provided.
     pub name: Symbol,
     /// The body of the function.
-    pub body: CodeBlock,
+    pub body: CodeBlock<Intrinsic>,
 }
 
-impl Function {
+impl<Intrinsic> Function<Intrinsic>
+where
+    Intrinsic: Display,
+{
     /// Returns a new function
-    pub fn new(name: impl Into<Symbol>, body: CodeBlock) -> Self {
+    pub fn new(name: impl Into<Symbol>, body: CodeBlock<Intrinsic>) -> Self {
         Self {
             name: name.into(),
             body,
@@ -1337,9 +1373,10 @@ impl Function {
 
     /// Links this function against `scope`, returning a function that is ready
     /// to be executed.
-    pub fn link<S>(&self, scope: &mut S) -> Result<crate::Function, LinkError>
+    pub fn link<S, E>(&self, scope: &mut S) -> Result<crate::Function<Intrinsic>, LinkError>
     where
-        S: Scope,
+        S: Scope<Environment = E>,
+        E: Environment<Intrinsic = Intrinsic>,
     {
         let name = self.name.clone();
         let block = self.body.link(scope)?;
@@ -1357,9 +1394,10 @@ impl Function {
 
     /// Links this function against `scope`, and registers the linked function
     /// with `scope`. The `usize` returned is the vtable index of the function.
-    pub fn link_into<S>(&self, scope: &mut S) -> Result<usize, LinkError>
+    pub fn link_into<S, E>(&self, scope: &mut S) -> Result<usize, LinkError>
     where
-        S: Scope,
+        S: Scope<Environment = E>,
+        E: Environment<Intrinsic = Intrinsic>,
     {
         let function = self.link(scope)?;
 
@@ -1370,7 +1408,10 @@ impl Function {
     }
 }
 
-impl Display for Function {
+impl<Intrinsic> Display for Function<Intrinsic>
+where
+    Intrinsic: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "function {}", self.name)?;
         for arg in &self.body.arguments {
@@ -1385,20 +1426,36 @@ impl Display for Function {
 }
 
 /// A collection of functions and modules.
-#[derive(Debug, Default, PartialEq)]
-pub struct Module {
+#[derive(Debug, PartialEq)]
+pub struct Module<Intrinsic> {
     /// A list of functions defined in the module.
-    pub vtable: Vec<Function>,
+    pub vtable: Vec<Function<Intrinsic>>,
     /// A list of submodules.
-    pub modules: Vec<Module>,
+    pub modules: Vec<Module<Intrinsic>>,
     /// The initialization function of this module, if any.
-    pub init: Option<Function>,
+    pub init: Option<Function<Intrinsic>>,
 }
 
-impl Module {
+impl<Intrinsic> Default for Module<Intrinsic> {
+    fn default() -> Self {
+        Self {
+            vtable: Vec::default(),
+            modules: Vec::default(),
+            init: None,
+        }
+    }
+}
+impl<Intrinsic> Module<Intrinsic>
+where
+    Intrinsic: Clone + FromStr + Display,
+{
     /// Returns a new module.
     #[must_use]
-    pub fn new(vtable: Vec<Function>, modules: Vec<Module>, init: Option<Function>) -> Self {
+    pub fn new(
+        vtable: Vec<Function<Intrinsic>>,
+        modules: Vec<Module<Intrinsic>>,
+        init: Option<Function<Intrinsic>>,
+    ) -> Self {
         Self {
             vtable,
             modules,
@@ -1417,7 +1474,7 @@ impl Module {
         context: &'a mut VirtualMachine<Env>,
     ) -> Result<Output, Error<'a, Env, Output>>
     where
-        Env: Environment,
+        Env: Environment<Intrinsic = Intrinsic>,
     {
         // // Process all modules first
         // for _module in &self.modules {
@@ -1464,7 +1521,10 @@ impl Module {
     }
 }
 
-impl Display for Module {
+impl<Intrinsic> Display for Module<Intrinsic>
+where
+    Intrinsic: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut needs_end_of_line = false;
         if let Some(init) = &self.init {

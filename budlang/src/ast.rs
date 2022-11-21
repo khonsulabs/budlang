@@ -11,8 +11,10 @@ use budvm::{
         self, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, LinkError, Literal,
         LiteralOrSource, LoopScope, Module, Scope, ScopeSymbol, ScopeSymbolKind,
     },
-    Comparison, Intrinsic, Symbol,
+    Comparison, Symbol,
 };
+
+use crate::Intrinsic;
 
 pub struct ExpressionTree {
     nodes: Vec<Node>,
@@ -34,7 +36,10 @@ impl ExpressionTree {
         self.node(self.root)
     }
 
-    pub fn generate_code(&self, block: &mut CodeBlockBuilder) -> Result<(), CompilationError> {
+    pub fn generate_code(
+        &self,
+        block: &mut CodeBlockBuilder<Intrinsic>,
+    ) -> Result<(), CompilationError> {
         self.root().generate_code(Destination::Return, block, self)
     }
 }
@@ -190,7 +195,7 @@ impl Node {
     pub fn generate_code(
         &self,
         result: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         match self {
@@ -237,7 +242,7 @@ impl Node {
 
     pub fn to_value_or_source(
         &self,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<LiteralOrSource, CompilationError> {
         match self {
@@ -263,7 +268,7 @@ impl Node {
 
     fn generate_return(
         value_to_return: NodeId,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         let value_to_return = tree.node(value_to_return);
@@ -298,7 +303,7 @@ impl If {
     fn generate_code(
         &self,
         result: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         let condition = tree.node(self.condition);
@@ -364,7 +369,7 @@ impl BinOp {
     fn generate_code(
         &self,
         result: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         self.kind
@@ -395,7 +400,7 @@ impl BinOpKind {
         left: NodeId,
         right: NodeId,
         destination: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         let left = tree.node(left);
@@ -488,7 +493,7 @@ impl BinOpKind {
         left: LiteralOrSource,
         right: &Node,
         destination: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         let after_op = operations.new_label();
@@ -565,7 +570,7 @@ impl Not {
     fn generate_code(
         &self,
         result: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         match tree.node(self.expr) {
@@ -639,7 +644,7 @@ impl Call {
     fn generate_code(
         &self,
         destination: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         match (self.target, self.name.as_ref()) {
@@ -731,7 +736,7 @@ impl Assign {
     fn generate_code(
         &self,
         result: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         match tree.node(self.target) {
@@ -756,7 +761,7 @@ impl Map {
     fn generate_code(
         &self,
         result: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         for mapping in &self.mappings {
@@ -790,7 +795,7 @@ impl List {
     fn generate_code(
         &self,
         result: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         for value in &self.values {
@@ -818,7 +823,7 @@ impl Loop {
     fn generate_code(
         &self,
         result: Destination,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         let mut scope = operations.begin_loop(self.name.clone(), result.clone());
@@ -938,7 +943,7 @@ impl Loop {
     fn generate_until_preamble(
         condition: NodeId,
         break_label: Label,
-        scope: &mut LoopScope<'_, CodeBlockBuilder>,
+        scope: &mut LoopScope<'_, CodeBlockBuilder<Intrinsic>, Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         scope.label_continue();
@@ -963,7 +968,7 @@ impl Loop {
     fn generate_while_preamble(
         condition: NodeId,
         break_label: Label,
-        scope: &mut LoopScope<'_, CodeBlockBuilder>,
+        scope: &mut LoopScope<'_, CodeBlockBuilder<Intrinsic>, Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         scope.label_continue();
@@ -1005,7 +1010,7 @@ pub struct Break {
 impl Break {
     fn generate_code(
         &self,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         if let Some(loop_info) = operations.loop_info(self.name.as_ref()) {
@@ -1031,7 +1036,7 @@ pub struct Continue {
 impl Continue {
     fn generate_code(
         &self,
-        operations: &mut CodeBlockBuilder,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
         _tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         if let Some(loop_info) = operations.loop_info(self.name.as_ref()) {
@@ -1191,10 +1196,13 @@ impl CodeUnit {
         self
     }
 
-    pub fn compile<InitScope: Scope>(
+    pub fn compile<
+        InitScope: Scope<Environment = E>,
+        E: budvm::Environment<Intrinsic = Intrinsic>,
+    >(
         self,
         scope: &mut InitScope,
-    ) -> Result<Module, CompilationError> {
+    ) -> Result<Module<Intrinsic>, CompilationError> {
         let init = match self.init_statements.len() {
             0 => None,
             1 => Some(self.init_statements[0]),

@@ -20,7 +20,12 @@
 // helper function to appease clippy.
 #![allow(clippy::range_plus_one)]
 
-use std::{iter::Peekable, ops::Range, str::CharIndices};
+use std::{
+    fmt::Display,
+    iter::Peekable,
+    ops::Range,
+    str::{CharIndices, FromStr},
+};
 
 use crate::{
     ir::{
@@ -31,7 +36,7 @@ use crate::{
         decode_numeric_literal, decode_string_literal_contents, DecodeNumericError,
         DecodeStringError, DoublePeekable, Numeric,
     },
-    Comparison, Intrinsic, Symbol,
+    Comparison, Symbol,
 };
 
 #[derive(PartialEq, Debug)]
@@ -182,15 +187,18 @@ impl From<DecodeNumericError> for AsmError {
     }
 }
 
-pub(crate) struct Parser<'a> {
+pub(crate) struct Parser<'a, Intrinsic> {
     tokens: Peekable<Lexer<'a>>,
     current_function_name: Option<Symbol>,
-    current_function: CodeBlockBuilder,
-    module: Module,
+    current_function: CodeBlockBuilder<Intrinsic>,
+    module: Module<Intrinsic>,
 }
 
-impl<'a> Parser<'a> {
-    pub fn parse(asm: &'a str) -> Result<Module, AsmError> {
+impl<'a, Intrinsic> Parser<'a, Intrinsic>
+where
+    Intrinsic: FromStr + Display,
+{
+    pub fn parse(asm: &'a str) -> Result<Module<Intrinsic>, AsmError> {
         Self {
             tokens: Lexer::new(asm).peekable(),
             current_function_name: None,
@@ -200,7 +208,7 @@ impl<'a> Parser<'a> {
         .parse_asm()
     }
 
-    fn parse_asm(mut self) -> Result<Module, AsmError> {
+    fn parse_asm(mut self) -> Result<Module<Intrinsic>, AsmError> {
         while let Some(token) = self.tokens.next().transpose()? {
             match &token.kind {
                 TokenKind::Identifier(symbol) => {
@@ -631,16 +639,12 @@ impl<'a> Parser<'a> {
 
     fn parse_intrinsic(&mut self) -> Result<(), AsmError> {
         let (name, range) = self.expect_identifier("intrinsic name")?;
-        let intrinsic = match &*name {
-            "NewMap" => Intrinsic::NewMap,
-            "NewList" => Intrinsic::NewList,
-            _ => {
-                return Err(AsmError::UnknownIntrinsic(Token {
-                    kind: TokenKind::Identifier(name),
-                    range,
-                }));
-            }
-        };
+        let intrinsic = <Intrinsic as FromStr>::from_str(&name).map_err(|_| {
+            AsmError::UnknownIntrinsic(Token {
+                kind: TokenKind::Identifier(name),
+                range,
+            })
+        })?;
 
         let arg_count = self.expect_arg_count()?;
         let destination = self.expect_destination()?;
@@ -682,7 +686,7 @@ impl<'a> Parser<'a> {
 
 #[test]
 fn basic() {
-    let block = Parser::parse(
+    let block: Module<crate::Noop> = Parser::parse(
         r#"
             // This is a comment.
             return 42
@@ -853,12 +857,7 @@ fn roundtrip_all_instructions() {
         destination: Destination::Stack,
     });
     block.push(Instruction::CallIntrinsic {
-        intrinsic: Intrinsic::NewList,
-        arg_count: 1,
-        destination: Destination::Stack,
-    });
-    block.push(Instruction::CallIntrinsic {
-        intrinsic: Intrinsic::NewMap,
+        intrinsic: crate::Noop,
         arg_count: 1,
         destination: Destination::Stack,
     });

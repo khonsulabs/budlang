@@ -22,6 +22,7 @@ use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
     ops::{Add, Bound, Div, Index, IndexMut, Mul, RangeBounds, Sub},
+    str::FromStr,
     sync::Arc,
     vec,
 };
@@ -51,7 +52,7 @@ pub use self::{
 /// This enum contains all instructions that the virtual machine is able to
 /// perform.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Instruction {
+pub enum Instruction<Intrinsic> {
     /// Adds `left` and `right` and places the result in `destination`.
     ///
     /// If this operation causes an overflow, [`Value::Void`] will be stored in
@@ -384,7 +385,10 @@ pub enum Instruction {
     },
 }
 
-impl Display for Instruction {
+impl<Intrinsic> Display for Instruction<Intrinsic>
+where
+    Intrinsic: Display,
+{
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -511,21 +515,6 @@ impl Display for Instruction {
     }
 }
 
-/// A runtime intrinsic function.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Intrinsic {
-    /// Creates a new Map with the given arguments.
-    NewMap,
-    /// Creates a new List with the given arguments.
-    NewList,
-}
-
-impl Display for Intrinsic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self, f)
-    }
-}
-
 /// An action to take during an [`Instruction::Compare`].
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CompareAction {
@@ -637,7 +626,7 @@ impl Display for Comparison {
 
 /// A virtual machine function.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Function {
+pub struct Function<Intrinsic> {
     /// The name of the function.
     pub name: Symbol,
     /// The number of arguments this function expects.
@@ -645,12 +634,12 @@ pub struct Function {
     /// The number of variables this function requests space for.
     pub variable_count: usize,
     /// The instructions that make up the function body.
-    pub code: Vec<Instruction>,
+    pub code: Vec<Instruction<Intrinsic>>,
 }
 
-impl Function {
+impl<Intrinsic> Function<Intrinsic> {
     /// Returns a new function for a given code block.
-    pub fn new(name: impl Into<Symbol>, arg_count: usize, block: CodeBlock) -> Self {
+    pub fn new(name: impl Into<Symbol>, arg_count: usize, block: CodeBlock<Intrinsic>) -> Self {
         Self {
             name: name.into(),
             arg_count,
@@ -1032,20 +1021,32 @@ impl Display for ValueKind {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
-struct Module {
+#[derive(Debug, Clone, PartialEq)]
+struct Module<Intrinsic> {
     contents: StdHashMap<Symbol, ModuleItem>,
-    vtable: Vec<VtableEntry>,
+    vtable: Vec<VtableEntry<Intrinsic>>,
+}
+impl<Intrinsic> Default for Module<Intrinsic> {
+    fn default() -> Self {
+        Self {
+            contents: StdHashMap::default(),
+            vtable: Vec::default(),
+        }
+    }
 }
 
-impl Module {
+impl<Intrinsic> Module<Intrinsic> {
     // #[must_use]
     // pub fn with_function(mut self, name: impl Into<Symbol>, function: Function) -> Self {
     //     self.define_function(name, function);
     //     self
     // }
 
-    fn define_vtable_entry(&mut self, name: impl Into<Symbol>, entry: VtableEntry) -> usize {
+    fn define_vtable_entry(
+        &mut self,
+        name: impl Into<Symbol>,
+        entry: VtableEntry<Intrinsic>,
+    ) -> usize {
         let vtable_index = self.vtable.len();
         self.contents
             .insert(name.into(), ModuleItem::Function(vtable_index));
@@ -1053,7 +1054,7 @@ impl Module {
         vtable_index
     }
 
-    pub fn define_function(&mut self, function: Function) -> usize {
+    pub fn define_function(&mut self, function: Function<Intrinsic>) -> usize {
         self.define_vtable_entry(function.name.clone(), VtableEntry::Function(function))
     }
 
@@ -1067,12 +1068,15 @@ impl Module {
 }
 
 #[derive(Clone)]
-enum VtableEntry {
-    Function(Function),
+enum VtableEntry<Intrinsic> {
+    Function(Function<Intrinsic>),
     NativeFunction(Arc<dyn NativeFunction>),
 }
 
-impl Debug for VtableEntry {
+impl<Intrinsic> Debug for VtableEntry<Intrinsic>
+where
+    Intrinsic: Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Function(arg0) => f.debug_tuple("Function").field(arg0).finish(),
@@ -1081,7 +1085,10 @@ impl Debug for VtableEntry {
     }
 }
 
-impl PartialEq for VtableEntry {
+impl<Intrinsic> PartialEq for VtableEntry<Intrinsic>
+where
+    Intrinsic: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Function(l0), Self::Function(r0)) => l0 == r0,
@@ -1201,13 +1208,33 @@ enum ModuleItem {
 /// [`DynamicValue`] can be used in the virtual machine.
 ///
 /// Each [`Instruction`] variant is documented with its expected behavior.
+///
+/// # Custom Environments
+///
+/// The virtual machine has several opportunities to customize its behavior. For
+/// default behavior, [`Environment`] is implemented for `()`.
+///
+/// There are multiple reasons to implement a custom [`Environment`]:
+///
+/// * The [`Environment::Intrinsic`] associated type allows extending the
+///   virtual machine with intrinsic functions. Bud uses this to initialize map
+///   and list literals at runtime via `NewMap` and `NewList` intrinsics.
+/// * The [`Environment::String`] type can be replaced to use another string
+///   type.
+/// * The [`Environment::step()`] function can be overriden to pause execution
+///   conditionally.
+///
+///
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct VirtualMachine<Env> {
+pub struct VirtualMachine<Env>
+where
+    Env: Environment,
+{
     /// The stack for this virtual machine. Take care when manually manipulating
     /// the stack.
     pub stack: Stack,
     persistent_variables: Vec<Symbol>,
-    local_module: Module,
+    local_module: Module<Env::Intrinsic>,
     environment: Env,
 }
 
@@ -1261,7 +1288,7 @@ where
     /// Registers a function with the provided name and returns self. This is a
     /// builder-style function.
     #[must_use]
-    pub fn with_function(mut self, function: Function) -> Self {
+    pub fn with_function(mut self, function: Function<Env::Intrinsic>) -> Self {
         self.define_function(function);
         self
     }
@@ -1320,7 +1347,7 @@ where
     /// Runs a set of instructions.
     pub fn run<'a, Output: FromStack>(
         &'a mut self,
-        operations: Cow<'a, [Instruction]>,
+        operations: Cow<'a, [Instruction<Env::Intrinsic>]>,
         variable_count: usize,
     ) -> Result<Output, Fault<'a, Env, Output>> {
         if variable_count > 0 {
@@ -1375,7 +1402,7 @@ where
     /// Runs a set of instructions without modifying the stack before executing.
     pub fn run_interactive<'a, Output: FromStack>(
         &'a mut self,
-        operations: Cow<'a, [Instruction]>,
+        operations: Cow<'a, [Instruction<Env::Intrinsic>]>,
         variable_count: usize,
         pop_variables: bool,
     ) -> Result<Output, Fault<'a, Env, Output>> {
@@ -1425,7 +1452,7 @@ where
 
     fn resume<'a, Output: FromStack>(
         &'a mut self,
-        operations: Cow<'a, [Instruction]>,
+        operations: Cow<'a, [Instruction<Env::Intrinsic>]>,
         mut paused_stack: VecDeque<PausedFrame>,
     ) -> Result<Output, Fault<'a, Env, Output>> {
         let first_frame = paused_stack.pop_front().expect("at least one frame");
@@ -1516,7 +1543,7 @@ where
         }
     }
 
-    fn define_function(&mut self, function: Function) -> Option<usize> {
+    fn define_function(&mut self, function: Function<Env::Intrinsic>) -> Option<usize> {
         Some(self.local_module.define_function(function))
     }
 
@@ -1536,8 +1563,11 @@ enum FlowControl {
 }
 
 #[derive(Debug)]
-struct StackFrame<'a, Env, Output> {
-    module: &'a Module,
+struct StackFrame<'a, Env, Output>
+where
+    Env: Environment,
+{
+    module: &'a Module<Env::Intrinsic>,
     stack: &'a mut Stack,
     environment: &'a mut Env,
     // Each stack frame cannot pop below this offset.
@@ -1559,7 +1589,7 @@ where
 {
     fn resume_executing_execute_operations(
         &mut self,
-        operations: &[Instruction],
+        operations: &[Instruction<Env::Intrinsic>],
         mut resume_from: VecDeque<PausedFrame>,
     ) -> Result<Value, Fault<'static, Env, Output>> {
         if let Some(call_to_resume) = resume_from.pop_front() {
@@ -1623,7 +1653,7 @@ where
     }
     fn execute_operations(
         &mut self,
-        operations: &[Instruction],
+        operations: &[Instruction<Env::Intrinsic>],
     ) -> Result<Value, Fault<'static, Env, Output>> {
         loop {
             if matches!(self.environment.step(), ExecutionBehavior::Pause) {
@@ -1702,7 +1732,7 @@ where
     #[allow(clippy::too_many_lines)]
     fn execute_operation(
         &mut self,
-        operation: &Instruction,
+        operation: &Instruction<Env::Intrinsic>,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
         match operation {
             Instruction::JumpTo(instruction_index) => {
@@ -1834,7 +1864,7 @@ where
                 intrinsic,
                 arg_count,
                 destination,
-            } => self.intrinsic(*intrinsic, *arg_count, *destination),
+            } => self.intrinsic(intrinsic, *arg_count, *destination),
             Instruction::CallInstance {
                 target,
                 name,
@@ -2215,7 +2245,7 @@ where
 
     fn intrinsic(
         &mut self,
-        intrinsic: Intrinsic,
+        intrinsic: &Env::Intrinsic,
         arg_count: usize,
         destination: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
@@ -2229,12 +2259,7 @@ where
         let args = self.stack.pop_n(arg_count);
 
         // If there was a fault, return.
-        let produced_value = match intrinsic {
-            Intrinsic::NewMap => {
-                Value::dynamic(<Env::Map as TryFrom<PoppedValues<'_>>>::try_from(args)?)
-            }
-            Intrinsic::NewList => Value::dynamic(args.collect::<Env::List>()),
-        };
+        let produced_value = self.environment.intrinsic(intrinsic, args)?;
         match destination {
             Destination::Variable(variable) => {
                 *self.resolve_variable_mut(variable)? = produced_value;
@@ -2456,14 +2481,20 @@ checked_op!(checked_div, div, "divide");
 
 /// An unexpected event occurred while executing the virtual machine.
 #[derive(Debug, PartialEq)]
-pub struct Fault<'a, Env, ReturnType> {
+pub struct Fault<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     /// The kind of fault this is.
     pub kind: FaultOrPause<'a, Env, ReturnType>,
     /// The stack trace of the virtual machine when the fault was raised.
     pub stack: Vec<FaultStackFrame>,
 }
 
-impl<Env, ReturnType> Clone for Fault<'static, Env, ReturnType> {
+impl<Env, ReturnType> Clone for Fault<'static, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn clone(&self) -> Self {
         Self {
             kind: self.kind.clone(),
@@ -2472,7 +2503,10 @@ impl<Env, ReturnType> Clone for Fault<'static, Env, ReturnType> {
     }
 }
 
-impl<'a, Env, ReturnType> Fault<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> Fault<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn stack_underflow() -> Self {
         Self::from(FaultKind::StackUnderflow)
     }
@@ -2486,7 +2520,10 @@ impl<'a, Env, ReturnType> Fault<'a, Env, ReturnType> {
     }
 }
 
-impl<'a, Env, ReturnType> From<FaultKind> for Fault<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> From<FaultKind> for Fault<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn from(kind: FaultKind) -> Self {
         Self {
             kind: FaultOrPause::Fault(kind),
@@ -2497,12 +2534,15 @@ impl<'a, Env, ReturnType> From<FaultKind> for Fault<'a, Env, ReturnType> {
 
 impl<'a, Env, ReturnType> std::error::Error for Fault<'a, Env, ReturnType>
 where
-    Env: std::fmt::Debug,
+    Env: std::fmt::Debug + Environment,
     ReturnType: std::fmt::Debug,
 {
 }
 
-impl<'a, Env, ReturnType> Display for Fault<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> Display for Fault<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.kind {
             FaultOrPause::Fault(fault) => Display::fmt(fault, f),
@@ -2513,7 +2553,10 @@ impl<'a, Env, ReturnType> Display for Fault<'a, Env, ReturnType> {
 
 /// A reason for a virtual machine [`Fault`].
 #[derive(Debug, PartialEq)]
-pub enum FaultOrPause<'a, Env, ReturnType> {
+pub enum FaultOrPause<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     /// A fault occurred while processing instructions.
     Fault(FaultKind),
     /// Execution was paused by the [`Environment`] as a result of returning
@@ -2524,7 +2567,10 @@ pub enum FaultOrPause<'a, Env, ReturnType> {
     Pause(PausedExecution<'a, Env, ReturnType>),
 }
 
-impl<Env, ReturnType> Clone for FaultOrPause<'static, Env, ReturnType> {
+impl<Env, ReturnType> Clone for FaultOrPause<'static, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn clone(&self) -> Self {
         match self {
             Self::Fault(arg0) => Self::Fault(arg0.clone()),
@@ -2698,15 +2744,19 @@ pub struct FaultStackFrame {
 
 /// A paused code execution.
 #[derive(Debug, PartialEq)]
-pub struct PausedExecution<'a, Env, ReturnType> {
+pub struct PausedExecution<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     context: Option<&'a mut VirtualMachine<Env>>,
-    operations: Option<Cow<'a, [Instruction]>>,
+    operations: Option<Cow<'a, [Instruction<Env::Intrinsic>]>>,
     stack: VecDeque<PausedFrame>,
     _return: PhantomData<ReturnType>,
 }
 
 impl<'a, Env, ReturnType> PausedExecution<'a, Env, ReturnType>
 where
+    Env: Environment,
     ReturnType: FromStack,
 {
     /// Returns a reference to the [`Environment`] from the virtual machine that
@@ -2838,10 +2888,19 @@ fn sizes() {
 pub trait Environment: 'static {
     /// The string type for this environment.
     type String: DynamicValue + for<'a> From<&'a str>;
-    /// The map type for this environment.
-    type Map: DynamicValue + for<'a> TryFrom<PoppedValues<'a>, Error = FaultKind>;
-    /// The list (array) type for this environment.
-    type List: DynamicValue + FromIterator<Value>;
+
+    /// The intrinsics offered by this environment.
+    type Intrinsic: Clone + PartialEq + Display + Debug + FromStr;
+
+    /// Evalutes the `intrinsic` operation with the provided arguments.
+    ///
+    /// This is invoked when the virtual machine executes an
+    /// [`Instruction::CallIntrinsic`].
+    fn intrinsic(
+        &mut self,
+        intrinsic: &Self::Intrinsic,
+        args: PoppedValues<'_>,
+    ) -> Result<Value, FaultKind>;
 
     /// Called once before each instruction is executed.
     ///
@@ -2857,8 +2916,15 @@ pub trait Environment: 'static {
 
 impl Environment for () {
     type String = String;
-    type Map = HashMap;
-    type List = List;
+    type Intrinsic = Noop;
+
+    fn intrinsic(
+        &mut self,
+        _intrinsic: &Self::Intrinsic,
+        _args: PoppedValues<'_>,
+    ) -> Result<Value, FaultKind> {
+        Ok(Value::Void)
+    }
 
     #[inline]
     fn step(&mut self) -> ExecutionBehavior {
@@ -2870,40 +2936,74 @@ impl Environment for () {
 /// pausing the virtual machine.
 #[derive(Debug, Default)]
 #[must_use]
-pub struct Budgeted(usize);
+pub struct Budgeted<Env> {
+    /// The wrapped environment.
+    pub env: Env,
+    remaining_steps: usize,
+}
 
-impl Budgeted {
+impl Budgeted<()> {
+    /// Returns a budgeted default environment.
+    pub fn empty() -> Self {
+        Self::new(0, ())
+    }
+}
+
+impl<Env> Budgeted<Env> {
     /// Returns a new instance with the provided initial budget.
-    pub const fn new(initial_budget: usize) -> Self {
-        Self(initial_budget)
+    pub const fn new(initial_budget: usize, env: Env) -> Self {
+        Self {
+            env,
+            remaining_steps: initial_budget,
+        }
     }
 
     /// Returns the current balance of the budget.
     #[must_use]
     pub const fn balance(&self) -> usize {
-        self.0
+        self.remaining_steps
+    }
+
+    /// Returns the current balance of the budget.
+    #[must_use]
+    pub fn charge(&mut self) -> bool {
+        if self.remaining_steps > 0 {
+            self.remaining_steps -= 1;
+            true
+        } else {
+            false
+        }
     }
 
     /// Adds an additional budget. This value will saturate `usize` instead of
     /// panicking or overflowing.
     pub fn add_budget(&mut self, additional_budget: usize) {
-        self.0 = self.0.saturating_add(additional_budget);
+        self.remaining_steps = self.remaining_steps.saturating_add(additional_budget);
     }
 }
 
-impl Environment for Budgeted {
-    type String = String;
-    type Map = HashMap;
-    type List = List;
+impl<Env> Environment for Budgeted<Env>
+where
+    Env: Environment,
+{
+    type String = Env::String;
+    type Intrinsic = Env::Intrinsic;
 
     #[inline]
     fn step(&mut self) -> ExecutionBehavior {
-        if self.0 > 0 {
-            self.0 -= 1;
-            ExecutionBehavior::Continue
+        if self.charge() {
+            self.env.step()
         } else {
             ExecutionBehavior::Pause
         }
+    }
+
+    fn intrinsic(
+        &mut self,
+        intrinsic: &Self::Intrinsic,
+        args: PoppedValues<'_>,
+    ) -> Result<Value, FaultKind> {
+        self.env.intrinsic(intrinsic, args)
     }
 }
 
@@ -2918,7 +3018,7 @@ pub enum ExecutionBehavior {
 
 #[test]
 fn budget() {
-    let mut context = VirtualMachine::default_for(Budgeted::new(0));
+    let mut context = VirtualMachine::default_for(Budgeted::new(0, ()));
     let mut pause_count = 0;
     let mut fault = context
         .run::<i64>(
@@ -3023,7 +3123,7 @@ fn budget_with_frames() {
             Instruction::Push(ValueOrSource::Variable(0)),
         ],
     };
-    let mut context = VirtualMachine::default_for(Budgeted::new(0)).with_function(test);
+    let mut context = VirtualMachine::default_for(Budgeted::new(0, ())).with_function(test);
     let mut fault = context
         .run::<i64>(
             Cow::Borrowed(&[
@@ -3056,19 +3156,19 @@ fn budget_with_frames() {
 
 /// A block of code that can be executed on the virtual machine.
 #[derive(Debug)]
-pub struct CodeBlock {
+pub struct CodeBlock<Intrinsic> {
     /// The number of variables this code block requires.
     pub variables: usize,
 
     /// The virtual machine instructions.
-    pub code: Vec<Instruction>,
+    pub code: Vec<Instruction<Intrinsic>>,
 }
 
-impl CodeBlock {
+impl<Intrinsic> CodeBlock<Intrinsic> {
     /// Returns a [`Display`] implementor that indents each printed operation
     /// with `indentation`.
     #[must_use]
-    pub fn display_indented<'a>(&'a self, indentation: &'a str) -> CodeBlockDisplay<'a> {
+    pub fn display_indented<'a>(&'a self, indentation: &'a str) -> CodeBlockDisplay<'a, Intrinsic> {
         CodeBlockDisplay {
             block: self,
             indentation,
@@ -3077,12 +3177,15 @@ impl CodeBlock {
 }
 
 /// Displays a [`CodeBlock`] with optional indentation.
-pub struct CodeBlockDisplay<'a> {
-    block: &'a CodeBlock,
+pub struct CodeBlockDisplay<'a, Intrinsic> {
+    block: &'a CodeBlock<Intrinsic>,
     indentation: &'a str,
 }
 
-impl<'a> Display for CodeBlockDisplay<'a> {
+impl<'a, Intrinsic> Display for CodeBlockDisplay<'a, Intrinsic>
+where
+    Intrinsic: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut is_first = true;
         for i in &self.block.code {
@@ -3098,7 +3201,10 @@ impl<'a> Display for CodeBlockDisplay<'a> {
     }
 }
 
-impl Display for CodeBlock {
+impl<Intrinsic> Display for CodeBlock<Intrinsic>
+where
+    Intrinsic: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(
             &CodeBlockDisplay {
@@ -3640,14 +3746,20 @@ fn function_needs_extra_cleanup() {
 
 /// All errors that can be encountered executing Bud code.
 #[derive(Debug, PartialEq)]
-pub enum Error<'a, Env, ReturnType> {
+pub enum Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     /// An error occurred while linking an [`Module`](ir::Module).
     Link(ir::LinkError),
     /// A fault occurred while running the virtual machine.
     Fault(Fault<'a, Env, ReturnType>),
 }
 
-impl<Env, ReturnType> Clone for Error<'static, Env, ReturnType> {
+impl<Env, ReturnType> Clone for Error<'static, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn clone(&self) -> Self {
         match self {
             Self::Link(arg0) => Self::Link(arg0.clone()),
@@ -3656,7 +3768,10 @@ impl<Env, ReturnType> Clone for Error<'static, Env, ReturnType> {
     }
 }
 
-impl<'a, Env, ReturnType> Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     /// Asserts that this error does not contain a paused execution. Returns an
     /// [`Error`] instance with a `'static` lifetime.
     ///
@@ -3683,12 +3798,15 @@ impl<'a, Env, ReturnType> Error<'a, Env, ReturnType> {
 
 impl<'a, Env, ReturnType> std::error::Error for Error<'a, Env, ReturnType>
 where
-    Env: std::fmt::Debug,
+    Env: std::fmt::Debug + Environment,
     ReturnType: std::fmt::Debug,
 {
 }
 
-impl<'a, Env, ReturnType> Display for Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> Display for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::Link(err) => write!(f, "link error: {err}"),
@@ -3696,20 +3814,54 @@ impl<'a, Env, ReturnType> Display for Error<'a, Env, ReturnType> {
         }
     }
 }
-impl<'a, Env, ReturnType> From<ir::LinkError> for Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> From<ir::LinkError> for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn from(err: ir::LinkError) -> Self {
         Self::Link(err)
     }
 }
 
-impl<'a, Env, ReturnType> From<Fault<'a, Env, ReturnType>> for Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> From<Fault<'a, Env, ReturnType>> for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn from(fault: Fault<'a, Env, ReturnType>) -> Self {
         Self::Fault(fault)
     }
 }
 
-impl<'a, Env, ReturnType> From<FaultKind> for Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> From<FaultKind> for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn from(fault: FaultKind) -> Self {
         Self::Fault(Fault::from(fault))
+    }
+}
+
+/// An intrinsic that does nothing.
+///
+/// This type can be used for [`Environment::Intrinsic`] if there is no need for
+/// custom intrinsics.
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+pub struct Noop;
+
+impl FromStr for Noop {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "noop" {
+            Ok(Self)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl Display for Noop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("noop")
     }
 }

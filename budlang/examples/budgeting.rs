@@ -8,7 +8,7 @@ fn main() {
     // instructions to operate before pausing. The default budget is 0, which
     // means the script will immediately pause when it begins executing
     // `fibonacci(10)`.
-    let mut context = Bud::default_for(Budgeted::default());
+    let mut context = Bud::default_for(Budgeted::empty());
 
     let mut result = context.run_source::<i64>(
         r#"function fibonacci(n)

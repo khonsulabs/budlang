@@ -18,15 +18,19 @@ use std::{
     env,
     fmt::Display,
     ops::{Deref, DerefMut, Range},
+    str::FromStr,
 };
 
 use budvm::{
     ir::{LinkError, Scope},
-    Environment, Fault, FaultKind, FromStack, NativeFunction, Symbol, Value,
+    Fault, FaultKind, FromStack, NativeFunction, Symbol, Value,
 };
 
 pub use budvm as vm;
-use vm::{Function, VirtualMachine};
+use vm::{
+    Budgeted, DynamicValue, ExecutionBehavior, Function, HashMap, List, PoppedValues,
+    VirtualMachine,
+};
 
 use crate::parser::parse;
 
@@ -39,16 +43,22 @@ pub mod parser;
 
 /// All errors that can be encountered executing Bud code.
 #[derive(Debug, PartialEq)]
-pub enum Error<'a, Env, ReturnType> {
+pub enum Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     /// An error occurred while parsing the source code.
     Parse(parser::ParseError),
     /// An error occurred while compiling [`CodeUnit`](ast::CodeUnit).
     Compilation(ast::CompilationError),
     /// A fault occurred while running the virtual machine.
-    Vm(budvm::Error<'a, Env, ReturnType>),
+    Vm(budvm::Error<'a, BudEnvironment<Env>, ReturnType>),
 }
 
-impl<Env, ReturnType> Clone for Error<'static, Env, ReturnType> {
+impl<Env, ReturnType> Clone for Error<'static, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn clone(&self) -> Self {
         match self {
             Self::Parse(arg0) => Self::Parse(arg0.clone()),
@@ -58,7 +68,10 @@ impl<Env, ReturnType> Clone for Error<'static, Env, ReturnType> {
     }
 }
 
-impl<'a, Env, ReturnType> Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     /// Asserts that this error does not contain a paused execution. Returns an
     /// [`Error`] instance with a `'static` lifetime.
     ///
@@ -88,12 +101,15 @@ impl<'a, Env, ReturnType> Error<'a, Env, ReturnType> {
 
 impl<'a, Env, ReturnType> std::error::Error for Error<'a, Env, ReturnType>
 where
-    Env: std::fmt::Debug,
+    Env: std::fmt::Debug + Environment,
     ReturnType: std::fmt::Debug,
 {
 }
 
-impl<'a, Env, ReturnType> Display for Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> Display for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::Parse(err) => write!(f, "parse error: {err}"),
@@ -103,36 +119,56 @@ impl<'a, Env, ReturnType> Display for Error<'a, Env, ReturnType> {
     }
 }
 
-impl<'a, Env, ReturnType> From<parser::ParseError> for Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> From<parser::ParseError> for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn from(err: parser::ParseError) -> Self {
         Self::Parse(err)
     }
 }
 
-impl<'a, Env, ReturnType> From<ast::CompilationError> for Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> From<ast::CompilationError> for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn from(err: ast::CompilationError) -> Self {
         Self::Compilation(err)
     }
 }
 
-impl<'a, Env, ReturnType> From<LinkError> for Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> From<LinkError> for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn from(err: LinkError) -> Self {
         Self::Vm(budvm::Error::from(err))
     }
 }
 
-impl<'a, Env, ReturnType> From<budvm::Error<'a, Env, ReturnType>> for Error<'a, Env, ReturnType> {
-    fn from(fault: budvm::Error<'a, Env, ReturnType>) -> Self {
+impl<'a, Env, ReturnType> From<budvm::Error<'a, BudEnvironment<Env>, ReturnType>>
+    for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
+    fn from(fault: budvm::Error<'a, BudEnvironment<Env>, ReturnType>) -> Self {
         Self::Vm(fault)
     }
 }
 
-impl<'a, Env, ReturnType> From<Fault<'a, Env, ReturnType>> for Error<'a, Env, ReturnType> {
-    fn from(fault: Fault<'a, Env, ReturnType>) -> Self {
+impl<'a, Env, ReturnType> From<Fault<'a, BudEnvironment<Env>, ReturnType>>
+    for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
+    fn from(fault: Fault<'a, BudEnvironment<Env>, ReturnType>) -> Self {
         Self::Vm(budvm::Error::Fault(fault))
     }
 }
-impl<'a, Env, ReturnType> From<FaultKind> for Error<'a, Env, ReturnType> {
+impl<'a, Env, ReturnType> From<FaultKind> for Error<'a, Env, ReturnType>
+where
+    Env: Environment,
+{
     fn from(fault: FaultKind) -> Self {
         Self::Vm(budvm::Error::from(fault))
     }
@@ -143,7 +179,9 @@ impl<'a, Env, ReturnType> From<FaultKind> for Error<'a, Env, ReturnType> {
 /// Each instance of this type has its own sandboxed environment. Its stack
 /// space, function declarations, and [`Environment`] are unique from all other
 /// instances of Bud with the exception that [`Symbol`]s are tracked globally.
-pub struct Bud<Env>(VirtualMachine<Env>);
+pub struct Bud<Env>(VirtualMachine<BudEnvironment<Env>>)
+where
+    Env: Environment;
 
 impl Bud<()> {
     /// Returns a default instance of Bud with no custom [`Environment`]
@@ -158,19 +196,19 @@ where
     Env: Environment,
 {
     /// Returns a new instance with the provided virtual machine.
-    pub const fn new(vm: VirtualMachine<Env>) -> Self {
+    pub const fn new(vm: VirtualMachine<BudEnvironment<Env>>) -> Self {
         Self(vm)
     }
 
     /// Returns a new instance with the provided environment.
     pub fn default_for(environment: Env) -> Self {
-        Self::new(VirtualMachine::default_for(environment))
+        Self::new(VirtualMachine::default_for(BudEnvironment(environment)))
     }
 
     /// Registers a function with the provided name and returns self. This is a
     /// builder-style function.
     #[must_use]
-    pub fn with_function(mut self, function: Function) -> Self {
+    pub fn with_function(mut self, function: Function<Intrinsic>) -> Self {
         self.define_function(function);
         self
     }
@@ -247,17 +285,195 @@ where
     }
 }
 
-impl<Env> Deref for Bud<Env> {
-    type Target = VirtualMachine<Env>;
+impl<Env> Scope for Bud<Env>
+where
+    Env: Environment,
+{
+    type Environment = BudEnvironment<Env>;
+
+    fn resolve_function_vtable_index(&self, name: &Symbol) -> Option<usize> {
+        self.0.resolve_function_vtable_index(name)
+    }
+
+    fn map_each_symbol(&self, callback: &mut impl FnMut(Symbol, vm::ir::ScopeSymbolKind)) {
+        self.0.map_each_symbol(callback);
+    }
+
+    fn define_function(
+        &mut self,
+        function: vm::Function<<Self::Environment as vm::Environment>::Intrinsic>,
+    ) -> Option<usize> {
+        self.0.define_function(function)
+    }
+
+    fn define_persistent_variable(&mut self, name: Symbol, variable: vm::ir::Variable) {
+        self.0.define_persistent_variable(name, variable);
+    }
+}
+
+impl<Env> Deref for Bud<Env>
+where
+    Env: Environment,
+{
+    type Target = VirtualMachine<BudEnvironment<Env>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<Env> DerefMut for Bud<Env> {
+impl<Env> DerefMut for Bud<Env>
+where
+    Env: Environment,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+/// Customizes the behavior of a virtual machine instance.
+pub trait Environment: 'static {
+    /// The string type for this environment.
+    type String: DynamicValue + for<'a> From<&'a str>;
+    /// The map type for this environment.
+    type Map: DynamicValue + for<'a> TryFrom<PoppedValues<'a>, Error = FaultKind>;
+    /// The list (array) type for this environment.
+    type List: DynamicValue + FromIterator<Value>;
+
+    /// Called once before each instruction is executed.
+    ///
+    /// If [`ExecutionBehavior::Continue`] is returned, the next instruction
+    /// will be exected.
+    ///
+    /// If [`ExecutionBehavior::Pause`] is returned, the virtual machine is
+    /// paused and a [`FaultOrPause::Pause`](budvm::FaultOrPause::Pause) is raised. If the execution is
+    /// resumed, the first function call will be before executing the same
+    /// instruction as the one when [`ExecutionBehavior::Pause`] was called.
+    fn step(&mut self) -> ExecutionBehavior;
+}
+
+/// A wrapper for a [`Environment`] that implements [`budvm::Environment`].
+#[derive(Debug, Eq, PartialEq)]
+pub struct BudEnvironment<Env>(Env);
+
+impl<Env> BudEnvironment<Env> {
+    /// Returns a new instance wrapping `env`.
+    pub fn new(env: Env) -> Self {
+        Self(env)
+    }
+}
+
+impl<T> budvm::Environment for BudEnvironment<T>
+where
+    T: Environment,
+{
+    type String = T::String;
+    type Intrinsic = Intrinsic;
+
+    fn step(&mut self) -> ExecutionBehavior {
+        T::step(&mut self.0)
+    }
+
+    fn intrinsic(
+        &mut self,
+        intrinsic: &Self::Intrinsic,
+        args: PoppedValues<'_>,
+    ) -> Result<Value, FaultKind> {
+        match intrinsic {
+            Intrinsic::NewMap => Ok(Value::dynamic(
+                <T::Map as TryFrom<PoppedValues<'_>>>::try_from(args)?,
+            )),
+            Intrinsic::NewList => Ok(Value::dynamic(args.collect::<T::List>())),
+        }
+    }
+}
+
+impl<T> Deref for BudEnvironment<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<T> DerefMut for BudEnvironment<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<T> Environment for Budgeted<T>
+where
+    T: Environment,
+{
+    type String = T::String;
+
+    type Map = T::Map;
+
+    type List = T::List;
+
+    fn step(&mut self) -> ExecutionBehavior {
+        if self.charge() {
+            self.env.step()
+        } else {
+            ExecutionBehavior::Pause
+        }
+    }
+}
+
+impl Environment for () {
+    type String = String;
+
+    type Map = HashMap;
+
+    type List = List;
+
+    fn step(&mut self) -> ExecutionBehavior {
+        ExecutionBehavior::Continue
+    }
+}
+
+impl<Env> Environment for Budgeted<BudEnvironment<Env>>
+where
+    Env: Environment,
+{
+    type String = Env::String;
+
+    type Map = Env::Map;
+
+    type List = Env::List;
+
+    fn step(&mut self) -> ExecutionBehavior {
+        vm::Environment::step(&mut self.env)
+    }
+}
+
+/// A runtime intrinsic function.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Intrinsic {
+    /// Creates a new Map with the given arguments.
+    NewMap,
+    /// Creates a new List with the given arguments.
+    NewList,
+}
+
+impl Display for Intrinsic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Intrinsic::NewMap => f.write_str("NewMap"),
+            Intrinsic::NewList => f.write_str("NewList"),
+        }
+    }
+}
+
+impl FromStr for Intrinsic {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "NewMap" => Ok(Self::NewMap),
+            "NewList" => Ok(Self::NewList),
+            _ => Err(()),
+        }
     }
 }
 

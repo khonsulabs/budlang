@@ -1,11 +1,12 @@
 use budlang::{
     ast::{self, Call, ExpressionTree, Function, If},
-    vm::{self, Comparison, Symbol},
+    vm::{Comparison, Symbol},
 };
 
 use crate::ast::BinOpKind;
 
 fn main() {
+    let mut context = budlang::Bud::empty();
     let code_unit = ast::CodeUnit::new(|builder| {
         vec![builder.call(Call::global("fibonacci", [builder.integer(10)]))]
     })
@@ -32,10 +33,9 @@ fn main() {
             }),
         ),
     )
-    .compile(&mut ())
+    .compile(&mut context)
     .unwrap();
 
-    let mut context = vm::VirtualMachine::empty();
     let result: i64 = code_unit.load_into(&mut context).unwrap();
     assert_eq!(result, 55);
 }
