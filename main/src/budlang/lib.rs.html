@@ -479,6 +479,7 @@
 <span id="479">479</span>
 <span id="480">480</span>
 <span id="481">481</span>
+<span id="482">482</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -827,9 +828,10 @@
     /// will be exected.
     ///
     /// If [`ExecutionBehavior::Pause`] is returned, the virtual machine is
-    /// paused and a [`FaultOrPause::Pause`](budvm::FaultOrPause::Pause) is raised. If the execution is
-    /// resumed, the first function call will be before executing the same
-    /// instruction as the one when [`ExecutionBehavior::Pause`] was called.
+    /// paused and a [`FaultOrPause::Pause`](budvm::FaultOrPause::Pause) is
+    /// raised. If the execution is resumed, the first function call will be
+    /// before executing the same instruction as the one when
+    /// [`ExecutionBehavior::Pause`] was called.
     </span><span class="kw">fn </span>step(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; ExecutionBehavior;
 }
 

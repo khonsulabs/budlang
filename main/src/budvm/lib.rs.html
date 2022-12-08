@@ -3865,6 +3865,60 @@
 <span id="3865">3865</span>
 <span id="3866">3866</span>
 <span id="3867">3867</span>
+<span id="3868">3868</span>
+<span id="3869">3869</span>
+<span id="3870">3870</span>
+<span id="3871">3871</span>
+<span id="3872">3872</span>
+<span id="3873">3873</span>
+<span id="3874">3874</span>
+<span id="3875">3875</span>
+<span id="3876">3876</span>
+<span id="3877">3877</span>
+<span id="3878">3878</span>
+<span id="3879">3879</span>
+<span id="3880">3880</span>
+<span id="3881">3881</span>
+<span id="3882">3882</span>
+<span id="3883">3883</span>
+<span id="3884">3884</span>
+<span id="3885">3885</span>
+<span id="3886">3886</span>
+<span id="3887">3887</span>
+<span id="3888">3888</span>
+<span id="3889">3889</span>
+<span id="3890">3890</span>
+<span id="3891">3891</span>
+<span id="3892">3892</span>
+<span id="3893">3893</span>
+<span id="3894">3894</span>
+<span id="3895">3895</span>
+<span id="3896">3896</span>
+<span id="3897">3897</span>
+<span id="3898">3898</span>
+<span id="3899">3899</span>
+<span id="3900">3900</span>
+<span id="3901">3901</span>
+<span id="3902">3902</span>
+<span id="3903">3903</span>
+<span id="3904">3904</span>
+<span id="3905">3905</span>
+<span id="3906">3906</span>
+<span id="3907">3907</span>
+<span id="3908">3908</span>
+<span id="3909">3909</span>
+<span id="3910">3910</span>
+<span id="3911">3911</span>
+<span id="3912">3912</span>
+<span id="3913">3913</span>
+<span id="3914">3914</span>
+<span id="3915">3915</span>
+<span id="3916">3916</span>
+<span id="3917">3917</span>
+<span id="3918">3918</span>
+<span id="3919">3919</span>
+<span id="3920">3920</span>
+<span id="3921">3921</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -4118,6 +4172,17 @@
         <span class="doccomment">/// The destination for the result to be stored in.
         </span>destination: Destination,
     },
+    <span class="doccomment">/// Converts a value to another type, storing the result in `destination`.
+    ///
+    /// If `value` cannot be converted, a fault will be returned.
+    </span>Convert {
+        <span class="doccomment">/// The left hand side of the operation.
+        </span>value: ValueOrSource,
+        <span class="doccomment">/// The type to convert to.
+        </span>kind: ValueKind,
+        <span class="doccomment">/// The destination for the converted value to be stored in.
+        </span>destination: Destination,
+    },
     <span class="doccomment">/// Checks [`condition.is_truthy()`](Value::is_truthy), jumping to the
     /// target instruction if false.
     ///
@@ -4324,6 +4389,13 @@
             }
             Instruction::BitwiseNot { value, destination } =&gt; {
                 <span class="macro">write!</span>(f, <span class="string">&quot;bitnot {value} {destination}&quot;</span>)
+            }
+            Instruction::Convert {
+                value,
+                kind,
+                destination,
+            } =&gt; {
+                <span class="macro">write!</span>(f, <span class="string">&quot;convert {value} {kind} {destination}&quot;</span>)
             }
             Instruction::If {
                 condition,
@@ -4854,7 +4926,7 @@
 }
 
 <span class="doccomment">/// All primitive [`Value`] kinds.
-</span><span class="attribute">#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+</span><span class="attribute">#[derive(Debug, Clone, Eq, PartialEq)]
 </span><span class="kw">pub enum </span>ValueKind {
     <span class="doccomment">/// A signed 64-bit integer value.
     </span>Integer,
@@ -4863,7 +4935,7 @@
     <span class="doccomment">/// A boolean representing true or false.
     </span>Boolean,
     <span class="doccomment">/// A dynamically exposed Rust type.
-    </span>Dynamic(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str),
+    </span>Dynamic(Symbol),
     <span class="doccomment">/// A value representing the lack of a value.
     </span>Void,
 }
@@ -4871,7 +4943,7 @@
 <span class="kw">impl </span>ValueKind {
     <span class="doccomment">/// Returns this kind as a string.
     </span><span class="attribute">#[must_use]
-    </span><span class="kw">pub const fn </span>as_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+    </span><span class="kw">pub fn </span>as_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
         <span class="kw">match </span><span class="self">self </span>{
             ValueKind::Integer =&gt; <span class="string">&quot;Integer&quot;</span>,
             ValueKind::Real =&gt; <span class="string">&quot;Real&quot;</span>,
@@ -5685,6 +5757,11 @@
                 value: left,
                 destination,
             } =&gt; <span class="self">self</span>.bitnot(left, <span class="kw-2">*</span>destination),
+            Instruction::Convert {
+                value,
+                kind,
+                destination,
+            } =&gt; <span class="self">self</span>.convert(value, kind, <span class="kw-2">*</span>destination),
             Instruction::If {
                 condition: value,
                 false_jump_to,
@@ -6165,6 +6242,33 @@
         <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= Value::Integer(!value);
 
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+    }
+
+    <span class="kw">fn </span>convert(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        value: <span class="kw-2">&amp;</span>ValueOrSource,
+        kind: <span class="kw-2">&amp;</span>ValueKind,
+        destination: Destination,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
+        <span class="kw">let </span>value = <span class="self">self</span>.resolve_value_or_source(value)<span class="question-mark">?</span>;
+        <span class="kw">let </span>converted = <span class="kw">match </span>kind {
+            ValueKind::Integer =&gt; value.as_i64().map(Value::Integer),
+            ValueKind::Real =&gt; value.as_f64().map(Value::Real),
+            ValueKind::Boolean =&gt; <span class="prelude-val">Some</span>(Value::Boolean(value.is_truthy())),
+            ValueKind::Dynamic(<span class="kw">_</span>) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;add convert() to Environment&quot;</span>),
+            ValueKind::Void =&gt; <span class="prelude-val">None</span>,
+        };
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(converted) = converted {
+            <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= converted;
+
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Err</span>(Fault::from(FaultKind::invalid_type(
+                <span class="macro">format!</span>(<span class="string">&quot;@received-kind cannot be converted to {kind}&quot;</span>),
+                value.clone(),
+            )))
+        }
     }
 
     <span class="kw">fn </span>extract_integer(value: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Result</span>&lt;i64, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
@@ -6730,7 +6834,11 @@
 {
     <span class="kw">fn </span>from_value(value: Value) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, FaultKind&gt; {
         value.into_dynamic().map_err(|value| {
-            FaultKind::type_mismatch(<span class="string">&quot;invalid type&quot;</span>, ValueKind::Dynamic(type_name::&lt;T&gt;()), value)
+            FaultKind::type_mismatch(
+                <span class="string">&quot;invalid type&quot;</span>,
+                ValueKind::Dynamic(Symbol::from(type_name::&lt;T&gt;())),
+                value,
+            )
         })
     }
 }
