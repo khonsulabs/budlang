@@ -251,6 +251,17 @@ pub enum Instruction<Intrinsic> {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
+    /// Converts a value to another type, storing the result in `destination`.
+    ///
+    /// If `value` cannot be converted, a fault will be returned.
+    Convert {
+        /// The left hand side of the operation.
+        value: ValueOrSource,
+        /// The type to convert to.
+        kind: ValueKind,
+        /// The destination for the converted value to be stored in.
+        destination: Destination,
+    },
     /// Checks [`condition.is_truthy()`](Value::is_truthy), jumping to the
     /// target instruction if false.
     ///
@@ -457,6 +468,13 @@ where
             }
             Instruction::BitwiseNot { value, destination } => {
                 write!(f, "bitnot {value} {destination}")
+            }
+            Instruction::Convert {
+                value,
+                kind,
+                destination,
+            } => {
+                write!(f, "convert {value} {kind} {destination}")
             }
             Instruction::If {
                 condition,
@@ -987,7 +1005,7 @@ impl PartialOrd for Value {
 }
 
 /// All primitive [`Value`] kinds.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ValueKind {
     /// A signed 64-bit integer value.
     Integer,
@@ -996,7 +1014,7 @@ pub enum ValueKind {
     /// A boolean representing true or false.
     Boolean,
     /// A dynamically exposed Rust type.
-    Dynamic(&'static str),
+    Dynamic(Symbol),
     /// A value representing the lack of a value.
     Void,
 }
@@ -1004,7 +1022,7 @@ pub enum ValueKind {
 impl ValueKind {
     /// Returns this kind as a string.
     #[must_use]
-    pub const fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             ValueKind::Integer => "Integer",
             ValueKind::Real => "Real",
@@ -1818,6 +1836,11 @@ where
                 value: left,
                 destination,
             } => self.bitnot(left, *destination),
+            Instruction::Convert {
+                value,
+                kind,
+                destination,
+            } => self.convert(value, kind, *destination),
             Instruction::If {
                 condition: value,
                 false_jump_to,
@@ -2298,6 +2321,33 @@ where
         *self.resolve_value_source_mut(destination)? = Value::Integer(!value);
 
         Ok(None)
+    }
+
+    fn convert(
+        &mut self,
+        value: &ValueOrSource,
+        kind: &ValueKind,
+        destination: Destination,
+    ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
+        let value = self.resolve_value_or_source(value)?;
+        let converted = match kind {
+            ValueKind::Integer => value.as_i64().map(Value::Integer),
+            ValueKind::Real => value.as_f64().map(Value::Real),
+            ValueKind::Boolean => Some(Value::Boolean(value.is_truthy())),
+            ValueKind::Dynamic(_) => todo!("add convert() to Environment"),
+            ValueKind::Void => None,
+        };
+
+        if let Some(converted) = converted {
+            *self.resolve_value_source_mut(destination)? = converted;
+
+            Ok(None)
+        } else {
+            Err(Fault::from(FaultKind::invalid_type(
+                format!("@received-kind cannot be converted to {kind}"),
+                value.clone(),
+            )))
+        }
     }
 
     fn extract_integer(value: &Value) -> Result<i64, Fault<'static, Env, Output>> {
@@ -2863,7 +2913,11 @@ where
 {
     fn from_value(value: Value) -> Result<Self, FaultKind> {
         value.into_dynamic().map_err(|value| {
-            FaultKind::type_mismatch("invalid type", ValueKind::Dynamic(type_name::<T>()), value)
+            FaultKind::type_mismatch(
+                "invalid type",
+                ValueKind::Dynamic(Symbol::from(type_name::<T>())),
+                value,
+            )
         })
     }
 }

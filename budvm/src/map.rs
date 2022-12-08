@@ -177,8 +177,8 @@ where
         !self.map().is_empty()
     }
 
-    fn kind(&self) -> &'static str {
-        "Map"
+    fn kind(&self) -> Symbol {
+        Symbol::from("Map")
     }
 
     fn partial_eq(&self, other: &Value) -> Option<bool> {

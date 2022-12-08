@@ -346,9 +346,10 @@ pub trait Environment: 'static {
     /// will be exected.
     ///
     /// If [`ExecutionBehavior::Pause`] is returned, the virtual machine is
-    /// paused and a [`FaultOrPause::Pause`](budvm::FaultOrPause::Pause) is raised. If the execution is
-    /// resumed, the first function call will be before executing the same
-    /// instruction as the one when [`ExecutionBehavior::Pause`] was called.
+    /// paused and a [`FaultOrPause::Pause`](budvm::FaultOrPause::Pause) is
+    /// raised. If the execution is resumed, the first function call will be
+    /// before executing the same instruction as the one when
+    /// [`ExecutionBehavior::Pause`] was called.
     fn step(&mut self) -> ExecutionBehavior;
 }
 

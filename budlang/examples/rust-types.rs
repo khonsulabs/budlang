@@ -30,8 +30,8 @@ impl DynamicValue for StdOut {
         true
     }
 
-    fn kind(&self) -> &'static str {
-        "StdOut"
+    fn kind(&self) -> Symbol {
+        Symbol::from("StdOut")
     }
 
     fn call(&self, name: &Symbol, args: &mut PoppedValues<'_>) -> Result<Value, FaultKind> {

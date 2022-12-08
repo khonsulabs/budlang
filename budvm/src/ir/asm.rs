@@ -36,7 +36,7 @@ use crate::{
         decode_numeric_literal, decode_string_literal_contents, DecodeNumericError,
         DecodeStringError, DoublePeekable, Numeric,
     },
-    Comparison, Symbol,
+    Comparison, Symbol, ValueKind,
 };
 
 #[derive(PartialEq, Debug)]
@@ -226,6 +226,7 @@ where
                             }
                             "not" => self.parse_not()?,
                             "bitnot" => self.parse_bitnot()?,
+                            "convert" => self.parse_convert()?,
                             "ifnot" => self.parse_ifnot()?,
                             "jump" => self.parse_jump()?,
                             "push" => self.parse_push()?,
@@ -580,6 +581,24 @@ where
         Ok(())
     }
 
+    fn parse_convert(&mut self) -> Result<(), AsmError> {
+        let value = self.expect_literal_or_source()?;
+        let (kind, _) = self.expect_identifier("value kind")?;
+        let kind = match &*kind {
+            "Integer" => ValueKind::Integer,
+            "Real" => ValueKind::Real,
+            "Boolean" => ValueKind::Boolean,
+            _ => ValueKind::Dynamic(kind),
+        };
+        let destination = self.expect_destination()?;
+        self.current_function.push(Instruction::Convert {
+            value,
+            kind,
+            destination,
+        });
+        Ok(())
+    }
+
     fn parse_ifnot(&mut self) -> Result<(), AsmError> {
         let condition = self.expect_literal_or_source()?;
         let false_jump_to = self.expect_label()?;
@@ -783,6 +802,26 @@ fn roundtrip_all_instructions() {
     });
     block.push(Instruction::BitwiseNot {
         value: LiteralOrSource::Literal(Literal::Void),
+        destination: Destination::Stack,
+    });
+    block.push(Instruction::Convert {
+        value: LiteralOrSource::Literal(Literal::Void),
+        kind: ValueKind::Boolean,
+        destination: Destination::Stack,
+    });
+    block.push(Instruction::Convert {
+        value: LiteralOrSource::Literal(Literal::Void),
+        kind: ValueKind::Integer,
+        destination: Destination::Stack,
+    });
+    block.push(Instruction::Convert {
+        value: LiteralOrSource::Literal(Literal::Void),
+        kind: ValueKind::Real,
+        destination: Destination::Stack,
+    });
+    block.push(Instruction::Convert {
+        value: LiteralOrSource::Literal(Literal::Void),
+        kind: ValueKind::Dynamic(Symbol::from("Dynamic")),
         destination: Destination::Stack,
     });
     block.push(Instruction::If {

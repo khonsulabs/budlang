@@ -50,8 +50,8 @@ impl DynamicValue for String {
         !self.is_empty()
     }
 
-    fn kind(&self) -> &'static str {
-        "String"
+    fn kind(&self) -> Symbol {
+        Symbol::from("String")
     }
 
     fn partial_eq(&self, other: &Value) -> Option<bool> {

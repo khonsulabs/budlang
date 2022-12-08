@@ -82,8 +82,8 @@ impl DynamicValue for List {
         !self.list().is_empty()
     }
 
-    fn kind(&self) -> &'static str {
-        "List"
+    fn kind(&self) -> Symbol {
+        Symbol::from("List")
     }
 
     fn partial_eq(&self, other: &Value) -> Option<bool> {

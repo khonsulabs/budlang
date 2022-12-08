@@ -21,7 +21,7 @@ pub trait DynamicValue: Send + Sync + Debug + 'static {
     ///
     /// This value does not influence the virtual machine's behavior. The
     /// virtual machine uses this string only when creating error messages.
-    fn kind(&self) -> &'static str;
+    fn kind(&self) -> Symbol;
 
     /// Returns this value as an `i64`, if possible.
     ///
@@ -165,7 +165,7 @@ impl Dynamic {
 
     /// Returns the result of [`DynamicValue::kind()`] for the wrapped value.
     #[must_use]
-    pub fn kind(&self) -> &'static str {
+    pub fn kind(&self) -> Symbol {
         self.0.kind()
     }
 
@@ -336,7 +336,7 @@ trait UnboxableDynamicValue: Debug + Send + Sync {
 
     fn is_truthy(&self) -> bool;
     fn as_i64(&self) -> Option<i64>;
-    fn kind(&self) -> &'static str;
+    fn kind(&self) -> Symbol;
     fn partial_eq(&self, other: &Value) -> Option<bool>;
     fn partial_cmp(&self, other: &Value) -> Option<Ordering>;
     fn checked_add(&self, other: &Value, is_reverse: bool) -> Result<Option<Value>, FaultKind>;
@@ -388,7 +388,7 @@ where
         self.value().as_i64()
     }
 
-    fn kind(&self) -> &'static str {
+    fn kind(&self) -> Symbol {
         self.value().kind()
     }
 

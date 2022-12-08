@@ -14,7 +14,7 @@ use std::{
 
 use crate::{
     symbol::Symbol, Comparison, Environment, Error, FromStack, Noop, StringLiteralDisplay, Value,
-    ValueOrSource, VirtualMachine,
+    ValueKind, ValueOrSource, VirtualMachine,
 };
 
 pub mod asm;
@@ -253,6 +253,17 @@ pub enum Instruction<Intrinsic> {
         /// The destination for the result to be stored in.
         destination: Destination,
     },
+    /// Converts a value to another type, storing the result in `destination`.
+    ///
+    /// If `value` cannot be converted, a fault will be returned.
+    Convert {
+        /// The left hand side of the operation.
+        value: LiteralOrSource,
+        /// The type to convert to.
+        kind: ValueKind,
+        /// The destination for the converted value to be stored in.
+        destination: Destination,
+    },
     /// Performs a bitwise shift left of `left` by `right` bits, storing
     /// the result in `destination`.
     ///
@@ -466,6 +477,13 @@ where
             }
             Instruction::BitwiseNot { value, destination } => {
                 write!(f, "bitnot {value} {destination}")
+            }
+            Instruction::Convert {
+                value,
+                kind,
+                destination,
+            } => {
+                write!(f, "convert {value} {kind} {destination}")
             }
             Instruction::If {
                 condition,
@@ -1210,6 +1228,15 @@ where
         },
         Instruction::BitwiseNot { value, destination } => crate::Instruction::BitwiseNot {
             value: value.instantiate::<S::Environment>(),
+            destination: destination.into(),
+        },
+        Instruction::Convert {
+            value,
+            kind,
+            destination,
+        } => crate::Instruction::Convert {
+            value: value.instantiate::<S::Environment>(),
+            kind: kind.clone(),
             destination: destination.into(),
         },
         Instruction::If {

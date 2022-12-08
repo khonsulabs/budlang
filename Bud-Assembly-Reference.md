@@ -181,6 +181,21 @@ to the next instruction.
 Pushes a value to the stack from another location. This is primarily used when
 passing arguments to functions.
 
+## Convert
+
+`convert <LiteralOrSource> <Kind> <Destination>`
+
+Converts a value to another kind. The runtime supports these types:
+
+- `Integer`: Converts the value to a 64-bit signed integer
+- `Real`: Converts the value to a 64-bit floating point value
+- `Boolean`: Converts the value to a boolean by evaluating its truthiness.
+
+Any other identifiers will be considered a Dynamic kind, and the environment is
+responsible for performing those conversions.
+
+If the value cannot be converted, a fault will be returned.
+
 ## Load
 
 `load <LiteralOrSource> <Variable>`

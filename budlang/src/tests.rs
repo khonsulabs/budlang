@@ -97,8 +97,8 @@ impl DynamicValue for TestDynamic {
         true
     }
 
-    fn kind(&self) -> &'static str {
-        "TestDynamic"
+    fn kind(&self) -> Symbol {
+        Symbol::from("TestDynamic")
     }
 
     fn call(&self, name: &Symbol, _args: &mut PoppedValues<'_>) -> Result<Value, FaultKind> {
