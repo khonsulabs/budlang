@@ -1332,6 +1332,47 @@
 <span id="1332">1332</span>
 <span id="1333">1333</span>
 <span id="1334">1334</span>
+<span id="1335">1335</span>
+<span id="1336">1336</span>
+<span id="1337">1337</span>
+<span id="1338">1338</span>
+<span id="1339">1339</span>
+<span id="1340">1340</span>
+<span id="1341">1341</span>
+<span id="1342">1342</span>
+<span id="1343">1343</span>
+<span id="1344">1344</span>
+<span id="1345">1345</span>
+<span id="1346">1346</span>
+<span id="1347">1347</span>
+<span id="1348">1348</span>
+<span id="1349">1349</span>
+<span id="1350">1350</span>
+<span id="1351">1351</span>
+<span id="1352">1352</span>
+<span id="1353">1353</span>
+<span id="1354">1354</span>
+<span id="1355">1355</span>
+<span id="1356">1356</span>
+<span id="1357">1357</span>
+<span id="1358">1358</span>
+<span id="1359">1359</span>
+<span id="1360">1360</span>
+<span id="1361">1361</span>
+<span id="1362">1362</span>
+<span id="1363">1363</span>
+<span id="1364">1364</span>
+<span id="1365">1365</span>
+<span id="1366">1366</span>
+<span id="1367">1367</span>
+<span id="1368">1368</span>
+<span id="1369">1369</span>
+<span id="1370">1370</span>
+<span id="1371">1371</span>
+<span id="1372">1372</span>
+<span id="1373">1373</span>
+<span id="1374">1374</span>
+<span id="1375">1375</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)] </span><span class="comment">// TODO docs and panics for ast
 
 </span><span class="kw">use </span>std::{
@@ -1345,7 +1386,7 @@
         <span class="self">self</span>, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, LinkError, Literal,
         LiteralOrSource, LoopScope, Module, Scope, ScopeSymbol, ScopeSymbolKind,
     },
-    Comparison, Symbol,
+    Comparison, Symbol, ValueKind,
 };
 
 <span class="kw">use </span><span class="kw">crate</span>::Intrinsic;
@@ -1424,6 +1465,11 @@
             Node::Not(op) =&gt; f
                 .debug_struct(<span class="string">&quot;Not&quot;</span>)
                 .field(<span class="string">&quot;expr&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.node(op.expr))
+                .finish(),
+            Node::Convert(op) =&gt; f
+                .debug_struct(<span class="string">&quot;Convert&quot;</span>)
+                .field(<span class="string">&quot;expr&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.node(op.expr))
+                .field(<span class="string">&quot;kind&quot;</span>, <span class="kw-2">&amp;</span>op.kind)
                 .finish(),
             Node::Assign(assign) =&gt; f
                 .debug_struct(<span class="string">&quot;Assign&quot;</span>)
@@ -1510,7 +1556,8 @@
     If(If),
     BinOp(BinOp),
     Not(Not), <span class="comment">// Upgrade to UnaryOp if we add more
-    </span>Assign(Assign),
+    </span>Convert(Convert),
+    Assign(Assign),
     <span class="comment">// UnaryOp(UnaryOp),
     </span>Block(Block),
     Literal(Literal),
@@ -1536,6 +1583,7 @@
             Node::If(if_expr) =&gt; if_expr.generate_code(result, operations, tree),
             Node::BinOp(bin_op) =&gt; bin_op.generate_code(result, operations, tree),
             Node::Not(not) =&gt; not.generate_code(result, operations, tree),
+            Node::Convert(convert) =&gt; convert.generate_code(result, operations, tree),
             Node::Block(statements) =&gt; {
                 <span class="kw">let </span><span class="kw-2">mut </span>last_result_var = <span class="prelude-val">None</span>;
                 <span class="kw">for </span>statement <span class="kw">in </span><span class="kw-2">&amp;</span>statements.<span class="number">0 </span>{
@@ -1935,6 +1983,36 @@
                 }
             }
         }
+        <span class="prelude-val">Ok</span>(())
+    }
+}
+
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>Convert {
+    expr: NodeId,
+    kind: ValueKind,
+}
+
+<span class="kw">impl </span>Convert {
+    <span class="kw">fn </span>generate_code(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        result: Destination,
+        operations: <span class="kw-2">&amp;mut </span>CodeBlockBuilder&lt;Intrinsic&gt;,
+        tree: <span class="kw-2">&amp;</span>ExpressionTree,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), CompilationError&gt; {
+        <span class="kw">let </span>value = operations.new_temporary_variable();
+        tree.node(<span class="self">self</span>.expr).generate_code(
+            Destination::Variable(value.clone()),
+            operations,
+            tree,
+        )<span class="question-mark">?</span>;
+        <span class="kw">let </span>value = LiteralOrSource::Variable(value);
+        operations.push(Instruction::Convert {
+            value,
+            kind: <span class="self">self</span>.kind.clone(),
+            destination: result,
+        });
+
         <span class="prelude-val">Ok</span>(())
     }
 }
@@ -2417,6 +2495,10 @@
 
     <span class="kw">pub fn </span>binop_node(<span class="kw-2">&amp;</span><span class="self">self</span>, kind: BinOpKind, left: NodeId, right: NodeId) -&gt; NodeId {
         <span class="self">self</span>.push(Node::BinOp(BinOp { kind, left, right }))
+    }
+
+    <span class="kw">pub fn </span>convert_node(<span class="kw-2">&amp;</span><span class="self">self</span>, expr: NodeId, kind: ValueKind) -&gt; NodeId {
+        <span class="self">self</span>.push(Node::Convert(Convert { expr, kind }))
     }
 
     <span class="kw">pub fn </span>compare_node(<span class="kw-2">&amp;</span><span class="self">self</span>, comparison: Comparison, left: NodeId, right: NodeId) -&gt; NodeId {

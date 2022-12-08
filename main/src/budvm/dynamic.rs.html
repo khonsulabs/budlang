@@ -468,6 +468,26 @@
 <span id="468">468</span>
 <span id="469">469</span>
 <span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     any::{Any, TypeId},
     cmp::Ordering,
@@ -499,6 +519,16 @@
     /// operations such as bitwise operations.
     </span><span class="attribute">#[must_use]
     </span><span class="kw">fn </span>as_i64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;i64&gt; {
+        <span class="prelude-val">None
+    </span>}
+
+    <span class="doccomment">/// Converts this value to the given kind, if possible.
+    ///
+    /// If this function returns None, the virtual machine will return a fault
+    /// from the conversion operation.
+    </span><span class="attribute">#[must_use]
+    #[allow(unused_variables)]
+    </span><span class="kw">fn </span>convert(<span class="kw-2">&amp;</span><span class="self">self</span>, kind: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
         <span class="prelude-val">None
     </span>}
 
@@ -725,6 +755,12 @@
         <span class="self">self</span>.<span class="number">0</span>.as_i64()
     }
 
+    <span class="doccomment">/// Returns the result of [`DynamicValue::convert()`] for the wrapped value.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub fn </span>convert(<span class="kw-2">&amp;</span><span class="self">self</span>, kind: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.convert(kind)
+    }
+
     <span class="doccomment">/// Returns the inverse of [`DynamicValue::is_truthy()`] for the wrapped
     /// value.
     </span><span class="attribute">#[must_use]
@@ -806,6 +842,7 @@
 
     <span class="kw">fn </span>is_truthy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
     <span class="kw">fn </span>as_i64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;i64&gt;;
+    <span class="kw">fn </span>convert(<span class="kw-2">&amp;</span><span class="self">self</span>, kind: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt;;
     <span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Symbol;
     <span class="kw">fn </span>partial_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt;;
     <span class="kw">fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt;;
@@ -856,6 +893,9 @@
 
     <span class="kw">fn </span>as_i64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;i64&gt; {
         <span class="self">self</span>.value().as_i64()
+    }
+    <span class="kw">fn </span>convert(<span class="kw-2">&amp;</span><span class="self">self</span>, kind: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="prelude-ty">Option</span>&lt;Value&gt; {
+        <span class="self">self</span>.value().convert(kind)
     }
 
     <span class="kw">fn </span>kind(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Symbol {

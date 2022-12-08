@@ -907,11 +907,6 @@
 <span id="907">907</span>
 <span id="908">908</span>
 <span id="909">909</span>
-<span id="910">910</span>
-<span id="911">911</span>
-<span id="912">912</span>
-<span id="913">913</span>
-<span id="914">914</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(missing_docs, clippy::missing_panics_doc)]
 </span><span class="doccomment">//! Bud Assembly Language
 //!
@@ -1498,12 +1493,7 @@
     <span class="kw">fn </span>parse_convert(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), AsmError&gt; {
         <span class="kw">let </span>value = <span class="self">self</span>.expect_literal_or_source()<span class="question-mark">?</span>;
         <span class="kw">let </span>(kind, <span class="kw">_</span>) = <span class="self">self</span>.expect_identifier(<span class="string">&quot;value kind&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>kind = <span class="kw">match </span><span class="kw-2">&amp;*</span>kind {
-            <span class="string">&quot;Integer&quot; </span>=&gt; ValueKind::Integer,
-            <span class="string">&quot;Real&quot; </span>=&gt; ValueKind::Real,
-            <span class="string">&quot;Boolean&quot; </span>=&gt; ValueKind::Boolean,
-            <span class="kw">_ </span>=&gt; ValueKind::Dynamic(kind),
-        };
+        <span class="kw">let </span>kind = ValueKind::from(kind);
         <span class="kw">let </span>destination = <span class="self">self</span>.expect_destination()<span class="question-mark">?</span>;
         <span class="self">self</span>.current_function.push(Instruction::Convert {
             value,
