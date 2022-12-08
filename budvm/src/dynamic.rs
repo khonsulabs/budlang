@@ -32,6 +32,16 @@ pub trait DynamicValue: Send + Sync + Debug + 'static {
         None
     }
 
+    /// Converts this value to the given kind, if possible.
+    ///
+    /// If this function returns None, the virtual machine will return a fault
+    /// from the conversion operation.
+    #[must_use]
+    #[allow(unused_variables)]
+    fn convert(&self, kind: &Symbol) -> Option<Value> {
+        None
+    }
+
     /// Returns true if self and other are considered equal. Returns false if
     /// self and other are able to be compared but are not equal. Returns None
     /// if the values are unable to be compared.
@@ -255,6 +265,12 @@ impl Dynamic {
         self.0.as_i64()
     }
 
+    /// Returns the result of [`DynamicValue::convert()`] for the wrapped value.
+    #[must_use]
+    pub fn convert(&self, kind: &Symbol) -> Option<Value> {
+        self.0.convert(kind)
+    }
+
     /// Returns the inverse of [`DynamicValue::is_truthy()`] for the wrapped
     /// value.
     #[must_use]
@@ -336,6 +352,7 @@ trait UnboxableDynamicValue: Debug + Send + Sync {
 
     fn is_truthy(&self) -> bool;
     fn as_i64(&self) -> Option<i64>;
+    fn convert(&self, kind: &Symbol) -> Option<Value>;
     fn kind(&self) -> Symbol;
     fn partial_eq(&self, other: &Value) -> Option<bool>;
     fn partial_cmp(&self, other: &Value) -> Option<Ordering>;
@@ -386,6 +403,9 @@ where
 
     fn as_i64(&self) -> Option<i64> {
         self.value().as_i64()
+    }
+    fn convert(&self, kind: &Symbol) -> Option<Value> {
+        self.value().convert(kind)
     }
 
     fn kind(&self) -> Symbol {

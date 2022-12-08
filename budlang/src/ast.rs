@@ -11,7 +11,7 @@ use budvm::{
         self, CodeBlockBuilder, CompareAction, Destination, Instruction, Label, LinkError, Literal,
         LiteralOrSource, LoopScope, Module, Scope, ScopeSymbol, ScopeSymbolKind,
     },
-    Comparison, Symbol,
+    Comparison, Symbol, ValueKind,
 };
 
 use crate::Intrinsic;
@@ -90,6 +90,11 @@ impl<'a> Debug for ExpressionTreeNode<'a> {
             Node::Not(op) => f
                 .debug_struct("Not")
                 .field("expr", &self.node(op.expr))
+                .finish(),
+            Node::Convert(op) => f
+                .debug_struct("Convert")
+                .field("expr", &self.node(op.expr))
+                .field("kind", &op.kind)
                 .finish(),
             Node::Assign(assign) => f
                 .debug_struct("Assign")
@@ -176,6 +181,7 @@ enum Node {
     If(If),
     BinOp(BinOp),
     Not(Not), // Upgrade to UnaryOp if we add more
+    Convert(Convert),
     Assign(Assign),
     // UnaryOp(UnaryOp),
     Block(Block),
@@ -202,6 +208,7 @@ impl Node {
             Node::If(if_expr) => if_expr.generate_code(result, operations, tree),
             Node::BinOp(bin_op) => bin_op.generate_code(result, operations, tree),
             Node::Not(not) => not.generate_code(result, operations, tree),
+            Node::Convert(convert) => convert.generate_code(result, operations, tree),
             Node::Block(statements) => {
                 let mut last_result_var = None;
                 for statement in &statements.0 {
@@ -601,6 +608,36 @@ impl Not {
                 }
             }
         }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct Convert {
+    expr: NodeId,
+    kind: ValueKind,
+}
+
+impl Convert {
+    fn generate_code(
+        &self,
+        result: Destination,
+        operations: &mut CodeBlockBuilder<Intrinsic>,
+        tree: &ExpressionTree,
+    ) -> Result<(), CompilationError> {
+        let value = operations.new_temporary_variable();
+        tree.node(self.expr).generate_code(
+            Destination::Variable(value.clone()),
+            operations,
+            tree,
+        )?;
+        let value = LiteralOrSource::Variable(value);
+        operations.push(Instruction::Convert {
+            value,
+            kind: self.kind.clone(),
+            destination: result,
+        });
+
         Ok(())
     }
 }
@@ -1083,6 +1120,10 @@ impl SyntaxTreeBuilder {
 
     pub fn binop_node(&self, kind: BinOpKind, left: NodeId, right: NodeId) -> NodeId {
         self.push(Node::BinOp(BinOp { kind, left, right }))
+    }
+
+    pub fn convert_node(&self, expr: NodeId, kind: ValueKind) -> NodeId {
+        self.push(Node::Convert(Convert { expr, kind }))
     }
 
     pub fn compare_node(&self, comparison: Comparison, left: NodeId, right: NodeId) -> NodeId {

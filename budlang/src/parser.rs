@@ -20,7 +20,7 @@ use budvm::{
         decode_numeric_literal, decode_string_literal_contents, DecodeNumericError,
         DecodeStringError, DoublePeekable, Numeric,
     },
-    Comparison, Symbol,
+    Comparison, Symbol, ValueKind,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -826,17 +826,40 @@ fn parse_comparison_expression(
     tokens: &mut Lexer<'_>,
     owning_function_name: Option<&str>,
 ) -> Result<NodeId, ParseError> {
-    let mut left = parse_bitwise_expression(first_token, tree, tokens, owning_function_name)?;
+    let mut left = parse_convert_expression(first_token, tree, tokens, owning_function_name)?;
 
     while let Some(TokenKind::Comparison(comparison)) = tokens.peek_token_kind() {
         let comparison = *comparison;
         let _op_token = tokens.next();
         let next_token = tokens.expect_next("value to compare against")?;
-        let right = parse_bitwise_expression(next_token, tree, tokens, owning_function_name)?;
+        let right = parse_convert_expression(next_token, tree, tokens, owning_function_name)?;
         left = tree.compare_node(comparison, left, right);
     }
 
     Ok(left)
+}
+
+fn parse_convert_expression(
+    first_token: Token,
+    tree: &SyntaxTreeBuilder,
+    tokens: &mut Lexer<'_>,
+    owning_function_name: Option<&str>,
+) -> Result<NodeId, ParseError> {
+    let mut expr = parse_bitwise_expression(first_token, tree, tokens, owning_function_name)?;
+
+    while matches!(tokens.peek_token_kind(), Some(TokenKind::Identifier(sym)) if sym == "as") {
+        let _op_token = tokens.next();
+        let conversion_type = tokens.expect_next("conversion type")?;
+        let kind = if let TokenKind::Identifier(kind) = &conversion_type.kind {
+            ValueKind::from(kind.clone())
+        } else {
+            return Err(ParseError::Unexpected(conversion_type));
+        };
+
+        expr = tree.convert_node(expr, kind);
+    }
+
+    Ok(expr)
 }
 
 fn parse_bitwise_expression(

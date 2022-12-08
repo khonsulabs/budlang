@@ -774,6 +774,44 @@ impl Value {
         }
     }
 
+    /// Converts this value to another kind, if possible.
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+    pub fn convert<Env>(&self, kind: &ValueKind, environment: &Env) -> Result<Self, FaultKind>
+    where
+        Env: Environment,
+    {
+        let converted = match kind {
+            ValueKind::Integer => match self {
+                Value::Void => None,
+                Value::Integer(value) => Some(Value::Integer(*value)),
+                Value::Real(value) => Some(Value::Integer(*value as i64)),
+                Value::Boolean(value) => {
+                    if *value {
+                        Some(Value::Integer(1))
+                    } else {
+                        Some(Value::Integer(0))
+                    }
+                }
+                Value::Dynamic(value) => value.as_i64().map(Value::Integer),
+            },
+            ValueKind::Real => match self {
+                Value::Integer(value) => Some(Value::Real(*value as f64)),
+                Value::Real(value) => Some(Value::Real(*value)),
+                _ => None,
+            },
+            ValueKind::Boolean => Some(Value::Boolean(self.is_truthy())),
+            ValueKind::Dynamic(kind) => Some(environment.convert(self, kind)?),
+            ValueKind::Void => None,
+        };
+
+        converted.ok_or_else(|| {
+            FaultKind::invalid_type(
+                format!("@received-kind cannot be converted to {kind}"),
+                self.clone(),
+            )
+        })
+    }
+
     /// Returns true if the value is considered truthy.
     ///
     /// | value type | condition     |
@@ -1029,6 +1067,28 @@ impl ValueKind {
             ValueKind::Boolean => "Boolean",
             ValueKind::Void => "Void",
             ValueKind::Dynamic(name) => name,
+        }
+    }
+}
+
+impl<'a> From<&'a str> for ValueKind {
+    fn from(kind: &'a str) -> Self {
+        match kind {
+            "Integer" => ValueKind::Integer,
+            "Real" => ValueKind::Real,
+            "Boolean" => ValueKind::Boolean,
+            _ => ValueKind::Dynamic(Symbol::from(kind)),
+        }
+    }
+}
+
+impl From<Symbol> for ValueKind {
+    fn from(kind: Symbol) -> Self {
+        match &*kind {
+            "Integer" => ValueKind::Integer,
+            "Real" => ValueKind::Real,
+            "Boolean" => ValueKind::Boolean,
+            _ => ValueKind::Dynamic(kind),
         }
     }
 }
@@ -2330,24 +2390,9 @@ where
         destination: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
         let value = self.resolve_value_or_source(value)?;
-        let converted = match kind {
-            ValueKind::Integer => value.as_i64().map(Value::Integer),
-            ValueKind::Real => value.as_f64().map(Value::Real),
-            ValueKind::Boolean => Some(Value::Boolean(value.is_truthy())),
-            ValueKind::Dynamic(_) => todo!("add convert() to Environment"),
-            ValueKind::Void => None,
-        };
+        *self.resolve_value_source_mut(destination)? = value.convert(kind, self.environment)?;
 
-        if let Some(converted) = converted {
-            *self.resolve_value_source_mut(destination)? = converted;
-
-            Ok(None)
-        } else {
-            Err(Fault::from(FaultKind::invalid_type(
-                format!("@received-kind cannot be converted to {kind}"),
-                value.clone(),
-            )))
-        }
+        Ok(None)
     }
 
     fn extract_integer(value: &Value) -> Result<i64, Fault<'static, Env, Output>> {
@@ -2941,7 +2986,7 @@ fn sizes() {
 /// Customizes the behavior of a virtual machine instance.
 pub trait Environment: 'static {
     /// The string type for this environment.
-    type String: DynamicValue + for<'a> From<&'a str>;
+    type String: DynamicValue + for<'a> From<&'a str> + From<String>;
 
     /// The intrinsics offered by this environment.
     type Intrinsic: Clone + PartialEq + Display + Debug + FromStr;
@@ -2966,6 +3011,53 @@ pub trait Environment: 'static {
     /// resumed, the first function call will be before executing the same
     /// instruction as the one when [`ExecutionBehavior::Pause`] was called.
     fn step(&mut self) -> ExecutionBehavior;
+
+    /// Converts `value` to a custom type supported by the runtime.
+    ///
+    /// The provided implementation supports the `String` type.
+    fn convert(&self, value: &Value, kind: &Symbol) -> Result<Value, FaultKind> {
+        if kind == "String" {
+            self.convert_string(value)
+        } else {
+            Err(FaultKind::invalid_type(
+                format!("@received-kind cannot be converted to {kind}"),
+                value.clone(),
+            ))
+        }
+    }
+
+    /// Converts `value` to a [`Value`] containing an instance of `Self::String`.
+    ///
+    /// The provided implementation supports the `String` type.
+    fn convert_string(&self, value: &Value) -> Result<Value, FaultKind> {
+        match value {
+            Value::Void => return Ok(Value::dynamic(<Self::String as From<&str>>::from(""))),
+            Value::Integer(value) => {
+                return Ok(Value::dynamic(<Self::String as From<String>>::from(
+                    value.to_string(),
+                )))
+            }
+            Value::Real(value) => {
+                return Ok(Value::dynamic(<Self::String as From<String>>::from(
+                    value.to_string(),
+                )))
+            }
+            Value::Boolean(value) => {
+                return Ok(Value::dynamic(<Self::String as From<String>>::from(
+                    value.to_string(),
+                )))
+            }
+            Value::Dynamic(value) => {
+                if let Some(value) = value.convert(&Symbol::from("String")) {
+                    return Ok(value);
+                }
+            }
+        }
+        Err(FaultKind::invalid_type(
+            "@received-kind cannot be converted to String",
+            value.clone(),
+        ))
+    }
 }
 
 impl Environment for () {

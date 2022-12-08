@@ -248,6 +248,19 @@ true or not_called()
 false and not_called()
 ```
 
+### As Expressions (Type Conversion/Casting)
+
+To convert from one type to another, use the `as` expression:
+
+```bud
+1 as String // produces "1"
+1.2 as Integer // produces 1
+"hello" as Boolean // produces true
+```
+
+The built-in type names are Integer, Real, Boolean, String, List, and Map. The
+runtime can be extended with additional dynamic types.
+
 ### Bitwise Binary Expressions
 
 Bitwise binary expresssions use the `&`, `|`, `^`, `<<` and `>>` symbols that

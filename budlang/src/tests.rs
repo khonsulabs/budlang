@@ -630,3 +630,13 @@ fn bitwise() {
     assert_run!("8 >> 3", 1);
     assert_run!("1 >> 64", 0);
 }
+
+#[test]
+fn conversions() {
+    assert_run!("1 as String", Value::dynamic(String::from("1")));
+    assert_run!("1 as Real", Value::Real(1.0));
+    assert_run!("1 as Integer", Value::Integer(1));
+    assert_run!("1 as Boolean", Value::Boolean(true));
+    assert_run!("0 as Boolean", Value::Boolean(false));
+    assert_run!("1.2 as Integer", Value::Integer(1));
+}

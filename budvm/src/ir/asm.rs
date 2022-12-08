@@ -584,12 +584,7 @@ where
     fn parse_convert(&mut self) -> Result<(), AsmError> {
         let value = self.expect_literal_or_source()?;
         let (kind, _) = self.expect_identifier("value kind")?;
-        let kind = match &*kind {
-            "Integer" => ValueKind::Integer,
-            "Real" => ValueKind::Real,
-            "Boolean" => ValueKind::Boolean,
-            _ => ValueKind::Dynamic(kind),
-        };
+        let kind = ValueKind::from(kind);
         let destination = self.expect_destination()?;
         self.current_function.push(Instruction::Convert {
             value,

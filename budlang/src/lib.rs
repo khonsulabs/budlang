@@ -334,7 +334,7 @@ where
 /// Customizes the behavior of a virtual machine instance.
 pub trait Environment: 'static {
     /// The string type for this environment.
-    type String: DynamicValue + for<'a> From<&'a str>;
+    type String: DynamicValue + for<'a> From<&'a str> + From<String>;
     /// The map type for this environment.
     type Map: DynamicValue + for<'a> TryFrom<PoppedValues<'a>, Error = FaultKind>;
     /// The list (array) type for this environment.
@@ -351,6 +351,14 @@ pub trait Environment: 'static {
     /// before executing the same instruction as the one when
     /// [`ExecutionBehavior::Pause`] was called.
     fn step(&mut self) -> ExecutionBehavior;
+
+    /// Converts `value` to a custom type supported by the runtime.
+    fn convert(&self, value: &Value, kind: &Symbol) -> Result<Value, FaultKind> {
+        Err(FaultKind::invalid_type(
+            format!("@received-kind cannot be converted to {kind}"),
+            value.clone(),
+        ))
+    }
 }
 
 /// A wrapper for a [`Environment`] that implements [`budvm::Environment`].
@@ -385,6 +393,14 @@ where
                 <T::Map as TryFrom<PoppedValues<'_>>>::try_from(args)?,
             )),
             Intrinsic::NewList => Ok(Value::dynamic(args.collect::<T::List>())),
+        }
+    }
+
+    fn convert(&self, value: &Value, kind: &Symbol) -> Result<Value, FaultKind> {
+        if kind == "String" {
+            self.convert_string(value)
+        } else {
+            T::convert(self, value, kind)
         }
     }
 }
