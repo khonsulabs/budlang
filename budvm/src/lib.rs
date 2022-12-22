@@ -1422,68 +1422,47 @@ where
         }
     }
 
-    /// Runs a set of instructions.
+    /// Runs a set of instructions, allocating space for `variable_count`
+    /// variables to be used by `instructions`. When this function returns, the
+    /// stack space for the variables will be removed.
     pub fn run<'a, Output: FromStack>(
         &'a mut self,
-        operations: Cow<'a, [Instruction<Env::Intrinsic>]>,
+        instructions: Cow<'a, [Instruction<Env::Intrinsic>]>,
         variable_count: usize,
     ) -> Result<Output, Fault<'a, Env, Output>> {
-        if variable_count > 0 {
-            self.stack.grow_by(variable_count)?;
-        }
-        self.run_interactive(operations, variable_count, true)
+        self.run_internal(instructions, variable_count, false)
     }
 
-    // /// Evaluates `source` interactively and returns the provided result.
-    // ///
-    // /// Bud is a compiled language. When compiling a chunk of source code, it is
-    // /// organized into a series of declarations. If any non-declaration
-    // /// statements are encountered, they are gathered into an initialization
-    // /// function.
-    // ///
-    // /// The difference between this function and [`Bud::run_source()`] is that
-    // /// the initialization function will be compiled with existing knowledge of
-    // /// any local variables defined in previous code evaluated on this instance.
-    // /// [`Bud::run_source()`] always executes the initialization code in its own
-    // /// environment, preventing persisting variables across invoations.
-    // pub fn evaluate<'a, ReturnType: FromStack>(
-    //     &'a mut self,
-    //     source: &str,
-    // ) -> Result<ReturnType, Error<'a, Env, ReturnType>> {
-    //     let previous_variable_count = self.init_variables.len();
-    //     let unit = parse(source)?.compile(self)?;
-    //     for function in unit.vtable {
-    //         if let (Some(name), Ok(_)) = (&function.name, env::var("PRINT_IR")) {
-    //             println!("function {}", name);
-    //         }
-    //         function.compile_into(self)?;
-    //     }
-
-    //     if let Some(init) = &unit.init {
-    //         if env::var("PRINT_IR").is_ok() {
-    //             println!("function init");
-    //         }
-
-    //         let function = init.compile(self)?;
-    //         let new_variables = self.init_variables.len() - previous_variable_count;
-    //         if new_variables > 0 {
-    //             self.stack.grow_by(new_variables)?;
-    //         }
-
-    //         self.run_interactive(Cow::Owned(function.code), self.init_variables.len(), false)
-    //             .map_err(Error::from)
-    //     } else {
-    //         ReturnType::from_value(Value::Void).map_err(Error::from)
-    //     }
-    // }
-
     /// Runs a set of instructions without modifying the stack before executing.
+    ///
+    /// The top `variable_count` slots on the stack are considered variables
+    /// while executing `instructions`.
+    ///
+    /// When the execution finishes, the stack will not be truncated in any way.
+    ///
+    /// This function can be used to build an interactive environment, like a
+    /// [REPL][repl].
+    ///
+    /// [repl]:
+    ///     https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop
     pub fn run_interactive<'a, Output: FromStack>(
         &'a mut self,
-        operations: Cow<'a, [Instruction<Env::Intrinsic>]>,
+        instructions: Cow<'a, [Instruction<Env::Intrinsic>]>,
         variable_count: usize,
-        pop_variables: bool,
     ) -> Result<Output, Fault<'a, Env, Output>> {
+        self.run_internal(instructions, variable_count, true)
+    }
+
+    fn run_internal<'a, Output: FromStack>(
+        &'a mut self,
+        instructions: Cow<'a, [Instruction<Env::Intrinsic>]>,
+        variable_count: usize,
+        interactive: bool,
+    ) -> Result<Output, Fault<'a, Env, Output>> {
+        if !interactive && variable_count > 0 {
+            self.stack.grow_by(variable_count)?;
+        }
+
         let return_offset = self.stack.len();
         let variables_offset = return_offset
             .checked_sub(variable_count)
@@ -1501,7 +1480,7 @@ where
             operation_index: 0,
             _output: PhantomData,
         }
-        .execute_operations(&operations))
+        .execute_operations(&instructions))
         {
             Err(Fault {
                 kind: FaultOrPause::Pause(paused_evaluation),
@@ -1509,7 +1488,7 @@ where
             }) => {
                 let paused_evaluation = PausedExecution {
                     context: Some(self),
-                    operations: Some(operations),
+                    operations: Some(instructions),
                     stack: paused_evaluation.stack,
                     _return: PhantomData,
                 };
@@ -1520,10 +1499,10 @@ where
             }
             other => other?,
         };
-        if pop_variables {
-            self.stack.truncate(variables_offset);
-        } else {
+        if interactive {
             self.stack.truncate(return_offset);
+        } else {
+            self.stack.truncate(variables_offset);
         }
         Output::from_value(returned_value).map_err(Fault::from)
     }

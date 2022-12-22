@@ -622,6 +622,25 @@ pub enum LiteralOrSource {
     Variable(Variable),
 }
 
+macro_rules! impl_simple_enum_from {
+    ($enum:ident, $from_type:ident) => {
+        impl From<$from_type> for $enum {
+            fn from(value: $from_type) -> Self {
+                Self::$from_type(value)
+            }
+        }
+        impl<'a> From<&'a $from_type> for $enum {
+            fn from(value: &'a $from_type) -> Self {
+                Self::$from_type(value.clone())
+            }
+        }
+    };
+}
+
+impl_simple_enum_from!(LiteralOrSource, Literal);
+impl_simple_enum_from!(LiteralOrSource, Argument);
+impl_simple_enum_from!(LiteralOrSource, Variable);
+
 impl LiteralOrSource {
     /// Instantiates this into a [`ValueOrSource`], promoting [`Literal`]s to
     /// [`Value`]s.
@@ -658,6 +677,8 @@ pub enum Destination {
     /// Store the value in the return register.
     Return,
 }
+
+impl_simple_enum_from!(Destination, Variable);
 
 impl Display for Destination {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1056,6 +1077,12 @@ pub struct CodeBlock<Intrinsic> {
 }
 
 impl<Intrinsic> CodeBlock<Intrinsic> {
+    /// Returns a builder for a new [`CodeBlock`].
+    #[must_use]
+    pub fn build() -> CodeBlockBuilder<Intrinsic> {
+        CodeBlockBuilder::default()
+    }
+
     /// Links the code block against `scope`, resolving all labels and function
     /// calls.
     #[allow(clippy::too_many_lines)]

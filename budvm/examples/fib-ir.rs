@@ -14,20 +14,20 @@ fn main() {
     // if n <= 2
     block.push(Instruction::Compare {
         comparison: Comparison::LessThanOrEqual,
-        left: LiteralOrSource::Argument(arg_n.clone()),
-        right: LiteralOrSource::Literal(Literal::Integer(2)),
+        left: LiteralOrSource::from(&arg_n),
+        right: LiteralOrSource::from(Literal::Integer(2)),
         action: CompareAction::JumpIfFalse(if_greater_than_two.clone()),
     });
     // return 1
-    block.push(Instruction::Return(Some(LiteralOrSource::Literal(
+    block.push(Instruction::Return(Some(LiteralOrSource::from(
         Literal::Integer(1),
     ))));
     // else (#if_greater_than_two)
     block.label(if_greater_than_two);
     // n - 1, push result to stack
     block.push(Instruction::Sub {
-        left: LiteralOrSource::Argument(arg_n.clone()),
-        right: LiteralOrSource::Literal(Literal::Integer(1)),
+        left: LiteralOrSource::from(&arg_n),
+        right: LiteralOrSource::from(Literal::Integer(1)),
         destination: Destination::Stack,
     });
     // recurse call, store result in a variable.
@@ -35,12 +35,12 @@ fn main() {
     block.push(Instruction::Call {
         function: None,
         arg_count: 1,
-        destination: Destination::Variable(n_minus_one.clone()),
+        destination: Destination::from(&n_minus_one),
     });
     // n - 2, push result to stack
     block.push(Instruction::Sub {
-        left: LiteralOrSource::Argument(arg_n),
-        right: LiteralOrSource::Literal(Literal::Integer(2)),
+        left: LiteralOrSource::from(arg_n),
+        right: LiteralOrSource::from(Literal::Integer(2)),
         destination: Destination::Stack,
     });
     // recurse call, store result in a variable.
@@ -48,16 +48,17 @@ fn main() {
     block.push(Instruction::Call {
         function: None,
         arg_count: 1,
-        destination: Destination::Variable(n_minus_two.clone()),
+        destination: Destination::from(&n_minus_two),
     });
     // Add the two variables together, and return the result.
     block.push(Instruction::Add {
-        left: LiteralOrSource::Variable(n_minus_one),
-        right: LiteralOrSource::Variable(n_minus_two),
+        left: LiteralOrSource::from(n_minus_one),
+        right: LiteralOrSource::from(n_minus_two),
         destination: Destination::Return,
     });
     let block = block.finish();
-    println!("IR: {block}");
+    println!("IR:");
+    println!("{block}");
 
     // The code block needs to be linked, which will convert the intermediate
     // representation into virtual machine instructions.

@@ -262,7 +262,7 @@ where
                 self.stack.grow_by(new_variables)?;
             }
 
-            self.run_interactive(Cow::Owned(function.code), variable_count, false)
+            self.run_interactive(Cow::Owned(function.code), variable_count)
                 .map_err(Error::from)
         } else {
             ReturnType::from_value(Value::Void).map_err(Error::from)
