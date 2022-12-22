@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budvm/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../budvm/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../budvm/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../budvm/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `budvm/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../budvm/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -3990,27 +3990,6 @@
 <span id="3990">3990</span>
 <span id="3991">3991</span>
 <span id="3992">3992</span>
-<span id="3993">3993</span>
-<span id="3994">3994</span>
-<span id="3995">3995</span>
-<span id="3996">3996</span>
-<span id="3997">3997</span>
-<span id="3998">3998</span>
-<span id="3999">3999</span>
-<span id="4000">4000</span>
-<span id="4001">4001</span>
-<span id="4002">4002</span>
-<span id="4003">4003</span>
-<span id="4004">4004</span>
-<span id="4005">4005</span>
-<span id="4006">4006</span>
-<span id="4007">4007</span>
-<span id="4008">4008</span>
-<span id="4009">4009</span>
-<span id="4010">4010</span>
-<span id="4011">4011</span>
-<span id="4012">4012</span>
-<span id="4013">4013</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -5435,68 +5414,47 @@
         }
     }
 
-    <span class="doccomment">/// Runs a set of instructions.
+    <span class="doccomment">/// Runs a set of instructions, allocating space for `variable_count`
+    /// variables to be used by `instructions`. When this function returns, the
+    /// stack space for the variables will be removed.
     </span><span class="kw">pub fn </span>run&lt;<span class="lifetime">&#39;a</span>, Output: FromStack&gt;(
         <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>,
-        operations: Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;,
+        instructions: Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;,
         variable_count: usize,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Output, Fault&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;&gt; {
-        <span class="kw">if </span>variable_count &gt; <span class="number">0 </span>{
-            <span class="self">self</span>.stack.grow_by(variable_count)<span class="question-mark">?</span>;
-        }
-        <span class="self">self</span>.run_interactive(operations, variable_count, <span class="bool-val">true</span>)
+        <span class="self">self</span>.run_internal(instructions, variable_count, <span class="bool-val">false</span>)
     }
 
-    <span class="comment">// /// Evaluates `source` interactively and returns the provided result.
-    // ///
-    // /// Bud is a compiled language. When compiling a chunk of source code, it is
-    // /// organized into a series of declarations. If any non-declaration
-    // /// statements are encountered, they are gathered into an initialization
-    // /// function.
-    // ///
-    // /// The difference between this function and [`Bud::run_source()`] is that
-    // /// the initialization function will be compiled with existing knowledge of
-    // /// any local variables defined in previous code evaluated on this instance.
-    // /// [`Bud::run_source()`] always executes the initialization code in its own
-    // /// environment, preventing persisting variables across invoations.
-    // pub fn evaluate&lt;&#39;a, ReturnType: FromStack&gt;(
-    //     &amp;&#39;a mut self,
-    //     source: &amp;str,
-    // ) -&gt; Result&lt;ReturnType, Error&lt;&#39;a, Env, ReturnType&gt;&gt; {
-    //     let previous_variable_count = self.init_variables.len();
-    //     let unit = parse(source)?.compile(self)?;
-    //     for function in unit.vtable {
-    //         if let (Some(name), Ok(_)) = (&amp;function.name, env::var(&quot;PRINT_IR&quot;)) {
-    //             println!(&quot;function {}&quot;, name);
-    //         }
-    //         function.compile_into(self)?;
-    //     }
-
-    //     if let Some(init) = &amp;unit.init {
-    //         if env::var(&quot;PRINT_IR&quot;).is_ok() {
-    //             println!(&quot;function init&quot;);
-    //         }
-
-    //         let function = init.compile(self)?;
-    //         let new_variables = self.init_variables.len() - previous_variable_count;
-    //         if new_variables &gt; 0 {
-    //             self.stack.grow_by(new_variables)?;
-    //         }
-
-    //         self.run_interactive(Cow::Owned(function.code), self.init_variables.len(), false)
-    //             .map_err(Error::from)
-    //     } else {
-    //         ReturnType::from_value(Value::Void).map_err(Error::from)
-    //     }
-    // }
-
-    </span><span class="doccomment">/// Runs a set of instructions without modifying the stack before executing.
+    <span class="doccomment">/// Runs a set of instructions without modifying the stack before executing.
+    ///
+    /// The top `variable_count` slots on the stack are considered variables
+    /// while executing `instructions`.
+    ///
+    /// When the execution finishes, the stack will not be truncated in any way.
+    ///
+    /// This function can be used to build an interactive environment, like a
+    /// [REPL][repl].
+    ///
+    /// [repl]:
+    ///     https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop
     </span><span class="kw">pub fn </span>run_interactive&lt;<span class="lifetime">&#39;a</span>, Output: FromStack&gt;(
         <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>,
-        operations: Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;,
+        instructions: Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;,
         variable_count: usize,
-        pop_variables: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Output, Fault&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;&gt; {
+        <span class="self">self</span>.run_internal(instructions, variable_count, <span class="bool-val">true</span>)
+    }
+
+    <span class="kw">fn </span>run_internal&lt;<span class="lifetime">&#39;a</span>, Output: FromStack&gt;(
+        <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>,
+        instructions: Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;,
+        variable_count: usize,
+        interactive: bool,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Output, Fault&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;&gt; {
+        <span class="kw">if </span>!interactive &amp;&amp; variable_count &gt; <span class="number">0 </span>{
+            <span class="self">self</span>.stack.grow_by(variable_count)<span class="question-mark">?</span>;
+        }
+
         <span class="kw">let </span>return_offset = <span class="self">self</span>.stack.len();
         <span class="kw">let </span>variables_offset = return_offset
             .checked_sub(variable_count)
@@ -5514,7 +5472,7 @@
             operation_index: <span class="number">0</span>,
             _output: PhantomData,
         }
-        .execute_operations(<span class="kw-2">&amp;</span>operations))
+        .execute_operations(<span class="kw-2">&amp;</span>instructions))
         {
             <span class="prelude-val">Err</span>(Fault {
                 kind: FaultOrPause::Pause(paused_evaluation),
@@ -5522,7 +5480,7 @@
             }) =&gt; {
                 <span class="kw">let </span>paused_evaluation = PausedExecution {
                     context: <span class="prelude-val">Some</span>(<span class="self">self</span>),
-                    operations: <span class="prelude-val">Some</span>(operations),
+                    operations: <span class="prelude-val">Some</span>(instructions),
                     stack: paused_evaluation.stack,
                     _return: PhantomData,
                 };
@@ -5533,10 +5491,10 @@
             }
             other =&gt; other<span class="question-mark">?</span>,
         };
-        <span class="kw">if </span>pop_variables {
-            <span class="self">self</span>.stack.truncate(variables_offset);
-        } <span class="kw">else </span>{
+        <span class="kw">if </span>interactive {
             <span class="self">self</span>.stack.truncate(return_offset);
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.stack.truncate(variables_offset);
         }
         Output::from_value(returned_value).map_err(Fault::from)
     }
@@ -8025,4 +7983,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="budvm" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="budvm" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0 (69f9c33d7 2022-12-12)" ></div></body></html>
