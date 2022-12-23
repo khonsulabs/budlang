@@ -15,7 +15,7 @@
         <div>
             <p class="heading">Lines</p>
             <p class="title has-text-success">
-                <abbr title="525 / 538">97.58 %</abbr></p>
+                <abbr title="526 / 539">97.59 %</abbr></p>
         </div>
     </div>
 
@@ -8315,7 +8315,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;1 as Real&quot;, Value::Real(1.0));</pre>
+                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;\&quot;1\&quot; as String&quot;, Value::dynamic(String::from(&quot;1&quot;)));</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -8328,7 +8328,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;1 as Integer&quot;, Value::Integer(1));</pre>
+                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;1 as Real&quot;, Value::Real(1.0));</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -8341,7 +8341,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;1 as Boolean&quot;, Value::Boolean(true));</pre>
+                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;1 as Integer&quot;, Value::Integer(1));</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -8354,7 +8354,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;0 as Boolean&quot;, Value::Boolean(false));</pre>
+                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;1 as Boolean&quot;, Value::Boolean(true));</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -8367,7 +8367,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;1.2 as Integer&quot;, Value::Integer(1));</pre>
+                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;0 as Boolean&quot;, Value::Boolean(false));</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -8380,12 +8380,25 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
+                <pre class="has-background-success-light py-0 px-2">    assert_run!(&quot;1.2 as Integer&quot;, Value::Integer(1));</pre>
+            </div>
+        </div><div class="columns p-0 m-0">
+            <div
+                class="column is-1 is-narrow p-0 has-text-centered"
+                id="643">
+                <a href="#643">643</a>
+            </div>
+            <div
+                class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
+                1
+            </div>
+            <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">}</pre>
             </div>
         </div></div>
         <footer class="footer">
             <div class="content has-text-centered">
-                <p class="heading">Date: 2022-12-23 04:17</p>
+                <p class="heading">Date: 2022-12-23 15:06</p>
             </div>
         </footer>
     </body>
