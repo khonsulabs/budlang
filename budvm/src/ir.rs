@@ -3,7 +3,7 @@
 //! This intermediate representation provides conveniences for handling
 //! variables, labels, and function calls.
 use std::{
-    borrow::{Borrow, BorrowMut, Cow},
+    borrow::{Borrow, BorrowMut},
     collections::HashMap,
     env,
     fmt::{Display, Write},
@@ -553,6 +553,36 @@ pub enum Literal {
     Boolean(bool),
     /// A string literal.
     String(String),
+}
+
+impl From<i64> for Literal {
+    fn from(value: i64) -> Self {
+        Self::Integer(value)
+    }
+}
+
+impl From<f64> for Literal {
+    fn from(value: f64) -> Self {
+        Self::Real(value)
+    }
+}
+
+impl From<bool> for Literal {
+    fn from(value: bool) -> Self {
+        Self::Boolean(value)
+    }
+}
+
+impl From<String> for Literal {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl<'a> From<&'a str> for Literal {
+    fn from(value: &'a str) -> Self {
+        Self::String(value.to_owned())
+    }
 }
 
 impl Literal {
@@ -1561,11 +1591,11 @@ where
             let vtable_index = init.link_into(context)?;
             context
                 .run(
-                    Cow::Owned(vec![crate::Instruction::Call {
+                    vec![crate::Instruction::Call {
                         vtable_index: Some(vtable_index),
                         arg_count: 0,
                         destination: crate::Destination::Stack,
-                    }]),
+                    }],
                     0,
                 )
                 .map_err(Error::from)

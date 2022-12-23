@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use budvm::{
     CompareAction, Comparison, Destination, Function, Instruction, Symbol, Value, ValueOrSource,
     VirtualMachine,
@@ -53,14 +51,14 @@ fn main() {
     let mut context = VirtualMachine::empty().with_function(fib);
     let result: i64 = context
         .run(
-            Cow::Borrowed(&[
+            &[
                 Instruction::Push(ValueOrSource::Value(Value::Integer(10))),
                 Instruction::Call {
                     vtable_index: Some(0),
                     arg_count: 1,
                     destination: Destination::Stack,
                 },
-            ]),
+            ],
             0,
         )
         .unwrap();

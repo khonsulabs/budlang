@@ -15,13 +15,12 @@
 
 use std::{
     any::{type_name, Any},
-    borrow::Cow,
     cmp::Ordering,
     collections::{HashMap as StdHashMap, VecDeque},
     fmt::{Debug, Display, Write},
     hash::{Hash, Hasher},
     marker::PhantomData,
-    ops::{Add, Bound, Div, Index, IndexMut, Mul, RangeBounds, Sub},
+    ops::{Add, Bound, Deref, Div, Index, IndexMut, Mul, RangeBounds, Sub},
     str::FromStr,
     sync::Arc,
     vec,
@@ -1254,14 +1253,14 @@ enum ModuleItem {
 /// let mut vm = VirtualMachine::empty().with_function(greet);
 /// let result: String = vm
 ///     .run(
-///         Cow::Borrowed(&[
+///         &[
 ///             Instruction::Push(ValueOrSource::Value(Value::dynamic(String::from("Ferris")))),
 ///             Instruction::Call {
 ///                 vtable_index: Some(0),
 ///                 arg_count: 1,
 ///                 destination: Destination::Stack,
 ///             },
-///         ]),
+///         ],
 ///         0,
 ///     )
 ///     .unwrap();
@@ -1407,11 +1406,11 @@ where
                 let arg_count = self.stack.extend(arguments)?;
                 // TODO It'd be nice to not have to have an allocation here
                 self.run(
-                    Cow::Owned(vec![Instruction::Call {
+                    vec![Instruction::Call {
                         vtable_index: Some(*vtable_index),
                         arg_count,
                         destination: Destination::Return,
-                    }]),
+                    }],
                     0,
                 )
             }
@@ -1427,7 +1426,7 @@ where
     /// stack space for the variables will be removed.
     pub fn run<'a, Output: FromStack>(
         &'a mut self,
-        instructions: Cow<'a, [Instruction<Env::Intrinsic>]>,
+        instructions: impl Into<Instructions<'a, Env::Intrinsic>>,
         variable_count: usize,
     ) -> Result<Output, Fault<'a, Env, Output>> {
         self.run_internal(instructions, variable_count, false)
@@ -1447,7 +1446,7 @@ where
     ///     https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop
     pub fn run_interactive<'a, Output: FromStack>(
         &'a mut self,
-        instructions: Cow<'a, [Instruction<Env::Intrinsic>]>,
+        instructions: impl Into<Instructions<'a, Env::Intrinsic>>,
         variable_count: usize,
     ) -> Result<Output, Fault<'a, Env, Output>> {
         self.run_internal(instructions, variable_count, true)
@@ -1455,10 +1454,11 @@ where
 
     fn run_internal<'a, Output: FromStack>(
         &'a mut self,
-        instructions: Cow<'a, [Instruction<Env::Intrinsic>]>,
+        instructions: impl Into<Instructions<'a, Env::Intrinsic>>,
         variable_count: usize,
         interactive: bool,
     ) -> Result<Output, Fault<'a, Env, Output>> {
+        let instructions = instructions.into();
         if !interactive && variable_count > 0 {
             self.stack.grow_by(variable_count)?;
         }
@@ -1509,7 +1509,7 @@ where
 
     fn resume<'a, Output: FromStack>(
         &'a mut self,
-        operations: Cow<'a, [Instruction<Env::Intrinsic>]>,
+        operations: Instructions<'a, Env::Intrinsic>,
         mut paused_stack: VecDeque<PausedFrame>,
     ) -> Result<Output, Fault<'a, Env, Output>> {
         let first_frame = paused_stack.pop_front().expect("at least one frame");
@@ -1561,6 +1561,55 @@ where
     //     let unit = parse(source)?;
     //     unit.compile(self)?.execute_in(self)
     // }
+}
+
+/// A collection of [`Instruction`]s that may be borrowed.
+///
+/// This type is functionally equivalent to `Cow<'a, [Instruction<Intrinsic>]>`,
+/// but it has more flexible `From` trait implementations.
+#[derive(Debug, Eq, PartialEq)]
+pub enum Instructions<'a, Intrinsic> {
+    /// An owned collection of instructions.
+    Owned(Vec<Instruction<Intrinsic>>),
+    /// A borrowed slice of instructions.
+    Borrowed(&'a [Instruction<Intrinsic>]),
+}
+
+impl<'a, Intrinsic> Deref for Instructions<'a, Intrinsic> {
+    type Target = [Instruction<Intrinsic>];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Instructions::Owned(instructions) => instructions,
+            Instructions::Borrowed(instructions) => instructions,
+        }
+    }
+}
+
+impl<'a, Intrinsic> From<&'a [Instruction<Intrinsic>]> for Instructions<'a, Intrinsic> {
+    fn from(instructions: &'a [Instruction<Intrinsic>]) -> Self {
+        Self::Borrowed(instructions)
+    }
+}
+
+impl<'a, Intrinsic> From<&'a Vec<Instruction<Intrinsic>>> for Instructions<'a, Intrinsic> {
+    fn from(instructions: &'a Vec<Instruction<Intrinsic>>) -> Self {
+        Self::Borrowed(instructions)
+    }
+}
+
+impl<'a, Intrinsic, const SIZE: usize> From<&'a [Instruction<Intrinsic>; SIZE]>
+    for Instructions<'a, Intrinsic>
+{
+    fn from(instructions: &'a [Instruction<Intrinsic>; SIZE]) -> Self {
+        Self::Borrowed(instructions)
+    }
+}
+
+impl<'a, Intrinsic> From<Vec<Instruction<Intrinsic>>> for Instructions<'a, Intrinsic> {
+    fn from(instructions: Vec<Instruction<Intrinsic>>) -> Self {
+        Self::Owned(instructions)
+    }
 }
 
 impl<Env> Scope for VirtualMachine<Env>
@@ -2823,7 +2872,7 @@ where
     Env: Environment,
 {
     context: Option<&'a mut VirtualMachine<Env>>,
-    operations: Option<Cow<'a, [Instruction<Env::Intrinsic>]>>,
+    operations: Option<Instructions<'a, Env::Intrinsic>>,
     stack: VecDeque<PausedFrame>,
     _return: PhantomData<ReturnType>,
 }
@@ -3147,7 +3196,7 @@ fn budget() {
     let mut pause_count = 0;
     let mut fault = context
         .run::<i64>(
-            Cow::Borrowed(&[
+            &[
                 Instruction::Add {
                     left: ValueOrSource::Value(Value::Integer(1)),
                     right: ValueOrSource::Value(Value::Integer(2)),
@@ -3163,7 +3212,7 @@ fn budget() {
                     right: ValueOrSource::Value(Value::Integer(4)),
                     destination: Destination::Return,
                 },
-            ]),
+            ],
             1,
         )
         .unwrap_err();
@@ -3251,14 +3300,14 @@ fn budget_with_frames() {
     let mut context = VirtualMachine::default_for(Budgeted::new(0, ())).with_function(test);
     let mut fault = context
         .run::<i64>(
-            Cow::Borrowed(&[
+            &[
                 Instruction::Push(ValueOrSource::Value(Value::Boolean(false))),
                 Instruction::Call {
                     vtable_index: Some(0),
                     arg_count: 1,
                     destination: Destination::Stack,
                 },
-            ]),
+            ],
             0,
         )
         .unwrap_err();
@@ -3298,6 +3347,18 @@ impl<Intrinsic> CodeBlock<Intrinsic> {
             block: self,
             indentation,
         }
+    }
+
+    /// Executes this code block using `vm`, returning the result.
+    pub fn execute_in<'a, Env, Output>(
+        &'a self,
+        vm: &'a mut VirtualMachine<Env>,
+    ) -> Result<Output, Fault<'a, Env, Output>>
+    where
+        Env: Environment<Intrinsic = Intrinsic>,
+        Output: FromStack,
+    {
+        vm.run(&self.code, self.variables)
     }
 }
 
@@ -3766,11 +3827,11 @@ fn invalid_variables() {
     assert!(matches!(
         context
             .run::<i64>(
-                Cow::Borrowed(&[Instruction::Call {
+                &[Instruction::Call {
                     vtable_index: Some(0),
                     arg_count: 0,
                     destination: Destination::Stack,
-                }],),
+                }],
                 0
             )
             .unwrap_err()
@@ -3791,11 +3852,11 @@ fn invalid_argument() {
     assert!(matches!(
         context
             .run::<i64>(
-                Cow::Borrowed(&[Instruction::Call {
+                &[Instruction::Call {
                     vtable_index: Some(0),
                     arg_count: 0,
                     destination: Destination::Stack,
-                }]),
+                }],
                 0
             )
             .unwrap_err()
@@ -3810,11 +3871,11 @@ fn invalid_vtable_index() {
     assert!(matches!(
         context
             .run::<i64>(
-                Cow::Borrowed(&[Instruction::Call {
+                &[Instruction::Call {
                     vtable_index: Some(0),
                     arg_count: 0,
                     destination: Destination::Stack,
-                }]),
+                }],
                 0
             )
             .unwrap_err()
@@ -3855,11 +3916,11 @@ fn function_needs_extra_cleanup() {
     assert_eq!(
         context
             .run::<Value>(
-                Cow::Borrowed(&[Instruction::Call {
+                &[Instruction::Call {
                     vtable_index: Some(0),
                     arg_count: 0,
                     destination: Destination::Stack,
-                }]),
+                }],
                 0
             )
             .unwrap(),

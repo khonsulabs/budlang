@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use budvm::{
     ir::{
         CodeBlockBuilder, CompareAction, Destination, Instruction, Literal, LiteralOrSource, Scope,
@@ -73,14 +71,14 @@ fn main() {
     // we received from defining the function.
     let result: i64 = vm
         .run(
-            Cow::Borrowed(&[
+            &[
                 budvm::Instruction::Push(ValueOrSource::Value(Value::Integer(10))),
                 budvm::Instruction::Call {
                     vtable_index: Some(fibonacci_vtable_index),
                     arg_count: 1,
                     destination: budvm::Destination::Stack,
                 },
-            ]),
+            ],
             0,
         )
         .unwrap();
