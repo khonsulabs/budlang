@@ -815,6 +815,20 @@ impl Value {
         })
     }
 
+    /// Tries to convert this value into a String.
+    ///
+    /// This is a shorthand for calling `convert()` and then `into_dynamic()` on
+    /// the resulting value.
+    pub fn try_convert_to_string<Env>(&self, env: &Env) -> Result<String, FaultKind>
+    where
+        Env: Environment<String = String>,
+    {
+        let as_string = self.convert(&ValueKind::Dynamic(Symbol::from("String")), env)?;
+        Ok(as_string
+            .into_dynamic()
+            .expect("convert returned a different type than expected"))
+    }
+
     /// Returns true if the value is considered truthy.
     ///
     /// | value type | condition     |
