@@ -495,7 +495,6 @@
 <span id="495">495</span>
 <span id="496">496</span>
 <span id="497">497</span>
-<span id="498">498</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -512,7 +511,6 @@
 )]
 
 </span><span class="kw">use </span>std::{
-    borrow::Cow,
     env,
     fmt::Display,
     ops::{Deref, DerefMut, Range},
@@ -760,7 +758,7 @@
                 <span class="self">self</span>.stack.grow_by(new_variables)<span class="question-mark">?</span>;
             }
 
-            <span class="self">self</span>.run_interactive(Cow::Owned(function.code), variable_count)
+            <span class="self">self</span>.run_interactive(function.code, variable_count)
                 .map_err(Error::from)
         } <span class="kw">else </span>{
             ReturnType::from_value(Value::Void).map_err(Error::from)

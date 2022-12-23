@@ -3990,6 +3990,67 @@
 <span id="3990">3990</span>
 <span id="3991">3991</span>
 <span id="3992">3992</span>
+<span id="3993">3993</span>
+<span id="3994">3994</span>
+<span id="3995">3995</span>
+<span id="3996">3996</span>
+<span id="3997">3997</span>
+<span id="3998">3998</span>
+<span id="3999">3999</span>
+<span id="4000">4000</span>
+<span id="4001">4001</span>
+<span id="4002">4002</span>
+<span id="4003">4003</span>
+<span id="4004">4004</span>
+<span id="4005">4005</span>
+<span id="4006">4006</span>
+<span id="4007">4007</span>
+<span id="4008">4008</span>
+<span id="4009">4009</span>
+<span id="4010">4010</span>
+<span id="4011">4011</span>
+<span id="4012">4012</span>
+<span id="4013">4013</span>
+<span id="4014">4014</span>
+<span id="4015">4015</span>
+<span id="4016">4016</span>
+<span id="4017">4017</span>
+<span id="4018">4018</span>
+<span id="4019">4019</span>
+<span id="4020">4020</span>
+<span id="4021">4021</span>
+<span id="4022">4022</span>
+<span id="4023">4023</span>
+<span id="4024">4024</span>
+<span id="4025">4025</span>
+<span id="4026">4026</span>
+<span id="4027">4027</span>
+<span id="4028">4028</span>
+<span id="4029">4029</span>
+<span id="4030">4030</span>
+<span id="4031">4031</span>
+<span id="4032">4032</span>
+<span id="4033">4033</span>
+<span id="4034">4034</span>
+<span id="4035">4035</span>
+<span id="4036">4036</span>
+<span id="4037">4037</span>
+<span id="4038">4038</span>
+<span id="4039">4039</span>
+<span id="4040">4040</span>
+<span id="4041">4041</span>
+<span id="4042">4042</span>
+<span id="4043">4043</span>
+<span id="4044">4044</span>
+<span id="4045">4045</span>
+<span id="4046">4046</span>
+<span id="4047">4047</span>
+<span id="4048">4048</span>
+<span id="4049">4049</span>
+<span id="4050">4050</span>
+<span id="4051">4051</span>
+<span id="4052">4052</span>
+<span id="4053">4053</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -4007,13 +4068,12 @@
 
 </span><span class="kw">use </span>std::{
     any::{type_name, Any},
-    borrow::Cow,
     cmp::Ordering,
     collections::{HashMap <span class="kw">as </span>StdHashMap, VecDeque},
     fmt::{Debug, Display, Write},
     hash::{Hash, Hasher},
     marker::PhantomData,
-    ops::{Add, Bound, Div, Index, IndexMut, Mul, RangeBounds, Sub},
+    ops::{Add, Bound, Deref, Div, Index, IndexMut, Mul, RangeBounds, Sub},
     str::FromStr,
     sync::Arc,
     vec,
@@ -5246,14 +5306,14 @@
 /// let mut vm = VirtualMachine::empty().with_function(greet);
 /// let result: String = vm
 ///     .run(
-///         Cow::Borrowed(&amp;[
+///         &amp;[
 ///             Instruction::Push(ValueOrSource::Value(Value::dynamic(String::from(&quot;Ferris&quot;)))),
 ///             Instruction::Call {
 ///                 vtable_index: Some(0),
 ///                 arg_count: 1,
 ///                 destination: Destination::Stack,
 ///             },
-///         ]),
+///         ],
 ///         0,
 ///     )
 ///     .unwrap();
@@ -5399,11 +5459,11 @@
                 <span class="kw">let </span>arg_count = <span class="self">self</span>.stack.extend(arguments)<span class="question-mark">?</span>;
                 <span class="comment">// TODO It&#39;d be nice to not have to have an allocation here
                 </span><span class="self">self</span>.run(
-                    Cow::Owned(<span class="macro">vec!</span>[Instruction::Call {
+                    <span class="macro">vec!</span>[Instruction::Call {
                         vtable_index: <span class="prelude-val">Some</span>(<span class="kw-2">*</span>vtable_index),
                         arg_count,
                         destination: Destination::Return,
-                    }]),
+                    }],
                     <span class="number">0</span>,
                 )
             }
@@ -5419,7 +5479,7 @@
     /// stack space for the variables will be removed.
     </span><span class="kw">pub fn </span>run&lt;<span class="lifetime">&#39;a</span>, Output: FromStack&gt;(
         <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>,
-        instructions: Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;,
+        instructions: <span class="kw">impl </span>Into&lt;Instructions&lt;<span class="lifetime">&#39;a</span>, Env::Intrinsic&gt;&gt;,
         variable_count: usize,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Output, Fault&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;&gt; {
         <span class="self">self</span>.run_internal(instructions, variable_count, <span class="bool-val">false</span>)
@@ -5439,7 +5499,7 @@
     ///     https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop
     </span><span class="kw">pub fn </span>run_interactive&lt;<span class="lifetime">&#39;a</span>, Output: FromStack&gt;(
         <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>,
-        instructions: Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;,
+        instructions: <span class="kw">impl </span>Into&lt;Instructions&lt;<span class="lifetime">&#39;a</span>, Env::Intrinsic&gt;&gt;,
         variable_count: usize,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Output, Fault&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;&gt; {
         <span class="self">self</span>.run_internal(instructions, variable_count, <span class="bool-val">true</span>)
@@ -5447,10 +5507,11 @@
 
     <span class="kw">fn </span>run_internal&lt;<span class="lifetime">&#39;a</span>, Output: FromStack&gt;(
         <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>,
-        instructions: Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;,
+        instructions: <span class="kw">impl </span>Into&lt;Instructions&lt;<span class="lifetime">&#39;a</span>, Env::Intrinsic&gt;&gt;,
         variable_count: usize,
         interactive: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Output, Fault&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;&gt; {
+        <span class="kw">let </span>instructions = instructions.into();
         <span class="kw">if </span>!interactive &amp;&amp; variable_count &gt; <span class="number">0 </span>{
             <span class="self">self</span>.stack.grow_by(variable_count)<span class="question-mark">?</span>;
         }
@@ -5501,7 +5562,7 @@
 
     <span class="kw">fn </span>resume&lt;<span class="lifetime">&#39;a</span>, Output: FromStack&gt;(
         <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>,
-        operations: Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;,
+        operations: Instructions&lt;<span class="lifetime">&#39;a</span>, Env::Intrinsic&gt;,
         <span class="kw-2">mut </span>paused_stack: VecDeque&lt;PausedFrame&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Output, Fault&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;&gt; {
         <span class="kw">let </span>first_frame = paused_stack.pop_front().expect(<span class="string">&quot;at least one frame&quot;</span>);
@@ -5554,6 +5615,55 @@
     //     unit.compile(self)?.execute_in(self)
     // }
 </span>}
+
+<span class="doccomment">/// A collection of [`Instruction`]s that may be borrowed.
+///
+/// This type is functionally equivalent to `Cow&lt;&#39;a, [Instruction&lt;Intrinsic&gt;]&gt;`,
+/// but it has more flexible `From` trait implementations.
+</span><span class="attribute">#[derive(Debug, Eq, PartialEq)]
+</span><span class="kw">pub enum </span>Instructions&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; {
+    <span class="doccomment">/// An owned collection of instructions.
+    </span>Owned(Vec&lt;Instruction&lt;Intrinsic&gt;&gt;),
+    <span class="doccomment">/// A borrowed slice of instructions.
+    </span>Borrowed(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[Instruction&lt;Intrinsic&gt;]),
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; Deref <span class="kw">for </span>Instructions&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; {
+    <span class="kw">type </span>Target = [Instruction&lt;Intrinsic&gt;];
+
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+        <span class="kw">match </span><span class="self">self </span>{
+            Instructions::Owned(instructions) =&gt; instructions,
+            Instructions::Borrowed(instructions) =&gt; instructions,
+        }
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[Instruction&lt;Intrinsic&gt;]&gt; <span class="kw">for </span>Instructions&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; {
+    <span class="kw">fn </span>from(instructions: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[Instruction&lt;Intrinsic&gt;]) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::Borrowed(instructions)
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Vec&lt;Instruction&lt;Intrinsic&gt;&gt;&gt; <span class="kw">for </span>Instructions&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; {
+    <span class="kw">fn </span>from(instructions: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Vec&lt;Instruction&lt;Intrinsic&gt;&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::Borrowed(instructions)
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, Intrinsic, <span class="kw">const </span>SIZE: usize&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[Instruction&lt;Intrinsic&gt;; SIZE]&gt;
+    <span class="kw">for </span>Instructions&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt;
+{
+    <span class="kw">fn </span>from(instructions: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[Instruction&lt;Intrinsic&gt;; SIZE]) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::Borrowed(instructions)
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; From&lt;Vec&lt;Instruction&lt;Intrinsic&gt;&gt;&gt; <span class="kw">for </span>Instructions&lt;<span class="lifetime">&#39;a</span>, Intrinsic&gt; {
+    <span class="kw">fn </span>from(instructions: Vec&lt;Instruction&lt;Intrinsic&gt;&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::Owned(instructions)
+    }
+}
 
 <span class="kw">impl</span>&lt;Env&gt; Scope <span class="kw">for </span>VirtualMachine&lt;Env&gt;
 <span class="kw">where
@@ -6815,7 +6925,7 @@
     </span>Env: Environment,
 {
     context: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>VirtualMachine&lt;Env&gt;&gt;,
-    operations: <span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;a</span>, [Instruction&lt;Env::Intrinsic&gt;]&gt;&gt;,
+    operations: <span class="prelude-ty">Option</span>&lt;Instructions&lt;<span class="lifetime">&#39;a</span>, Env::Intrinsic&gt;&gt;,
     stack: VecDeque&lt;PausedFrame&gt;,
     _return: PhantomData&lt;ReturnType&gt;,
 }
@@ -7139,7 +7249,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>pause_count = <span class="number">0</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>fault = context
         .run::&lt;i64&gt;(
-            Cow::Borrowed(<span class="kw-2">&amp;</span>[
+            <span class="kw-2">&amp;</span>[
                 Instruction::Add {
                     left: ValueOrSource::Value(Value::Integer(<span class="number">1</span>)),
                     right: ValueOrSource::Value(Value::Integer(<span class="number">2</span>)),
@@ -7155,7 +7265,7 @@
                     right: ValueOrSource::Value(Value::Integer(<span class="number">4</span>)),
                     destination: Destination::Return,
                 },
-            ]),
+            ],
             <span class="number">1</span>,
         )
         .unwrap_err();
@@ -7243,14 +7353,14 @@
     <span class="kw">let </span><span class="kw-2">mut </span>context = VirtualMachine::default_for(Budgeted::new(<span class="number">0</span>, ())).with_function(test);
     <span class="kw">let </span><span class="kw-2">mut </span>fault = context
         .run::&lt;i64&gt;(
-            Cow::Borrowed(<span class="kw-2">&amp;</span>[
+            <span class="kw-2">&amp;</span>[
                 Instruction::Push(ValueOrSource::Value(Value::Boolean(<span class="bool-val">false</span>))),
                 Instruction::Call {
                     vtable_index: <span class="prelude-val">Some</span>(<span class="number">0</span>),
                     arg_count: <span class="number">1</span>,
                     destination: Destination::Stack,
                 },
-            ]),
+            ],
             <span class="number">0</span>,
         )
         .unwrap_err();
@@ -7290,6 +7400,18 @@
             block: <span class="self">self</span>,
             indentation,
         }
+    }
+
+    <span class="doccomment">/// Executes this code block using `vm`, returning the result.
+    </span><span class="kw">pub fn </span>execute_in&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;(
+        <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>,
+        vm: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>VirtualMachine&lt;Env&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Output, Fault&lt;<span class="lifetime">&#39;a</span>, Env, Output&gt;&gt;
+    <span class="kw">where
+        </span>Env: Environment&lt;Intrinsic = Intrinsic&gt;,
+        Output: FromStack,
+    {
+        vm.run(<span class="kw-2">&amp;</span><span class="self">self</span>.code, <span class="self">self</span>.variables)
     }
 }
 
@@ -7758,11 +7880,11 @@
     <span class="macro">assert!</span>(<span class="macro">matches!</span>(
         context
             .run::&lt;i64&gt;(
-                Cow::Borrowed(<span class="kw-2">&amp;</span>[Instruction::Call {
+                <span class="kw-2">&amp;</span>[Instruction::Call {
                     vtable_index: <span class="prelude-val">Some</span>(<span class="number">0</span>),
                     arg_count: <span class="number">0</span>,
                     destination: Destination::Stack,
-                }],),
+                }],
                 <span class="number">0
             </span>)
             .unwrap_err()
@@ -7783,11 +7905,11 @@
     <span class="macro">assert!</span>(<span class="macro">matches!</span>(
         context
             .run::&lt;i64&gt;(
-                Cow::Borrowed(<span class="kw-2">&amp;</span>[Instruction::Call {
+                <span class="kw-2">&amp;</span>[Instruction::Call {
                     vtable_index: <span class="prelude-val">Some</span>(<span class="number">0</span>),
                     arg_count: <span class="number">0</span>,
                     destination: Destination::Stack,
-                }]),
+                }],
                 <span class="number">0
             </span>)
             .unwrap_err()
@@ -7802,11 +7924,11 @@
     <span class="macro">assert!</span>(<span class="macro">matches!</span>(
         context
             .run::&lt;i64&gt;(
-                Cow::Borrowed(<span class="kw-2">&amp;</span>[Instruction::Call {
+                <span class="kw-2">&amp;</span>[Instruction::Call {
                     vtable_index: <span class="prelude-val">Some</span>(<span class="number">0</span>),
                     arg_count: <span class="number">0</span>,
                     destination: Destination::Stack,
-                }]),
+                }],
                 <span class="number">0
             </span>)
             .unwrap_err()
@@ -7847,11 +7969,11 @@
     <span class="macro">assert_eq!</span>(
         context
             .run::&lt;Value&gt;(
-                Cow::Borrowed(<span class="kw-2">&amp;</span>[Instruction::Call {
+                <span class="kw-2">&amp;</span>[Instruction::Call {
                     vtable_index: <span class="prelude-val">Some</span>(<span class="number">0</span>),
                     arg_count: <span class="number">0</span>,
                     destination: Destination::Stack,
-                }]),
+                }],
                 <span class="number">0
             </span>)
             .unwrap(),
