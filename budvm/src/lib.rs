@@ -779,6 +779,10 @@ impl Value {
     where
         Env: Environment,
     {
+        if &self.kind() == kind {
+            return Ok(self.clone());
+        }
+
         let converted = match kind {
             ValueKind::Integer => match self {
                 Value::Void => None,
@@ -894,6 +898,49 @@ impl Value {
         }
         true
     }
+}
+
+impl From<i64> for Value {
+    fn from(int: i64) -> Self {
+        Self::Integer(int)
+    }
+}
+
+impl From<f64> for Value {
+    fn from(real: f64) -> Self {
+        Self::Real(real)
+    }
+}
+
+impl From<()> for Value {
+    fn from(_: ()) -> Self {
+        Self::Void
+    }
+}
+
+impl<'a> From<&'a str> for Value {
+    fn from(str: &'a str) -> Self {
+        Self::from(str.to_string())
+    }
+}
+
+impl<T> From<T> for Value
+where
+    T: DynamicValue,
+{
+    fn from(value: T) -> Self {
+        Self::dynamic(value)
+    }
+}
+
+#[test]
+fn value_from_tests() {
+    assert_eq!(Value::from(0f64), Value::Real(0.));
+    assert_eq!(Value::from(0i64), Value::Integer(0));
+    assert_eq!(
+        Value::from("hello").as_dynamic::<String>(),
+        Some(&String::from("hello"))
+    );
 }
 
 impl Hash for Value {

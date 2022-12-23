@@ -634,6 +634,7 @@ fn bitwise() {
 #[test]
 fn conversions() {
     assert_run!("1 as String", Value::dynamic(String::from("1")));
+    assert_run!("\"1\" as String", Value::dynamic(String::from("1")));
     assert_run!("1 as Real", Value::Real(1.0));
     assert_run!("1 as Integer", Value::Integer(1));
     assert_run!("1 as Boolean", Value::Boolean(true));
