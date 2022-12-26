@@ -132,6 +132,12 @@
 <span id="132">132</span>
 <span id="133">133</span>
 <span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     cmp::Ordering,
     fmt::{Display, Write},
@@ -157,6 +163,12 @@
         f.write_char(<span class="string">&#39;&quot;&#39;</span>)<span class="question-mark">?</span>;
         <span class="kw">for </span>ch <span class="kw">in </span><span class="self">self</span>.<span class="number">0</span>.chars() {
             <span class="kw">match </span>ch {
+                <span class="string">&#39;&quot;&#39; </span>=&gt; {
+                    f.write_str(<span class="string">&quot;\\\&quot;&quot;</span>)<span class="question-mark">?</span>;
+                }
+                <span class="string">&#39;\\&#39; </span>=&gt; {
+                    f.write_str(<span class="string">&quot;\\\\&quot;</span>)<span class="question-mark">?</span>;
+                }
                 ch <span class="kw">if </span>ch.is_alphanumeric() || ch == <span class="string">&#39; &#39; </span>|| ch.is_ascii_punctuation() =&gt; {
                     f.write_char(ch)<span class="question-mark">?</span>;
                 }
