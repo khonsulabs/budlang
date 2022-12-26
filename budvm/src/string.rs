@@ -23,6 +23,12 @@ impl<'a> Display for StringLiteralDisplay<'a> {
         f.write_char('"')?;
         for ch in self.0.chars() {
             match ch {
+                '"' => {
+                    f.write_str("\\\"")?;
+                }
+                '\\' => {
+                    f.write_str("\\\\")?;
+                }
                 ch if ch.is_alphanumeric() || ch == ' ' || ch.is_ascii_punctuation() => {
                     f.write_char(ch)?;
                 }

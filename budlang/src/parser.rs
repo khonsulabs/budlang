@@ -1220,9 +1220,9 @@ fn string_parsing() {
             .unwrap(),
         vec![Token::new(TokenKind::String(String::from("hello")), 0..7)]
     );
-    let string = String::from("\t\r\n\u{2764}test");
+    let string = String::from("\"\\\t\r\n\u{2764}test");
     let source = string.to_source().unwrap();
-    assert_eq!(source, r#""\t\r\n\u{2764}test""#);
+    assert_eq!(source, r#""\"\\\t\r\n\u{2764}test""#);
     assert_eq!(
         Lexer::new(source.as_str())
             .collect::<Result<Vec<_>, _>>()
