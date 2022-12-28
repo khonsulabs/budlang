@@ -650,6 +650,10 @@ pub enum LiteralOrSource {
     Argument(Argument), // Make this like Variable
     /// The value is in a variable specified.
     Variable(Variable),
+    /// The value is popped from the stack
+    ///
+    /// The order of popping is the order the fields apear in the [`Instruction ]
+    Stack,
 }
 
 macro_rules! impl_simple_enum_from {
@@ -683,6 +687,7 @@ impl LiteralOrSource {
             LiteralOrSource::Literal(literal) => ValueOrSource::Value(literal.instantiate::<Env>()),
             LiteralOrSource::Argument(index) => ValueOrSource::Argument(index.index),
             LiteralOrSource::Variable(index) => ValueOrSource::Variable(index.index),
+            LiteralOrSource::Stack => ValueOrSource::Stack,
         }
     }
 }
@@ -693,6 +698,7 @@ impl Display for LiteralOrSource {
             LiteralOrSource::Literal(value) => Display::fmt(value, f),
             LiteralOrSource::Argument(arg) => Display::fmt(arg, f),
             LiteralOrSource::Variable(variable) => Display::fmt(variable, f),
+            LiteralOrSource::Stack => Display::fmt("$", f),
         }
     }
 }

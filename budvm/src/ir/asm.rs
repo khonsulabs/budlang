@@ -429,6 +429,7 @@ where
                 _ => {
                     let (first_char, remaining) = symbol.split_at(1);
                     match first_char {
+                        "$" if remaining.is_empty() => Ok(LiteralOrSource::Stack),
                         "$" => {
                             let variable = self
                                 .current_function
@@ -747,7 +748,7 @@ fn roundtrip_all_instructions() {
         destination: Destination::Stack,
     });
     block.push(Instruction::Divide {
-        left: LiteralOrSource::Literal(Literal::Void),
+        left: LiteralOrSource::Stack,
         right: LiteralOrSource::Literal(Literal::Integer(0)),
         destination: Destination::Stack,
     });

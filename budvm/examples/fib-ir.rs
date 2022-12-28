@@ -2,7 +2,7 @@ use budvm::{
     ir::{
         CodeBlockBuilder, CompareAction, Destination, Instruction, Literal, LiteralOrSource, Scope,
     },
-    Comparison, Function, Symbol, Value, ValueOrSource, VirtualMachine,
+    Comparison, Function, Value, ValueOrSource, VirtualMachine,
 };
 
 fn main() {
@@ -28,12 +28,11 @@ fn main() {
         right: LiteralOrSource::from(Literal::Integer(1)),
         destination: Destination::Stack,
     });
-    // recurse call, store result in a variable.
-    let n_minus_one = block.variable_index_from_name(&Symbol::from("n_minus_one"));
+    // recurse call
     block.push(Instruction::Call {
         function: None,
         arg_count: 1,
-        destination: Destination::from(&n_minus_one),
+        destination: Destination::Stack,
     });
     // n - 2, push result to stack
     block.push(Instruction::Sub {
@@ -41,17 +40,16 @@ fn main() {
         right: LiteralOrSource::from(Literal::Integer(2)),
         destination: Destination::Stack,
     });
-    // recurse call, store result in a variable.
-    let n_minus_two = block.variable_index_from_name(&Symbol::from("n_minus_two"));
+    // recurse call
     block.push(Instruction::Call {
         function: None,
         arg_count: 1,
-        destination: Destination::from(&n_minus_two),
+        destination: Destination::Stack,
     });
     // Add the two variables together, and return the result.
     block.push(Instruction::Add {
-        left: LiteralOrSource::from(n_minus_one),
-        right: LiteralOrSource::from(n_minus_two),
+        left: LiteralOrSource::Stack,
+        right: LiteralOrSource::Stack,
         destination: Destination::Return,
     });
     let block = block.finish();

@@ -15,6 +15,7 @@
 
 use std::{
     any::{type_name, Any},
+    borrow::Cow,
     cmp::Ordering,
     collections::{HashMap as StdHashMap, VecDeque},
     fmt::{Debug, Display, Write},
@@ -599,6 +600,10 @@ pub enum ValueOrSource {
     Argument(usize),
     /// The value is in a variable at the provided 0-based index.
     Variable(usize),
+    /// The value is popped from the stack
+    ///
+    /// The order of popping is the order the fields apear in the [`Instruction ]
+    Stack,
 }
 
 impl Display for ValueOrSource {
@@ -607,6 +612,7 @@ impl Display for ValueOrSource {
             ValueOrSource::Value(value) => Display::fmt(value, f),
             ValueOrSource::Argument(index) => write!(f, "@{index}"),
             ValueOrSource::Variable(variable) => write!(f, "${variable}"),
+            ValueOrSource::Stack => write!(f, "$"),
         }
     }
 }
@@ -2005,6 +2011,7 @@ where
                     ValueOrSource::Value(value) => self.stack.push(value.clone())?,
                     ValueOrSource::Argument(arg) => self.push_arg(*arg)?,
                     ValueOrSource::Variable(variable) => self.push_var(*variable)?,
+                    ValueOrSource::Stack => {}
                 }
 
                 Ok(None)
@@ -2018,6 +2025,7 @@ where
                     Some(ValueOrSource::Argument(source)) => {
                         self.resolve_argument(*source)?.clone()
                     }
+                    Some(ValueOrSource::Stack) => self.stack.pop()?,
                     None => self.return_value.take().unwrap_or_default(),
                 };
 
@@ -2112,13 +2120,32 @@ where
     }
 
     fn resolve_value_or_source<'v>(
+        &'v mut self,
+        value: &'v ValueOrSource,
+    ) -> Result<Cow<'v, Value>, FaultKind> {
+        match value {
+            ValueOrSource::Argument(index) => self.resolve_argument(*index).map(Cow::Borrowed),
+            ValueOrSource::Variable(index) => self.resolve_variable(*index).map(Cow::Borrowed),
+            ValueOrSource::Value(value) => Ok(value).map(Cow::Borrowed),
+            ValueOrSource::Stack => self.stack.pop().map(Cow::Owned),
+        }
+    }
+
+    /// Does not mutate the stack, instead keeps track of popped values with `pop_index`,
+    /// requires to call [`Stack::pop_n(pop_index)`](Stack::pop_n) afterwards
+    fn resolve_value_or_source_non_stack_mutating<'v>(
         &'v self,
         value: &'v ValueOrSource,
+        pop_index: &mut usize,
     ) -> Result<&'v Value, FaultKind> {
         match value {
             ValueOrSource::Argument(index) => self.resolve_argument(*index),
             ValueOrSource::Variable(index) => self.resolve_variable(*index),
             ValueOrSource::Value(value) => Ok(value),
+            ValueOrSource::Stack => {
+                *pop_index += 1;
+                self.stack.get(*pop_index - 1)
+            }
         }
     }
 
@@ -2166,8 +2193,9 @@ where
         right: &ValueOrSource,
         result: CompareAction,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let left = self.resolve_value_or_source(left)?;
-        let right = self.resolve_value_or_source(right)?;
+        let mut to_pop = 0;
+        let left = self.resolve_value_or_source_non_stack_mutating(left, &mut to_pop)?;
+        let right = self.resolve_value_or_source_non_stack_mutating(right, &mut to_pop)?;
 
         let comparison_result = match comparison {
             Comparison::Equal => Self::equality::<false>(left, right),
@@ -2185,6 +2213,8 @@ where
                 matches!(ordering, Ordering::Greater | Ordering::Equal)
             })?,
         };
+
+        self.stack.pop_n(to_pop);
 
         match result {
             CompareAction::Store(dest) => {
@@ -2230,7 +2260,7 @@ where
         value: &ValueOrSource,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
         let value = self.resolve_value_or_source(value)?;
-        *self.resolve_variable_mut(variable)? = value.clone();
+        *self.resolve_variable_mut(variable)? = value.into_owned();
 
         Ok(None)
     }
@@ -2346,7 +2376,7 @@ where
                     name: name.clone(),
                 }));
             }
-            None => {
+            Some(ValueOrSource::Stack) | None => {
                 // If None, the target is the value prior to the arguments.
                 if let Some(stack_index) = self
                     .stack
@@ -2465,7 +2495,7 @@ where
         destination: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
         let value = self.resolve_value_or_source(value)?;
-        let value = Self::extract_integer(value)?;
+        let value = Self::extract_integer(&value)?;
 
         *self.resolve_value_source_mut(destination)? = Value::Integer(!value);
 
@@ -2478,7 +2508,7 @@ where
         kind: &ValueKind,
         destination: Destination,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
-        let value = self.resolve_value_or_source(value)?;
+        let value = self.resolve_value_or_source(value)?.into_owned();
         *self.resolve_value_source_mut(destination)? = value.convert(kind, self.environment)?;
 
         Ok(None)
@@ -2504,9 +2534,9 @@ where
         body: impl FnOnce(i64, i64) -> Result<i64, Fault<'static, Env, Output>>,
     ) -> Result<Option<FlowControl>, Fault<'static, Env, Output>> {
         let left = self.resolve_value_or_source(left)?;
-        let left = Self::extract_integer(left)?;
+        let left = Self::extract_integer(&left)?;
         let right = self.resolve_value_or_source(right)?;
-        let right = Self::extract_integer(right)?;
+        let right = Self::extract_integer(&right)?;
         let produced_value = body(left, right)?;
         *self.resolve_value_source_mut(destination)? = Value::Integer(produced_value);
 
@@ -2585,8 +2615,11 @@ macro_rules! checked_op {
                     $fullname,
                     " @expected and `@received-value` (@received-type)"
                 );
-                let left_value = self.resolve_value_or_source(left)?;
-                let right_value = self.resolve_value_or_source(right)?;
+                let mut to_pop = 0;
+                let left_value =
+                    self.resolve_value_or_source_non_stack_mutating(left, &mut to_pop)?;
+                let right_value =
+                    self.resolve_value_or_source_non_stack_mutating(right, &mut to_pop)?;
 
                 let produced_value = match (left_value, right_value) {
                     (Value::Integer(left), Value::Integer(right)) => {
@@ -2651,6 +2684,7 @@ macro_rules! checked_op {
                         ))
                     }
                 };
+                self.stack.pop_n(to_pop);
                 *self.resolve_value_source_mut(result)? = produced_value;
                 Ok(None)
             }
@@ -3574,7 +3608,18 @@ impl Stack {
     #[inline]
     pub fn top(&self) -> Result<&Value, FaultKind> {
         if self.length > 0 {
-            Ok(&self.values[self.length])
+            Ok(&self.values[self.length - 1])
+        } else {
+            Err(FaultKind::StackUnderflow)
+        }
+    }
+
+    /// Returns a reference to the `index` [`Value`] from the end of the stack, or returns a
+    /// [`FaultKind::StackUnderflow`] if no value is present.
+    #[inline]
+    pub fn get(&self, index: usize) -> Result<&Value, FaultKind> {
+        if index < self.length {
+            Ok(&self.values[self.length - 1 - index])
         } else {
             Err(FaultKind::StackUnderflow)
         }
