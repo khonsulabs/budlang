@@ -751,7 +751,7 @@ impl Call {
 
                 // Invoke the call
                 operations.push(Instruction::CallInstance {
-                    target: Some(target),
+                    target,
                     name: name.clone(),
                     arg_count: self.args.len(),
                     destination,

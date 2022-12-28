@@ -392,9 +392,9 @@ pub enum Instruction<Intrinsic> {
     /// the stack. The value returned from the function (or [`Value::Void`] if
     /// no value was returned) will be placed in `destination`.
     CallInstance {
-        /// The target of the function call. If None, the value on the stack
-        /// prior to the arguments is the target of the call.
-        target: Option<LiteralOrSource>,
+        /// The target of the function call. If [`LiteralOrSource::Stack`], the value on
+        /// the stack prior to the arguments is the target of the call.
+        target: LiteralOrSource,
         /// The name of the function to call.
         name: Symbol,
         /// The number of arguments on the stack that should be used as
@@ -530,11 +530,7 @@ where
                 arg_count,
                 destination,
             } => {
-                if let Some(target) = target {
-                    write!(f, "invoke {target} {name} {arg_count} {destination}")
-                } else {
-                    write!(f, "invoke $ {name} {arg_count} {destination}")
-                }
+                write!(f, "invoke {target} {name} {arg_count} {destination}")
             }
         }
     }
@@ -650,6 +646,10 @@ pub enum LiteralOrSource {
     Argument(Argument), // Make this like Variable
     /// The value is in a variable specified.
     Variable(Variable),
+    /// The value is popped from the stack
+    ///
+    /// The order of popping is the order the fields apear in the [`Instruction ]
+    Stack,
 }
 
 macro_rules! impl_simple_enum_from {
@@ -683,6 +683,7 @@ impl LiteralOrSource {
             LiteralOrSource::Literal(literal) => ValueOrSource::Value(literal.instantiate::<Env>()),
             LiteralOrSource::Argument(index) => ValueOrSource::Argument(index.index),
             LiteralOrSource::Variable(index) => ValueOrSource::Variable(index.index),
+            LiteralOrSource::Stack => ValueOrSource::Stack,
         }
     }
 }
@@ -693,6 +694,7 @@ impl Display for LiteralOrSource {
             LiteralOrSource::Literal(value) => Display::fmt(value, f),
             LiteralOrSource::Argument(arg) => Display::fmt(arg, f),
             LiteralOrSource::Variable(variable) => Display::fmt(variable, f),
+            LiteralOrSource::Stack => Display::fmt("$", f),
         }
     }
 }
@@ -1353,9 +1355,7 @@ where
             arg_count,
             destination,
         } => crate::Instruction::CallInstance {
-            target: target
-                .as_ref()
-                .map(LiteralOrSource::instantiate::<S::Environment>),
+            target: target.instantiate::<S::Environment>(),
             name: name.clone(),
             arg_count: *arg_count,
             destination: destination.into(),

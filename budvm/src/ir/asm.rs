@@ -429,6 +429,7 @@ where
                 _ => {
                     let (first_char, remaining) = symbol.split_at(1);
                     match first_char {
+                        "$" if remaining.is_empty() => Ok(LiteralOrSource::Stack),
                         "$" => {
                             let variable = self
                                 .current_function
@@ -672,16 +673,7 @@ where
     }
 
     fn parse_invoke(&mut self) -> Result<(), AsmError> {
-        let target = if let Some(TokenKind::Identifier(identifier)) = self.peek_token_kind() {
-            if identifier == "$" {
-                self.tokens.next();
-                None
-            } else {
-                Some(self.expect_literal_or_source()?)
-            }
-        } else {
-            return Err(AsmError::UnexpectedEof(String::from("invoke target")));
-        };
+        let target = self.expect_literal_or_source()?;
 
         let (name, _) = self.expect_identifier("function name")?;
         let arg_count = self.expect_arg_count()?;
@@ -747,7 +739,7 @@ fn roundtrip_all_instructions() {
         destination: Destination::Stack,
     });
     block.push(Instruction::Divide {
-        left: LiteralOrSource::Literal(Literal::Void),
+        left: LiteralOrSource::Stack,
         right: LiteralOrSource::Literal(Literal::Integer(0)),
         destination: Destination::Stack,
     });
@@ -879,13 +871,13 @@ fn roundtrip_all_instructions() {
         destination: Destination::Stack,
     });
     block.push(Instruction::CallInstance {
-        target: None,
+        target: LiteralOrSource::Stack,
         name: Symbol::from("test"),
         arg_count: 1,
         destination: Destination::Stack,
     });
     block.push(Instruction::CallInstance {
-        target: Some(LiteralOrSource::Variable(var1)),
+        target: LiteralOrSource::Variable(var1),
         name: Symbol::from("test"),
         arg_count: 1,
         destination: Destination::Stack,
