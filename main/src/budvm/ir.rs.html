@@ -2081,9 +2081,9 @@
     /// the stack. The value returned from the function (or [`Value::Void`] if
     /// no value was returned) will be placed in `destination`.
     </span>CallInstance {
-        <span class="doccomment">/// The target of the function call. If None, the value on the stack
-        /// prior to the arguments is the target of the call.
-        </span>target: <span class="prelude-ty">Option</span>&lt;LiteralOrSource&gt;,
+        <span class="doccomment">/// The target of the function call. If [`LiteralOrSource::Stack`], the value on
+        /// the stack prior to the arguments is the target of the call.
+        </span>target: LiteralOrSource,
         <span class="doccomment">/// The name of the function to call.
         </span>name: Symbol,
         <span class="doccomment">/// The number of arguments on the stack that should be used as
@@ -2219,11 +2219,7 @@
                 arg_count,
                 destination,
             } =&gt; {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(target) = target {
-                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke {target} {name} {arg_count} {destination}&quot;</span>)
-                } <span class="kw">else </span>{
-                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke $ {name} {arg_count} {destination}&quot;</span>)
-                }
+                <span class="macro">write!</span>(f, <span class="string">&quot;invoke {target} {name} {arg_count} {destination}&quot;</span>)
             }
         }
     }
@@ -2339,6 +2335,10 @@
     </span>Argument(Argument), <span class="comment">// Make this like Variable
     </span><span class="doccomment">/// The value is in a variable specified.
     </span>Variable(Variable),
+    <span class="doccomment">/// The value is popped from the stack
+    ///
+    /// The order of popping is the order the fields apear in the [`Instruction ]
+    </span>Stack,
 }
 
 <span class="macro">macro_rules! </span>impl_simple_enum_from {
@@ -2372,6 +2372,7 @@
             LiteralOrSource::Literal(literal) =&gt; ValueOrSource::Value(literal.instantiate::&lt;Env&gt;()),
             LiteralOrSource::Argument(index) =&gt; ValueOrSource::Argument(index.index),
             LiteralOrSource::Variable(index) =&gt; ValueOrSource::Variable(index.index),
+            LiteralOrSource::Stack =&gt; ValueOrSource::Stack,
         }
     }
 }
@@ -2382,6 +2383,7 @@
             LiteralOrSource::Literal(value) =&gt; Display::fmt(value, f),
             LiteralOrSource::Argument(arg) =&gt; Display::fmt(arg, f),
             LiteralOrSource::Variable(variable) =&gt; Display::fmt(variable, f),
+            LiteralOrSource::Stack =&gt; Display::fmt(<span class="string">&quot;$&quot;</span>, f),
         }
     }
 }
@@ -3042,9 +3044,7 @@
             arg_count,
             destination,
         } =&gt; <span class="kw">crate</span>::Instruction::CallInstance {
-            target: target
-                .as_ref()
-                .map(LiteralOrSource::instantiate::&lt;S::Environment&gt;),
+            target: target.instantiate::&lt;S::Environment&gt;(),
             name: name.clone(),
             arg_count: <span class="kw-2">*</span>arg_count,
             destination: destination.into(),

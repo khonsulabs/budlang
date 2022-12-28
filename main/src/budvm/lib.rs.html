@@ -4112,6 +4112,50 @@
 <span id="4112">4112</span>
 <span id="4113">4113</span>
 <span id="4114">4114</span>
+<span id="4115">4115</span>
+<span id="4116">4116</span>
+<span id="4117">4117</span>
+<span id="4118">4118</span>
+<span id="4119">4119</span>
+<span id="4120">4120</span>
+<span id="4121">4121</span>
+<span id="4122">4122</span>
+<span id="4123">4123</span>
+<span id="4124">4124</span>
+<span id="4125">4125</span>
+<span id="4126">4126</span>
+<span id="4127">4127</span>
+<span id="4128">4128</span>
+<span id="4129">4129</span>
+<span id="4130">4130</span>
+<span id="4131">4131</span>
+<span id="4132">4132</span>
+<span id="4133">4133</span>
+<span id="4134">4134</span>
+<span id="4135">4135</span>
+<span id="4136">4136</span>
+<span id="4137">4137</span>
+<span id="4138">4138</span>
+<span id="4139">4139</span>
+<span id="4140">4140</span>
+<span id="4141">4141</span>
+<span id="4142">4142</span>
+<span id="4143">4143</span>
+<span id="4144">4144</span>
+<span id="4145">4145</span>
+<span id="4146">4146</span>
+<span id="4147">4147</span>
+<span id="4148">4148</span>
+<span id="4149">4149</span>
+<span id="4150">4150</span>
+<span id="4151">4151</span>
+<span id="4152">4152</span>
+<span id="4153">4153</span>
+<span id="4154">4154</span>
+<span id="4155">4155</span>
+<span id="4156">4156</span>
+<span id="4157">4157</span>
+<span id="4158">4158</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -4129,6 +4173,7 @@
 
 </span><span class="kw">use </span>std::{
     any::{type_name, Any},
+    borrow::Cow,
     cmp::Ordering,
     collections::{HashMap <span class="kw">as </span>StdHashMap, VecDeque},
     fmt::{Debug, Display, Write},
@@ -4493,9 +4538,9 @@
     /// the stack. The value returned from the function (or [`Value::Void`] if
     /// no value was returned) will be placed in `destination`.
     </span>CallInstance {
-        <span class="doccomment">/// The target of the function call. If None, the value on the stack
-        /// prior to the arguments is the target of the call.
-        </span>target: <span class="prelude-ty">Option</span>&lt;ValueOrSource&gt;,
+        <span class="doccomment">/// The target of the function call. If [`ValueOrSource::Stack`], the value on the
+        /// stack prior to the arguments is the target of the call.
+        </span>target: ValueOrSource,
 
         <span class="doccomment">/// The name of the function to call.
         </span>name: Symbol,
@@ -4629,11 +4674,7 @@
                 arg_count,
                 destination,
             } =&gt; {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(target) = target {
-                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke {target} {name} {arg_count} {destination}&quot;</span>)
-                } <span class="kw">else </span>{
-                    <span class="macro">write!</span>(f, <span class="string">&quot;invoke $ {name} {arg_count} {destination}&quot;</span>)
-                }
+                <span class="macro">write!</span>(f, <span class="string">&quot;invoke {target} {name} {arg_count} {destination}&quot;</span>)
             }
             Instruction::CallIntrinsic {
                 intrinsic,
@@ -4713,6 +4754,10 @@
     </span>Argument(usize),
     <span class="doccomment">/// The value is in a variable at the provided 0-based index.
     </span>Variable(usize),
+    <span class="doccomment">/// The value is popped from the stack
+    ///
+    /// The order of popping is the order the fields apear in the [`Instruction ]
+    </span>Stack,
 }
 
 <span class="kw">impl </span>Display <span class="kw">for </span>ValueOrSource {
@@ -4721,6 +4766,7 @@
             ValueOrSource::Value(value) =&gt; Display::fmt(value, f),
             ValueOrSource::Argument(index) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;@{index}&quot;</span>),
             ValueOrSource::Variable(variable) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;${variable}&quot;</span>),
+            ValueOrSource::Stack =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;$&quot;</span>),
         }
     }
 }
@@ -6119,6 +6165,7 @@
                     ValueOrSource::Value(value) =&gt; <span class="self">self</span>.stack.push(value.clone())<span class="question-mark">?</span>,
                     ValueOrSource::Argument(arg) =&gt; <span class="self">self</span>.push_arg(<span class="kw-2">*</span>arg)<span class="question-mark">?</span>,
                     ValueOrSource::Variable(variable) =&gt; <span class="self">self</span>.push_var(<span class="kw-2">*</span>variable)<span class="question-mark">?</span>,
+                    ValueOrSource::Stack =&gt; {}
                 }
 
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
@@ -6132,6 +6179,7 @@
                     <span class="prelude-val">Some</span>(ValueOrSource::Argument(source)) =&gt; {
                         <span class="self">self</span>.resolve_argument(<span class="kw-2">*</span>source)<span class="question-mark">?</span>.clone()
                     }
+                    <span class="prelude-val">Some</span>(ValueOrSource::Stack) =&gt; <span class="self">self</span>.stack.pop()<span class="question-mark">?</span>,
                     <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.return_value.take().unwrap_or_default(),
                 };
 
@@ -6156,7 +6204,7 @@
                 name,
                 arg_count,
                 destination,
-            } =&gt; <span class="self">self</span>.call_instance(target.as_ref(), name, <span class="kw-2">*</span>arg_count, <span class="kw-2">*</span>destination),
+            } =&gt; <span class="self">self</span>.call_instance(target, name, <span class="kw-2">*</span>arg_count, <span class="kw-2">*</span>destination),
         }
     }
 
@@ -6226,13 +6274,32 @@
     }
 
     <span class="kw">fn </span>resolve_value_or_source&lt;<span class="lifetime">&#39;v</span>&gt;(
+        <span class="kw-2">&amp;</span><span class="lifetime">&#39;v </span><span class="kw-2">mut </span><span class="self">self</span>,
+        value: <span class="kw-2">&amp;</span><span class="lifetime">&#39;v </span>ValueOrSource,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Cow&lt;<span class="lifetime">&#39;v</span>, Value&gt;, FaultKind&gt; {
+        <span class="kw">match </span>value {
+            ValueOrSource::Argument(index) =&gt; <span class="self">self</span>.resolve_argument(<span class="kw-2">*</span>index).map(Cow::Borrowed),
+            ValueOrSource::Variable(index) =&gt; <span class="self">self</span>.resolve_variable(<span class="kw-2">*</span>index).map(Cow::Borrowed),
+            ValueOrSource::Value(value) =&gt; <span class="prelude-val">Ok</span>(value).map(Cow::Borrowed),
+            ValueOrSource::Stack =&gt; <span class="self">self</span>.stack.pop().map(Cow::Owned),
+        }
+    }
+
+    <span class="doccomment">/// Does not mutate the stack, instead keeps track of popped values with `pop_index`,
+    /// requires to call [`Stack::pop_n(pop_index)`](Stack::pop_n) afterwards
+    </span><span class="kw">fn </span>resolve_value_or_source_non_stack_mutating&lt;<span class="lifetime">&#39;v</span>&gt;(
         <span class="kw-2">&amp;</span><span class="lifetime">&#39;v </span><span class="self">self</span>,
         value: <span class="kw-2">&amp;</span><span class="lifetime">&#39;v </span>ValueOrSource,
+        pop_index: <span class="kw-2">&amp;mut </span>usize,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;v </span>Value, FaultKind&gt; {
         <span class="kw">match </span>value {
             ValueOrSource::Argument(index) =&gt; <span class="self">self</span>.resolve_argument(<span class="kw-2">*</span>index),
             ValueOrSource::Variable(index) =&gt; <span class="self">self</span>.resolve_variable(<span class="kw-2">*</span>index),
             ValueOrSource::Value(value) =&gt; <span class="prelude-val">Ok</span>(value),
+            ValueOrSource::Stack =&gt; {
+                <span class="kw-2">*</span>pop_index += <span class="number">1</span>;
+                <span class="self">self</span>.stack.get(<span class="kw-2">*</span>pop_index - <span class="number">1</span>)
+            }
         }
     }
 
@@ -6280,8 +6347,9 @@
         right: <span class="kw-2">&amp;</span>ValueOrSource,
         result: CompareAction,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
-        <span class="kw">let </span>left = <span class="self">self</span>.resolve_value_or_source(left)<span class="question-mark">?</span>;
-        <span class="kw">let </span>right = <span class="self">self</span>.resolve_value_or_source(right)<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>to_pop = <span class="number">0</span>;
+        <span class="kw">let </span>left = <span class="self">self</span>.resolve_value_or_source_non_stack_mutating(left, <span class="kw-2">&amp;mut </span>to_pop)<span class="question-mark">?</span>;
+        <span class="kw">let </span>right = <span class="self">self</span>.resolve_value_or_source_non_stack_mutating(right, <span class="kw-2">&amp;mut </span>to_pop)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>comparison_result = <span class="kw">match </span>comparison {
             Comparison::Equal =&gt; <span class="self">Self</span>::equality::&lt;<span class="bool-val">false</span>&gt;(left, right),
@@ -6299,6 +6367,8 @@
                 <span class="macro">matches!</span>(ordering, Ordering::Greater | Ordering::Equal)
             })<span class="question-mark">?</span>,
         };
+
+        <span class="self">self</span>.stack.pop_n(to_pop);
 
         <span class="kw">match </span>result {
             CompareAction::Store(dest) =&gt; {
@@ -6344,7 +6414,7 @@
         value: <span class="kw-2">&amp;</span>ValueOrSource,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
         <span class="kw">let </span>value = <span class="self">self</span>.resolve_value_or_source(value)<span class="question-mark">?</span>;
-        <span class="kw-2">*</span><span class="self">self</span>.resolve_variable_mut(variable)<span class="question-mark">? </span>= value.clone();
+        <span class="kw-2">*</span><span class="self">self</span>.resolve_variable_mut(variable)<span class="question-mark">? </span>= value.into_owned();
 
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
@@ -6421,7 +6491,7 @@
 
     <span class="kw">fn </span>call_instance(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        target: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>ValueOrSource&gt;,
+        target: <span class="kw-2">&amp;</span>ValueOrSource,
         name: <span class="kw-2">&amp;</span>Symbol,
         arg_count: usize,
         destination: Destination,
@@ -6430,7 +6500,7 @@
         // borrows of the stack, we temporarily take the value from where it
         // lives.
         </span><span class="kw">let </span>stack_index = <span class="kw">match </span>target {
-            <span class="prelude-val">Some</span>(ValueOrSource::Argument(index)) =&gt; {
+            ValueOrSource::Argument(index) =&gt; {
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(stack_index) = <span class="self">self</span>.arg_offset.checked_add(<span class="kw-2">*</span>index) {
                     <span class="kw">if </span>stack_index &lt; <span class="self">self</span>.variables_offset {
                         stack_index
@@ -6441,7 +6511,7 @@
                     <span class="kw">return </span><span class="prelude-val">Err</span>(Fault::from(FaultKind::InvalidArgumentIndex));
                 }
             }
-            <span class="prelude-val">Some</span>(ValueOrSource::Variable(index)) =&gt; {
+            ValueOrSource::Variable(index) =&gt; {
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(stack_index) = <span class="self">self</span>.variables_offset.checked_add(<span class="kw-2">*</span>index) {
                     <span class="kw">if </span>stack_index &lt; <span class="self">self</span>.return_offset {
                         stack_index
@@ -6452,7 +6522,7 @@
                     <span class="kw">return </span><span class="prelude-val">Err</span>(Fault::from(FaultKind::InvalidVariableIndex));
                 }
             }
-            <span class="prelude-val">Some</span>(ValueOrSource::Value(value)) =&gt; {
+            ValueOrSource::Value(value) =&gt; {
                 <span class="comment">// We don&#39;t have any intrinsic functions yet, and this Value can
                 // only be a literal.
                 </span><span class="kw">return </span><span class="prelude-val">Err</span>(Fault::from(FaultKind::UnknownFunction {
@@ -6460,7 +6530,7 @@
                     name: name.clone(),
                 }));
             }
-            <span class="prelude-val">None </span>=&gt; {
+            ValueOrSource::Stack =&gt; {
                 <span class="comment">// If None, the target is the value prior to the arguments.
                 </span><span class="kw">if let </span><span class="prelude-val">Some</span>(stack_index) = <span class="self">self
                     </span>.stack
@@ -6501,15 +6571,18 @@
                 )))
             }
         };
-        <span class="kw">if </span>target.is_some() {
-            <span class="comment">// Return the target to its proper location
-            </span>std::mem::swap(<span class="kw-2">&amp;mut </span>target_value, <span class="kw-2">&amp;mut </span><span class="self">self</span>.stack[stack_index]);
-        } <span class="kw">else </span>{
-            <span class="comment">// Remove the target&#39;s stack space. We didn&#39;t do this earlier
-            // because it would have caused a copy of all args. But at this
-            // point, all the args have been drained during the call so the
-            // target can simply be popped.
-            </span><span class="self">self</span>.stack.pop()<span class="question-mark">?</span>;
+        <span class="kw">match </span>target {
+            ValueOrSource::Value(<span class="kw">_</span>) | ValueOrSource::Argument(<span class="kw">_</span>) | ValueOrSource::Variable(<span class="kw">_</span>) =&gt; {
+                <span class="comment">// Return the target to its proper location
+                </span>std::mem::swap(<span class="kw-2">&amp;mut </span>target_value, <span class="kw-2">&amp;mut </span><span class="self">self</span>.stack[stack_index]);
+            }
+            ValueOrSource::Stack =&gt; {
+                <span class="comment">// Remove the target&#39;s stack space. We didn&#39;t do this earlier
+                // because it would have caused a copy of all args. But at this
+                // point, all the args have been drained during the call so the
+                // target can simply be popped.
+                </span><span class="self">self</span>.stack.pop()<span class="question-mark">?</span>;
+            }
         }
 
         <span class="comment">// If there was a fault, return.
@@ -6579,7 +6652,7 @@
         destination: Destination,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
         <span class="kw">let </span>value = <span class="self">self</span>.resolve_value_or_source(value)<span class="question-mark">?</span>;
-        <span class="kw">let </span>value = <span class="self">Self</span>::extract_integer(value)<span class="question-mark">?</span>;
+        <span class="kw">let </span>value = <span class="self">Self</span>::extract_integer(<span class="kw-2">&amp;</span>value)<span class="question-mark">?</span>;
 
         <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= Value::Integer(!value);
 
@@ -6592,7 +6665,7 @@
         kind: <span class="kw-2">&amp;</span>ValueKind,
         destination: Destination,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
-        <span class="kw">let </span>value = <span class="self">self</span>.resolve_value_or_source(value)<span class="question-mark">?</span>;
+        <span class="kw">let </span>value = <span class="self">self</span>.resolve_value_or_source(value)<span class="question-mark">?</span>.into_owned();
         <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= value.convert(kind, <span class="self">self</span>.environment)<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
@@ -6618,9 +6691,9 @@
         body: <span class="kw">impl </span>FnOnce(i64, i64) -&gt; <span class="prelude-ty">Result</span>&lt;i64, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FlowControl&gt;, Fault&lt;<span class="lifetime">&#39;static</span>, Env, Output&gt;&gt; {
         <span class="kw">let </span>left = <span class="self">self</span>.resolve_value_or_source(left)<span class="question-mark">?</span>;
-        <span class="kw">let </span>left = <span class="self">Self</span>::extract_integer(left)<span class="question-mark">?</span>;
+        <span class="kw">let </span>left = <span class="self">Self</span>::extract_integer(<span class="kw-2">&amp;</span>left)<span class="question-mark">?</span>;
         <span class="kw">let </span>right = <span class="self">self</span>.resolve_value_or_source(right)<span class="question-mark">?</span>;
-        <span class="kw">let </span>right = <span class="self">Self</span>::extract_integer(right)<span class="question-mark">?</span>;
+        <span class="kw">let </span>right = <span class="self">Self</span>::extract_integer(<span class="kw-2">&amp;</span>right)<span class="question-mark">?</span>;
         <span class="kw">let </span>produced_value = body(left, right)<span class="question-mark">?</span>;
         <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(destination)<span class="question-mark">? </span>= Value::Integer(produced_value);
 
@@ -6699,8 +6772,11 @@
                     <span class="macro-nonterminal">$fullname</span>,
                     <span class="string">&quot; @expected and `@received-value` (@received-type)&quot;
                 </span>);
-                <span class="kw">let </span>left_value = <span class="self">self</span>.resolve_value_or_source(left)<span class="question-mark">?</span>;
-                <span class="kw">let </span>right_value = <span class="self">self</span>.resolve_value_or_source(right)<span class="question-mark">?</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>to_pop = <span class="number">0</span>;
+                <span class="kw">let </span>left_value =
+                    <span class="self">self</span>.resolve_value_or_source_non_stack_mutating(left, <span class="kw-2">&amp;mut </span>to_pop)<span class="question-mark">?</span>;
+                <span class="kw">let </span>right_value =
+                    <span class="self">self</span>.resolve_value_or_source_non_stack_mutating(right, <span class="kw-2">&amp;mut </span>to_pop)<span class="question-mark">?</span>;
 
                 <span class="kw">let </span>produced_value = <span class="kw">match </span>(left_value, right_value) {
                     (Value::Integer(left), Value::Integer(right)) =&gt; {
@@ -6765,6 +6841,7 @@
                         ))
                     }
                 };
+                <span class="self">self</span>.stack.pop_n(to_pop);
                 <span class="kw-2">*</span><span class="self">self</span>.resolve_value_source_mut(result)<span class="question-mark">? </span>= produced_value;
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
             }
@@ -7688,7 +7765,18 @@
     </span><span class="attribute">#[inline]
     </span><span class="kw">pub fn </span>top(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>Value, FaultKind&gt; {
         <span class="kw">if </span><span class="self">self</span>.length &gt; <span class="number">0 </span>{
-            <span class="prelude-val">Ok</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.values[<span class="self">self</span>.length])
+            <span class="prelude-val">Ok</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.values[<span class="self">self</span>.length - <span class="number">1</span>])
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Err</span>(FaultKind::StackUnderflow)
+        }
+    }
+
+    <span class="doccomment">/// Returns a reference to the `index` [`Value`] from the end of the stack, or returns a
+    /// [`FaultKind::StackUnderflow`] if no value is present.
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>Value, FaultKind&gt; {
+        <span class="kw">if </span>index &lt; <span class="self">self</span>.length {
+            <span class="prelude-val">Ok</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.values[<span class="self">self</span>.length - <span class="number">1 </span>- index])
         } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(FaultKind::StackUnderflow)
         }
