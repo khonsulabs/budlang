@@ -30,7 +30,7 @@ fn main() {
         "Hello, World!",
     ))));
     block.push(Instruction::CallInstance {
-        target: Some(LiteralOrSource::from(&stdout)),
+        target: LiteralOrSource::from(&stdout),
         name: Symbol::from("write"),
         arg_count: 1,
         destination: Destination::Return,

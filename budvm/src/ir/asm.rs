@@ -673,16 +673,7 @@ where
     }
 
     fn parse_invoke(&mut self) -> Result<(), AsmError> {
-        let target = if let Some(TokenKind::Identifier(identifier)) = self.peek_token_kind() {
-            if identifier == "$" {
-                self.tokens.next();
-                None
-            } else {
-                Some(self.expect_literal_or_source()?)
-            }
-        } else {
-            return Err(AsmError::UnexpectedEof(String::from("invoke target")));
-        };
+        let target = self.expect_literal_or_source()?;
 
         let (name, _) = self.expect_identifier("function name")?;
         let arg_count = self.expect_arg_count()?;
@@ -880,13 +871,13 @@ fn roundtrip_all_instructions() {
         destination: Destination::Stack,
     });
     block.push(Instruction::CallInstance {
-        target: None,
+        target: LiteralOrSource::Stack,
         name: Symbol::from("test"),
         arg_count: 1,
         destination: Destination::Stack,
     });
     block.push(Instruction::CallInstance {
-        target: Some(LiteralOrSource::Variable(var1)),
+        target: LiteralOrSource::Variable(var1),
         name: Symbol::from("test"),
         arg_count: 1,
         destination: Destination::Stack,

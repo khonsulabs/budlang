@@ -380,9 +380,9 @@ pub enum Instruction<Intrinsic> {
     /// the stack. The value returned from the function (or [`Value::Void`] if
     /// no value was returned) will be placed in `destination`.
     CallInstance {
-        /// The target of the function call. If None, the value on the stack
-        /// prior to the arguments is the target of the call.
-        target: Option<ValueOrSource>,
+        /// The target of the function call. If [`ValueOrSource::Stack`], the value on the
+        /// stack prior to the arguments is the target of the call.
+        target: ValueOrSource,
 
         /// The name of the function to call.
         name: Symbol,
@@ -516,11 +516,7 @@ where
                 arg_count,
                 destination,
             } => {
-                if let Some(target) = target {
-                    write!(f, "invoke {target} {name} {arg_count} {destination}")
-                } else {
-                    write!(f, "invoke $ {name} {arg_count} {destination}")
-                }
+                write!(f, "invoke {target} {name} {arg_count} {destination}")
             }
             Instruction::CallIntrinsic {
                 intrinsic,
@@ -2050,7 +2046,7 @@ where
                 name,
                 arg_count,
                 destination,
-            } => self.call_instance(target.as_ref(), name, *arg_count, *destination),
+            } => self.call_instance(target, name, *arg_count, *destination),
         }
     }
 
@@ -2337,7 +2333,7 @@ where
 
     fn call_instance(
         &mut self,
-        target: Option<&ValueOrSource>,
+        target: &ValueOrSource,
         name: &Symbol,
         arg_count: usize,
         destination: Destination,
@@ -2346,7 +2342,7 @@ where
         // borrows of the stack, we temporarily take the value from where it
         // lives.
         let stack_index = match target {
-            Some(ValueOrSource::Argument(index)) => {
+            ValueOrSource::Argument(index) => {
                 if let Some(stack_index) = self.arg_offset.checked_add(*index) {
                     if stack_index < self.variables_offset {
                         stack_index
@@ -2357,7 +2353,7 @@ where
                     return Err(Fault::from(FaultKind::InvalidArgumentIndex));
                 }
             }
-            Some(ValueOrSource::Variable(index)) => {
+            ValueOrSource::Variable(index) => {
                 if let Some(stack_index) = self.variables_offset.checked_add(*index) {
                     if stack_index < self.return_offset {
                         stack_index
@@ -2368,7 +2364,7 @@ where
                     return Err(Fault::from(FaultKind::InvalidVariableIndex));
                 }
             }
-            Some(ValueOrSource::Value(value)) => {
+            ValueOrSource::Value(value) => {
                 // We don't have any intrinsic functions yet, and this Value can
                 // only be a literal.
                 return Err(Fault::from(FaultKind::UnknownFunction {
@@ -2376,7 +2372,7 @@ where
                     name: name.clone(),
                 }));
             }
-            Some(ValueOrSource::Stack) | None => {
+            ValueOrSource::Stack => {
                 // If None, the target is the value prior to the arguments.
                 if let Some(stack_index) = self
                     .stack
@@ -2417,15 +2413,18 @@ where
                 )))
             }
         };
-        if target.is_some() {
-            // Return the target to its proper location
-            std::mem::swap(&mut target_value, &mut self.stack[stack_index]);
-        } else {
-            // Remove the target's stack space. We didn't do this earlier
-            // because it would have caused a copy of all args. But at this
-            // point, all the args have been drained during the call so the
-            // target can simply be popped.
-            self.stack.pop()?;
+        match target {
+            ValueOrSource::Value(_) | ValueOrSource::Argument(_) | ValueOrSource::Variable(_) => {
+                // Return the target to its proper location
+                std::mem::swap(&mut target_value, &mut self.stack[stack_index]);
+            }
+            ValueOrSource::Stack => {
+                // Remove the target's stack space. We didn't do this earlier
+                // because it would have caused a copy of all args. But at this
+                // point, all the args have been drained during the call so the
+                // target can simply be popped.
+                self.stack.pop()?;
+            }
         }
 
         // If there was a fault, return.

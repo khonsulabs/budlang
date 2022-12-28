@@ -392,9 +392,9 @@ pub enum Instruction<Intrinsic> {
     /// the stack. The value returned from the function (or [`Value::Void`] if
     /// no value was returned) will be placed in `destination`.
     CallInstance {
-        /// The target of the function call. If None, the value on the stack
-        /// prior to the arguments is the target of the call.
-        target: Option<LiteralOrSource>,
+        /// The target of the function call. If [`LiteralOrSource::Stack`], the value on
+        /// the stack prior to the arguments is the target of the call.
+        target: LiteralOrSource,
         /// The name of the function to call.
         name: Symbol,
         /// The number of arguments on the stack that should be used as
@@ -530,11 +530,7 @@ where
                 arg_count,
                 destination,
             } => {
-                if let Some(target) = target {
-                    write!(f, "invoke {target} {name} {arg_count} {destination}")
-                } else {
-                    write!(f, "invoke $ {name} {arg_count} {destination}")
-                }
+                write!(f, "invoke {target} {name} {arg_count} {destination}")
             }
         }
     }
@@ -1359,9 +1355,7 @@ where
             arg_count,
             destination,
         } => crate::Instruction::CallInstance {
-            target: target
-                .as_ref()
-                .map(LiteralOrSource::instantiate::<S::Environment>),
+            target: target.instantiate::<S::Environment>(),
             name: name.clone(),
             arg_count: *arg_count,
             destination: destination.into(),

@@ -119,7 +119,7 @@ fn dynamic_values() {
         arg_count: 1,
         variable_count: 0,
         code: vec![Instruction::CallInstance {
-            target: Some(ValueOrSource::Argument(0)),
+            target: ValueOrSource::Argument(0),
             name: Symbol::from("squared"),
             arg_count: 0,
             destination: budvm::Destination::Stack,
