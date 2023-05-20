@@ -21,6 +21,7 @@
 #![allow(clippy::range_plus_one)]
 
 use std::{
+    error::Error,
     fmt::Display,
     iter::Peekable,
     ops::Range,
@@ -184,6 +185,39 @@ impl From<DecodeStringError> for AsmError {
 impl From<DecodeNumericError> for AsmError {
     fn from(err: DecodeNumericError) -> Self {
         Self::Numeric(err)
+    }
+}
+
+impl Display for AsmError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AsmError::String(error) => write!(f, "{error}"),
+            AsmError::Numeric(error) => write!(f, "{error}"),
+            AsmError::UnexpectedChar { character, offset } => {
+                write!(f, "unexpected char `{character}` at {offset}")
+            }
+            AsmError::Unexpected(token) => write!(f, "unexpected token `{token:?}`"),
+            AsmError::UnexpectedEof(expected) => write!(f, "unexpected eof, expected `{expected}`"),
+            AsmError::LabelAlreadyUsed { label, range } => {
+                write!(f, "label already used `{label}` at {range:?}")
+            }
+            AsmError::UnknownInstruction(token) => write!(f, "unknown instruction `{token:?}`"),
+            AsmError::UnknownArgument(token) => write!(f, "unknown argument `{token:?}`"),
+            AsmError::InvalidArgumentCount(token) => {
+                write!(f, "invalid argument count `{token:?}`")
+            }
+            AsmError::UnknownIntrinsic(token) => write!(f, "unknown intrinsic `{token:?}`"),
+        }
+    }
+}
+
+impl Error for AsmError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            AsmError::String(error) => Some(error),
+            AsmError::Numeric(error) => Some(error),
+            _ => None,
+        }
     }
 }
 
