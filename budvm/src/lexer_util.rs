@@ -7,7 +7,7 @@ use std::{
     fmt::Display,
     num::{ParseFloatError, ParseIntError},
     ops::Range,
-    str::CharIndices,
+    str::CharIndices, error::Error,
 };
 
 /// An iterator adapter thatallows peeking up to two positions ahead.
@@ -184,6 +184,8 @@ impl Display for DecodeStringError {
         }
     }
 }
+
+impl Error for DecodeStringError {}
 
 /// The result of decoding a string literal's contents.
 pub struct StringLiteral {
@@ -381,5 +383,14 @@ impl From<ParseFloatError> for DecodeNumericError {
 impl From<ParseIntError> for DecodeNumericError {
     fn from(err: ParseIntError) -> Self {
         Self::Integer(err)
+    }
+}
+
+impl Error for DecodeNumericError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            DecodeNumericError::Float(error) => Some(error),
+            DecodeNumericError::Integer(error) => Some(error),
+        }
     }
 }

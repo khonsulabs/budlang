@@ -176,12 +176,12 @@ fn insert_or_remove<Hasher: BuildHasher>(
             .iter_mut()
             .find(|(entry_key, _)| entry_key == &key)
         {
-            println!("Replacing {} with {}", key, value);
+            println!("Replacing {key} with {value}");
             let old_value = *entry_value;
             *entry_value = value;
             Some(old_value)
         } else {
-            println!("Inserting {}: {}", key, value);
+            println!("Inserting {key}: {value}");
             expected_entries.push((key, value));
             None
         };

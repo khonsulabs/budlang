@@ -1455,8 +1455,8 @@ where
     }
 
     /// Runs a set of instructions.
-    pub fn call<'a, Output: FromStack, Args, ArgsIter>(
-        &'a mut self,
+    pub fn call<Output: FromStack, Args, ArgsIter>(
+        &mut self,
         function: &Symbol,
         arguments: Args,
     ) -> Result<Output, Fault<'_, Env, Output>>

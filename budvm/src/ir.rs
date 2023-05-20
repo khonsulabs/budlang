@@ -29,7 +29,7 @@ pub struct Label {
 impl Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(name) = &self.name {
-            write!(f, "#{}", name)
+            write!(f, "#{name}")
         } else {
             write!(f, "#_{}", self.index)
         }
@@ -1656,7 +1656,7 @@ impl Display for LinkError {
             }
             LinkError::InvalidLabel(label) => {
                 if let Some(name) = &label.name {
-                    write!(f, "invalid label: #{}", name)
+                    write!(f, "invalid label: #{name}")
                 } else {
                     write!(f, "invalid label: {}", label.index)
                 }
@@ -1664,6 +1664,8 @@ impl Display for LinkError {
         }
     }
 }
+
+impl std::error::Error for LinkError {}
 
 // #[test]
 // fn optimizations() {
