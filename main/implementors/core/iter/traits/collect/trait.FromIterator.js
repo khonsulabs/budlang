@@ -1,3 +1,3 @@
 (function() {var implementors = {
-"budvm":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.66.0/core/iter/traits/collect/trait.FromIterator.html\" title=\"trait core::iter::traits::collect::FromIterator\">FromIterator</a>&lt;<a class=\"enum\" href=\"budvm/enum.Value.html\" title=\"enum budvm::Value\">Value</a>&gt; for <a class=\"struct\" href=\"budvm/struct.List.html\" title=\"struct budvm::List\">List</a>"]]
+"budvm":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.69.0/core/iter/traits/collect/trait.FromIterator.html\" title=\"trait core::iter::traits::collect::FromIterator\">FromIterator</a>&lt;<a class=\"enum\" href=\"budvm/enum.Value.html\" title=\"enum budvm::Value\">Value</a>&gt; for <a class=\"struct\" href=\"budvm/struct.List.html\" title=\"struct budvm::List\">List</a>"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

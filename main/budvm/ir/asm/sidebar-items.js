@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["AsmError",""],["TokenKind",""]],"struct":[["Lexer",""],["Token",""]]};
+window.SIDEBAR_ITEMS = {"enum":["AsmError","TokenKind"],"struct":["Lexer","Token"]};

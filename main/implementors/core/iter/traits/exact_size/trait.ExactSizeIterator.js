@@ -1,3 +1,3 @@
 (function() {var implementors = {
-"budvm":[["impl&lt;'a&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.66.0/core/iter/traits/exact_size/trait.ExactSizeIterator.html\" title=\"trait core::iter::traits::exact_size::ExactSizeIterator\">ExactSizeIterator</a> for <a class=\"struct\" href=\"budvm/struct.PoppedValues.html\" title=\"struct budvm::PoppedValues\">PoppedValues</a>&lt;'a&gt;"]]
+"budvm":[["impl&lt;'a&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.69.0/core/iter/traits/exact_size/trait.ExactSizeIterator.html\" title=\"trait core::iter::traits::exact_size::ExactSizeIterator\">ExactSizeIterator</a> for <a class=\"struct\" href=\"budvm/struct.PoppedValues.html\" title=\"struct budvm::PoppedValues\">PoppedValues</a>&lt;'a&gt;"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
