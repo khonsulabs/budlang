@@ -314,12 +314,7 @@ impl If {
         tree: &ExpressionTree,
     ) -> Result<(), CompilationError> {
         let condition = tree.node(self.condition);
-        let after_false_label = operations.new_label();
-        let if_false_label = self.else_block.map(|_| operations.new_label());
-        let false_jump_to = if_false_label
-            .clone()
-            .unwrap_or_else(|| after_false_label.clone());
-        if let Node::BinOp(BinOp {
+        let mut if_block = if let Node::BinOp(BinOp {
             kind: BinOpKind::Compare(comparison),
             left,
             right,
@@ -330,34 +325,19 @@ impl If {
             // operation
             let left = tree.node(*left).to_value_or_source(operations, tree)?;
             let right = tree.node(*right).to_value_or_source(operations, tree)?;
-            operations.push(Instruction::Compare {
-                comparison: *comparison,
-                left,
-                right,
-                action: CompareAction::JumpIfFalse(false_jump_to),
-            });
+            operations.begin_if_comparison(*comparison, left, right)
         } else {
             // The if statement is a result of something more complex
-            let condition_result = operations.new_temporary_variable();
-            condition.generate_code(
-                Destination::Variable(condition_result.clone()),
-                operations,
-                tree,
-            )?;
-            operations.push(Instruction::If {
-                condition: LiteralOrSource::Variable(condition_result),
-                false_jump_to,
-            });
-        }
+            condition.generate_code(Destination::Stack, operations, tree)?;
+            operations.begin_if(LiteralOrSource::Stack)
+        };
         let true_block = tree.node(self.true_block);
-        true_block.generate_code(result.clone(), operations, tree)?;
-        if let (Some(else_block), Some(if_false_label)) = (self.else_block, if_false_label) {
-            operations.push(Instruction::JumpTo(after_false_label.clone()));
-            operations.label(if_false_label);
-            let else_block = tree.node(else_block);
-            else_block.generate_code(result, operations, tree)?;
+        true_block.generate_code(result.clone(), &mut if_block, tree)?;
+        if let Some(false_block) = self.else_block {
+            let mut else_block = if_block.begin_else();
+            let false_block = tree.node(false_block);
+            false_block.generate_code(result, &mut else_block, tree)?;
         }
-        operations.label(after_false_label);
         Ok(())
     }
 }

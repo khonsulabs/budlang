@@ -984,11 +984,125 @@ impl<Intrinsic> CodeBlockBuilder<Intrinsic> {
         }
     }
 
+    /// Begins an if block with the given comparison.
+    pub fn begin_if_comparison(
+        &mut self,
+        comparison: Comparison,
+        left: impl Into<LiteralOrSource>,
+        right: impl Into<LiteralOrSource>,
+    ) -> If<'_, Intrinsic> {
+        let label = self.new_label();
+        self.push(Instruction::Compare {
+            comparison,
+            left: left.into(),
+            right: right.into(),
+            action: CompareAction::JumpIfFalse(label.clone()),
+        });
+        If {
+            label: Some(label),
+            code_block: self,
+        }
+    }
+
+    /// Begins an if block with the given condition.
+    pub fn begin_if(&mut self, condition: impl Into<LiteralOrSource>) -> If<'_, Intrinsic> {
+        let label = self.new_label();
+        self.push(Instruction::If {
+            condition: condition.into(),
+            false_jump_to: label.clone(),
+        });
+        If {
+            label: Some(label),
+            code_block: self,
+        }
+    }
+
     /// Returns the collection of known variables.
     #[must_use]
     pub fn variables(&self) -> &HashMap<Symbol, Variable> {
         &self.variables
     }
+}
+
+/// An if within a [`CodeBlockBuilder`].
+#[must_use]
+pub struct If<'a, Intrinsic> {
+    label: Option<Label>,
+    code_block: &'a mut CodeBlockBuilder<Intrinsic>,
+}
+
+impl<Intrinsic> Deref for If<'_, Intrinsic> {
+    type Target = CodeBlockBuilder<Intrinsic>;
+
+    fn deref(&self) -> &Self::Target {
+        self.code_block
+    }
+}
+
+impl<Intrinsic> DerefMut for If<'_, Intrinsic> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.code_block
+    }
+}
+
+impl<Intrinsic> Drop for If<'_, Intrinsic> {
+    fn drop(&mut self) {
+        if let Some(label) = self.label.take() {
+            self.code_block.label(label);
+        }
+    }
+}
+
+impl<'a, Intrinsic> If<'a, Intrinsic> {
+    /// Ends the `if` block, equivalent to dropping.
+    pub fn end(self) {}
+
+    /// Ends the `if` block, and starts an `else` block.
+    pub fn begin_else(mut self) -> Else<'a, Intrinsic> {
+        let label = self.code_block.new_label();
+        self.code_block.push(Instruction::JumpTo(label.clone()));
+        self.code_block.label(
+            self.label.take().expect(
+                "should only be None if `.else` or `.end` was called, both consuming self.",
+            ),
+        );
+        Else {
+            label,
+            code_block: self,
+        }
+    }
+}
+
+#[must_use]
+/// An else within a [`CodeBlockBuilder`]
+pub struct Else<'a, Intrinsic> {
+    label: Label,
+    code_block: If<'a, Intrinsic>,
+}
+
+impl<Intrinsic> Deref for Else<'_, Intrinsic> {
+    type Target = CodeBlockBuilder<Intrinsic>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.code_block
+    }
+}
+
+impl<Intrinsic> DerefMut for Else<'_, Intrinsic> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.code_block
+    }
+}
+
+impl<T> Drop for Else<'_, T> {
+    fn drop(&mut self) {
+        self.code_block.label(self.label.clone());
+    }
+}
+
+impl<T> Else<'_, T> {
+    /// Ends the `else` block, equivalent to dropping.
+    pub fn end(self) {}
 }
 
 /// A loop within a [`CodeBlockBuilder`].
