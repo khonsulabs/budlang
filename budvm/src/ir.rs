@@ -665,9 +665,21 @@ macro_rules! impl_simple_enum_from {
             }
         }
     };
+    ($enum:ident, $from_type:ty, $variant:ident) => {
+        impl From<$from_type> for $enum {
+            fn from(value: $from_type) -> Self {
+                Self::$variant(value.into())
+            }
+        }
+    };
 }
 
 impl_simple_enum_from!(LiteralOrSource, Literal);
+impl_simple_enum_from!(LiteralOrSource, bool, Literal);
+impl_simple_enum_from!(LiteralOrSource, i64, Literal);
+impl_simple_enum_from!(LiteralOrSource, f64, Literal);
+impl_simple_enum_from!(LiteralOrSource, String, Literal);
+impl_simple_enum_from!(LiteralOrSource, &str, Literal);
 impl_simple_enum_from!(LiteralOrSource, Argument);
 impl_simple_enum_from!(LiteralOrSource, Variable);
 
