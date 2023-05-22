@@ -36,6 +36,12 @@ impl Display for Label {
     }
 }
 
+impl From<&Label> for Label {
+    fn from(value: &Label) -> Self {
+        value.clone()
+    }
+}
+
 /// A reference to a local variable.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Variable {
@@ -303,7 +309,7 @@ pub enum Instruction<Intrinsic> {
         /// The label to jump to if the condition is falsey.
         false_jump_to: Label,
     },
-    /// Jump execution to the address of the given label.
+    /// Jump execution to the address of the given [`Label`].
     JumpTo(Label),
     /// Labels the next instruction with the given [`Label`].
     Label(Label),
@@ -344,7 +350,7 @@ pub enum Instruction<Intrinsic> {
     /// ensure the correct number of arguments are taken even when variable
     /// argument lists are supported, the number of arguments is passed and
     /// controls the baseline of the stack.
-    ///  
+    ///
     /// Upon returning from a function call, the arguments will no longer be on
     /// the stack. The value returned from the function (or [`Value::Void`] if
     /// no value was returned) will be placed in `destination`.
@@ -367,7 +373,7 @@ pub enum Instruction<Intrinsic> {
     /// ensure the correct number of arguments are taken even when variable
     /// argument lists are supported, the number of arguments is passed and
     /// controls the baseline of the stack.
-    ///  
+    ///
     /// Upon returning from a function call, the arguments will no longer be on
     /// the stack. The value returned from the function (or [`Value::Void`] if
     /// no value was returned) will be placed in `destination`.
@@ -387,7 +393,7 @@ pub enum Instruction<Intrinsic> {
     /// ensure the correct number of arguments are taken even when variable
     /// argument lists are supported, the number of arguments is passed and
     /// controls the baseline of the stack.
-    ///  
+    ///
     /// Upon returning from a function call, the arguments will no longer be on
     /// the stack. The value returned from the function (or [`Value::Void`] if
     /// no value was returned) will be placed in `destination`.
@@ -648,7 +654,7 @@ pub enum LiteralOrSource {
     Variable(Variable),
     /// The value is popped from the stack
     ///
-    /// The order of popping is the order the fields apear in the [`Instruction ]
+    /// The order of popping is the order the fields apear in the [`Instruction`]
     Stack,
 }
 
@@ -752,6 +758,24 @@ pub enum CompareAction {
     /// If the comparison is false, jump to the 0-based instruction index
     /// indicated.
     JumpIfFalse(Label),
+}
+
+impl From<&CompareAction> for CompareAction {
+    fn from(value: &CompareAction) -> Self {
+        value.clone()
+    }
+}
+
+impl From<Destination> for CompareAction {
+    fn from(value: Destination) -> Self {
+        Self::Store(value)
+    }
+}
+
+impl From<&Destination> for CompareAction {
+    fn from(value: &Destination) -> Self {
+        value.clone().into()
+    }
 }
 
 impl Display for CompareAction {
@@ -859,13 +883,10 @@ impl<Intrinsic> CodeBlockBuilder<Intrinsic> {
     }
 
     /// Push an instruction.
+    ///
+    /// To push a value to the stack use [`push_to_stack`](Self::push_to_stack).
     pub fn push(&mut self, operation: Instruction<Intrinsic>) {
         self.ops.push(operation);
-    }
-
-    /// Label the next instruction as `label`.
-    pub fn label(&mut self, label: Label) {
-        self.push(Instruction::Label(label));
     }
 
     /// Looks up a symbol.
@@ -960,6 +981,220 @@ impl<Intrinsic> CodeBlockBuilder<Intrinsic> {
         }
     }
 
+    /// Returns the collection of known variables.
+    #[must_use]
+    pub fn variables(&self) -> &HashMap<Symbol, Variable> {
+        &self.variables
+    }
+}
+
+macro_rules! op {
+    ($($(#[doc = $doc:expr])* $name:ident $variant:ident {$($field:ident: $type:ty),+$(,)?});+$(;)?) => {
+        $($(#[doc = $doc])*
+        pub fn $name(
+            &mut self,
+            $($field: impl Into<$type>,)+
+        ) {
+            self.push(Instruction::$variant {
+                $($field: $field.into(),)+
+            })
+        })+
+    };
+    ($($(#[doc = $doc:expr])* $name:ident $variant:ident ($($field:ident: $type:ty),+$(,)?));+$(;)?) => {
+        $($(#[doc = $doc])*
+        pub fn $name(
+            &mut self,
+            $($field: impl Into<$type>,)+
+        ) {
+            self.push(Instruction::$variant (
+                $( $field.into(),)+
+            ))
+        })+
+    };
+}
+
+macro_rules! unaryop {
+    ($($(#[doc = $doc:expr])* $name:ident $variant:ident);+$(;)?) => {
+        op!{$(
+            $(#[doc = $doc])*
+            $name $variant{value: LiteralOrSource, destination: Destination};
+        )+}
+    };
+}
+
+macro_rules! binop {
+    ($($(#[doc = $doc:expr])* $name:ident $variant:ident);+$(;)?) => {
+        op!{$(
+            $(#[doc = $doc])*
+            $name $variant{left: LiteralOrSource, right: LiteralOrSource, destination: Destination};
+        )+}
+    };
+}
+
+/// Builder like functions adding instructions skipping the need of pushing the instructions
+/// manually.
+impl<Intrinsic> CodeBlockBuilder<Intrinsic> {
+    binop! {
+        /// Adds `left` and `right` and places the result in `destination`.
+        ///
+        /// If this operation causes an overflow, [`Value::Void`] will be stored in
+        /// the destination instead.
+        add Add;
+        /// Subtracts `right` from `left` and places the result in `destination`.
+        ///
+        /// If this operation causes an overflow, [`Value::Void`] will be stored in
+        /// the destination instead.
+        sub Sub;
+        /// Multiply `left` by `right` and places the result in `destination`.
+        ///
+        /// If this operation causes an overflow, [`Value::Void`] will be stored in
+        /// the destination instead.
+        multiply Multiply;
+        /// Divides `left` by `right` and places the result in `destination`.
+        ///
+        /// If this operation causes an overflow, [`Value::Void`] will be stored in
+        /// the destination instead.
+        divide Divide;
+        /// Performs a logical and of `left` and `right` and places the result in
+        /// `destination`. This operation always results in a [`Value::Boolean`].
+        ///
+        /// `left` and `right` will be checked for thruthyness. If both are truthy,
+        /// this operation will store true in `destination`. Otherwise, false will
+        /// be stored.
+        ///
+        /// # Short Circuiting
+        ///
+        /// This instruction will not evaluate `right`'s truthiness if `left` is
+        /// false.
+        logical_and LogicalAnd;
+        /// Performs a logical or of `left` and `right` and places the result in
+        /// `destination`. This operation always results in a [`Value::Boolean`].
+        ///
+        /// `left` and `right` will be checked for thruthyness. If either are
+        /// truthy, this operation will store true in `destination`. Otherwise,
+        /// false will be stored.
+        ///
+        /// # Short Circuiting
+        ///
+        /// This instruction will not evaluate `right`'s truthiness if `left` is
+        /// true.
+        logical_or LogicalOr;
+        /// Performs a logical exclusive-or of `left` and `right` and places the result in
+        /// `destination`. This operation always results in a [`Value::Boolean`].
+        ///
+        /// `left` and `right` will be checked for thruthyness. If one is truthy and
+        /// the other is not, this operation will store true in `destination`.
+        /// Otherwise, false will be stored.
+        logical_xor LogicalXor;
+    }
+    unaryop! {
+        /// Performs a logical `not` operation for `value`, storing the result in
+        /// `destination`.
+        ///
+        /// If the value is truthy, false will be stored in the destination. If the
+        /// value is falsey, true will be stored in the destination.
+        logical_not LogicalNot
+    }
+    binop! {
+        /// Performs a bitwise and of `left` and `right` and places the result in
+        /// `destination`. This operation always results in a [`Value::Integer`].
+        ///
+        /// If either `left` or `right ` cannot be coerced to an integer, a fault will be
+        /// returned.
+        ///
+        /// The result will have each bit set based on whether the corresponding bit
+        /// in both `left` and `right` are both 1.
+        bitwise_and BitwiseAnd;
+        /// Performs a bitwise or of `left` and `right` and places the result in
+        /// `destination`. This operation always results in a [`Value::Integer`].
+        ///
+        /// If either `left` or `right ` cannot be coerced to an integer, a fault will be
+        /// returned.
+        ///
+        /// The result will have each bit set based on whether either corresponding bit
+        /// in `left` or `right` are 1.
+        bitwise_or BitwiseOr;
+        /// Performs a bitwise exclusive-or of `left` and `right` and places the
+        /// result in `destination`. This operation always results in a
+        /// [`Value::Integer`].
+        ///
+        /// If either `left` or `right ` cannot be coerced to an integer, a fault will be
+        /// returned.
+        ///
+        /// The result will have each bit set based on whether only one
+        /// corresponding bit in either `left` or `right` are 1.
+        bitwise_xor BitwiseXor;
+    }
+    unaryop! {
+        /// Performs a bitwise not operation for `value`, storing the result in
+        /// `destination`. This operation always results in a [`Value::Integer`].
+        ///
+        /// If `value` cannot be coerced to an integer, a fault will be returned.
+        ///
+        /// The result will be `value` with each bit flipped.
+        bitwise_not BitwiseNot;
+    }
+    op! {
+        /// Converts a value to another type, storing the result in `destination`.
+        ///
+        /// If `value` cannot be converted, a fault will be returned.
+        convert Convert {
+            value: LiteralOrSource,
+            kind: ValueKind,
+            destination: Destination,
+        };
+    }
+    binop! {
+        /// Performs a bitwise shift left of `left` by `right` bits, storing
+        /// the result in `destination`.
+        ///
+        /// This operation requires both operands to be integers. If either are not
+        /// integers, a fault will be returned.
+        shift_left ShiftLeft;
+        /// Performs a bitwise shift right of `left` by `right` bits, storing the
+        /// result in `destination`.
+        ///
+        /// This operation requires both operands to be integers. If either are not
+        /// integers, a fault will be returned.
+        shift_right ShiftRight;
+    }
+    op! {
+        /// Checks [`condition.is_truthy()`](Value::is_truthy), jumping to the
+        /// target label if false.
+        ///
+        /// If truthy, the virtual machine continues executing the next instruction
+        /// in sequence.
+        ///
+        /// If not truthy, the virtual machine jumps to label `false_jump_to`.
+        ///
+        /// Consider using [`begin_if()`](Self::begin_if) instead for a more convinient
+        /// option.
+        jump_if_false If {
+            condition: LiteralOrSource,
+            false_jump_to: Label,
+        };
+    }
+    /// Begins an if block with the given condition.
+    ///
+    /// If the condition is the result of a comparsion consider
+    /// [`begin_if_comparison()`](Self::begin_if_comparison).
+    pub fn begin_if(&mut self, condition: impl Into<LiteralOrSource>) -> If<'_, Intrinsic> {
+        let label = self.new_label();
+        self.jump_if_false(condition, &label);
+        If {
+            label: Some(label),
+            code_block: self,
+        }
+    }
+    op! {
+        /// Jump execution to the address of the given [`Label`].
+        ///
+        /// Consider using [`begin_loop()`](Self::begin_loop) instead of using
+        /// `jump_to` for looping.
+        jump_to JumpTo(label: Label);
+        /// Labels the next instruction with the given [`Label`].
+        label Label(label: Label);
+    }
     /// Begins a loop with the given `name`. The result of the loop will be
     /// stored in `result`. If the loop does not return a result, the
     /// destination will be untouched.
@@ -983,7 +1218,24 @@ impl<Intrinsic> CodeBlockBuilder<Intrinsic> {
             _intrinsic: PhantomData,
         }
     }
-
+    op! {
+        /// Compares `left` and `right` using `comparison` to evaluate a boolean
+        /// result.
+        ///
+        /// If [`CompareAction::Store`] is used, the boolean result will be stored
+        /// in the provided destination.
+        ///
+        /// If [`CompareAction::JumpIfFalse`] is used and the result is false,
+        /// execution will jump to the label specified. If the result is true, the
+        /// next instruction will continue executing. Consider `begin_if_comparison`
+        /// for more convinient jumping.
+        compare Compare {
+            comparison: Comparison,
+            left: LiteralOrSource,
+            right: LiteralOrSource,
+            action: CompareAction,
+        }
+    }
     /// Begins an if block with the given comparison.
     pub fn begin_if_comparison(
         &mut self,
@@ -1003,24 +1255,117 @@ impl<Intrinsic> CodeBlockBuilder<Intrinsic> {
             code_block: self,
         }
     }
-
-    /// Begins an if block with the given condition.
-    pub fn begin_if(&mut self, condition: impl Into<LiteralOrSource>) -> If<'_, Intrinsic> {
-        let label = self.new_label();
-        self.push(Instruction::If {
-            condition: condition.into(),
-            false_jump_to: label.clone(),
-        });
-        If {
-            label: Some(label),
-            code_block: self,
+    op! {
+        /// Pushes a value to the stack.
+        push_to_stack Push(value: LiteralOrSource)
+    }
+    op! {
+        /// Loads a `value` into a variable.
+        load Load {
+            value: LiteralOrSource,
+            variable: Variable,
         }
     }
-
-    /// Returns the collection of known variables.
-    #[must_use]
-    pub fn variables(&self) -> &HashMap<Symbol, Variable> {
-        &self.variables
+    // I have to admit, part of having two functions for return was, that I didn't know how
+    // to name a single function.
+    /// Returns a value from the current stack frame.
+    pub fn return_value(&mut self, value: impl Into<LiteralOrSource>) {
+        self.push(Instruction::Return(Some(value.into())));
+    }
+    /// Returns from the current stack frame without a value.
+    pub fn return_void(&mut self) {
+        self.push(Instruction::Return(None));
+    }
+    /// Calls a function.
+    ///
+    /// When calling a function, values on the stack are "passed" to the
+    /// function being pushed to the stack before calling the function. To
+    /// ensure the correct number of arguments are taken even when variable
+    /// argument lists are supported, the number of arguments is passed and
+    /// controls the baseline of the stack.
+    ///
+    /// Upon returning from a function call, the arguments will no longer be on
+    /// the stack. The value returned from the function (or [`Value::Void`] if
+    /// no value was returned) will be placed in `destination`.
+    ///
+    /// There is also [`recurse()`](Self::recurse) always recursing the current function.
+    pub fn call(
+        &mut self,
+        function: impl Into<Symbol>,
+        arg_count: usize,
+        destination: impl Into<Destination>,
+    ) {
+        self.push(Instruction::Call {
+            function: Some(function.into()),
+            arg_count,
+            destination: destination.into(),
+        });
+    }
+    /// Calls the current function recursively.
+    ///
+    /// When calling a function, values on the stack are "passed" to the
+    /// function being pushed to the stack before calling the function. To
+    /// ensure the correct number of arguments are taken even when variable
+    /// argument lists are supported, the number of arguments is passed and
+    /// controls the baseline of the stack.
+    ///
+    /// Upon returning from a function call, the arguments will no longer be on
+    /// the stack. The value returned from the function (or [`Value::Void`] if
+    /// no value was returned) will be placed in `destination`.
+    pub fn recurse(&mut self, arg_count: usize, destination: impl Into<Destination>) {
+        self.push(Instruction::Call {
+            function: None,
+            arg_count,
+            destination: destination.into(),
+        });
+    }
+    /// Calls an intrinsic runtime function.
+    ///
+    /// When calling a function, values on the stack are "passed" to the
+    /// function being pushed to the stack before calling the function. To
+    /// ensure the correct number of arguments are taken even when variable
+    /// argument lists are supported, the number of arguments is passed and
+    /// controls the baseline of the stack.
+    ///
+    /// Upon returning from a function call, the arguments will no longer be on
+    /// the stack. The value returned from the function (or [`Value::Void`] if
+    /// no value was returned) will be placed in `destination`.
+    pub fn call_intrinsic(
+        &mut self,
+        intrinsic: impl Into<Intrinsic>,
+        arg_count: usize,
+        destination: impl Into<Destination>,
+    ) {
+        self.push(Instruction::CallIntrinsic {
+            intrinsic: intrinsic.into(),
+            arg_count,
+            destination: destination.into(),
+        });
+    }
+    /// Calls a function by name on a value.
+    ///
+    /// When calling a function, values on the stack are "passed" to the
+    /// function being pushed to the stack before calling the function. To
+    /// ensure the correct number of arguments are taken even when variable
+    /// argument lists are supported, the number of arguments is passed and
+    /// controls the baseline of the stack.
+    ///
+    /// Upon returning from a function call, the arguments will no longer be on
+    /// the stack. The value returned from the function (or [`Value::Void`] if
+    /// no value was returned) will be placed in `destination`.
+    pub fn call_instance(
+        &mut self,
+        target: impl Into<LiteralOrSource>,
+        name: impl Into<Symbol>,
+        arg_count: usize,
+        destination: impl Into<Destination>,
+    ) {
+        self.push(Instruction::CallInstance {
+            target: target.into(),
+            name: name.into(),
+            arg_count,
+            destination: destination.into(),
+        });
     }
 }
 
@@ -1060,7 +1405,7 @@ impl<'a, Intrinsic> If<'a, Intrinsic> {
     /// Ends the `if` block, and starts an `else` block.
     pub fn begin_else(mut self) -> Else<'a, Intrinsic> {
         let label = self.code_block.new_label();
-        self.code_block.push(Instruction::JumpTo(label.clone()));
+        self.code_block.jump_to(&label);
         self.code_block.label(
             self.label.take().expect(
                 "should only be None if `.else` or `.end` was called, both consuming self.",
@@ -1096,7 +1441,7 @@ impl<Intrinsic> DerefMut for Else<'_, Intrinsic> {
 
 impl<T> Drop for Else<'_, T> {
     fn drop(&mut self) {
-        self.code_block.label(self.label.clone());
+        self.code_block.label(&self.label);
     }
 }
 

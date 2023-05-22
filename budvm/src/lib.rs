@@ -1133,6 +1133,12 @@ impl ValueKind {
     }
 }
 
+impl From<&ValueKind> for ValueKind {
+    fn from(value: &ValueKind) -> Self {
+        value.clone()
+    }
+}
+
 impl<'a> From<&'a str> for ValueKind {
     fn from(kind: &'a str) -> Self {
         match kind {
@@ -1151,6 +1157,17 @@ impl From<Symbol> for ValueKind {
             "Real" => ValueKind::Real,
             "Boolean" => ValueKind::Boolean,
             _ => ValueKind::Dynamic(kind),
+        }
+    }
+}
+
+impl From<&Symbol> for ValueKind {
+    fn from(kind: &Symbol) -> Self {
+        match kind.as_str() {
+            "Integer" => ValueKind::Integer,
+            "Real" => ValueKind::Real,
+            "Boolean" => ValueKind::Boolean,
+            _ => ValueKind::Dynamic(kind.clone()),
         }
     }
 }
