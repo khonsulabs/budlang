@@ -4156,6 +4156,23 @@
 <a href="#4156" id="4156">4156</a>
 <a href="#4157" id="4157">4157</a>
 <a href="#4158" id="4158">4158</a>
+<a href="#4159" id="4159">4159</a>
+<a href="#4160" id="4160">4160</a>
+<a href="#4161" id="4161">4161</a>
+<a href="#4162" id="4162">4162</a>
+<a href="#4163" id="4163">4163</a>
+<a href="#4164" id="4164">4164</a>
+<a href="#4165" id="4165">4165</a>
+<a href="#4166" id="4166">4166</a>
+<a href="#4167" id="4167">4167</a>
+<a href="#4168" id="4168">4168</a>
+<a href="#4169" id="4169">4169</a>
+<a href="#4170" id="4170">4170</a>
+<a href="#4171" id="4171">4171</a>
+<a href="#4172" id="4172">4172</a>
+<a href="#4173" id="4173">4173</a>
+<a href="#4174" id="4174">4174</a>
+<a href="#4175" id="4175">4175</a>
 </pre><pre class="rust"><code><span class="attr">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -5291,6 +5308,12 @@
     }
 }
 
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>ValueKind&gt; <span class="kw">for </span>ValueKind {
+    <span class="kw">fn </span>from(value: <span class="kw-2">&amp;</span>ValueKind) -&gt; <span class="self">Self </span>{
+        value.clone()
+    }
+}
+
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; <span class="kw">for </span>ValueKind {
     <span class="kw">fn </span>from(kind: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; <span class="self">Self </span>{
         <span class="kw">match </span>kind {
@@ -5309,6 +5332,17 @@
             <span class="string">&quot;Real&quot; </span>=&gt; ValueKind::Real,
             <span class="string">&quot;Boolean&quot; </span>=&gt; ValueKind::Boolean,
             <span class="kw">_ </span>=&gt; ValueKind::Dynamic(kind),
+        }
+    }
+}
+
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Symbol&gt; <span class="kw">for </span>ValueKind {
+    <span class="kw">fn </span>from(kind: <span class="kw-2">&amp;</span>Symbol) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>kind.as_str() {
+            <span class="string">&quot;Integer&quot; </span>=&gt; ValueKind::Integer,
+            <span class="string">&quot;Real&quot; </span>=&gt; ValueKind::Real,
+            <span class="string">&quot;Boolean&quot; </span>=&gt; ValueKind::Boolean,
+            <span class="kw">_ </span>=&gt; ValueKind::Dynamic(kind.clone()),
         }
     }
 }
