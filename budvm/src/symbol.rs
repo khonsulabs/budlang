@@ -66,6 +66,12 @@ impl PartialEq for Symbol {
     }
 }
 
+impl From<&Symbol> for Symbol {
+    fn from(value: &Symbol) -> Self {
+        value.clone()
+    }
+}
+
 #[derive(Debug, Clone)]
 struct SharedData(Arc<Data>);
 
